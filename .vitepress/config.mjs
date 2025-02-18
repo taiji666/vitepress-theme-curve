@@ -3,6 +3,7 @@ import { createRssFile } from "./theme/utils/generateRSS.mjs";
 import { withPwa } from "@vite-pwa/vitepress";
 import {
   getAllPosts,
+  getAllRepository,
   getAllType,
   getAllCategories,
   getAllArchives,
@@ -13,10 +14,9 @@ import markdownConfig from "./theme/utils/markdownConfig.mjs";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import path from "path";
-
 // 获取全局数据
 const postData = await getAllPosts();
-
+const RepositoryData = await getAllRepository();
 // 获取主题配置
 const themeConfig = await getThemeConfig();
 
@@ -31,7 +31,7 @@ export default withPwa(
     // 最后更新时间戳
     lastUpdated: true,
     // 主题
-    appearance: "dark",
+    appearance: 'light',
     // Head
     head: themeConfig.inject.header,
     // sitemap
@@ -43,6 +43,7 @@ export default withPwa(
       ...themeConfig,
       // 必要数据
       postData: postData,
+      RepositoryData:RepositoryData,
       tagsData: getAllType(postData),
       categoriesData: getAllCategories(postData),
       archivesData: getAllArchives(postData),
@@ -51,7 +52,7 @@ export default withPwa(
     markdown: {
       math: true,
       lineNumbers: true,
-      toc: { level: [1, 2, 3] },
+      toc: { level: [1, 2, 3, 4] },
       image: {
         lazyLoading: true,
       },

@@ -5,6 +5,7 @@ import { enhanceAppWithTabs } from "vitepress-plugin-tabs/client";
 import LazyLoader from "@/components/LazyLoader.vue";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 
+
 // 根组件
 import App from "@/App.vue";
 // 全局样式
@@ -27,6 +28,7 @@ const Theme = {
     // 挂载
     app.use(pinia);
     app.use(InstantSearch);
+    // 注入目录结构数据
     app.component("LazyLoader", LazyLoader);
     // 插件
     enhanceAppWithTabs(app);

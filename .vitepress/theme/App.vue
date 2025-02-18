@@ -8,7 +8,7 @@
   <!-- 导航栏 -->
   <Nav />
   <!-- 主内容 -->
-  <main :class="['mian-layout', { loading: loadingStatus, 'is-post': isPostPage }]">
+  <main :class="['mian-layout', { loading: loadingStatus, 'is-post': isPostPage , 'is-repository': isRepositoryPage }]">
     <!-- 404 -->
     <NotFound v-if="page.isNotFound" />
     <!-- 首页 -->
@@ -17,6 +17,8 @@
     <template v-else>
       <!-- 文章页面 -->
       <Post v-if="isPostPage" />
+      <!-- 书库页面 -->
+      <Repository v-if="isRepositoryPage" />
       <!-- 普通页面 -->
       <Page v-else-if="!page.isNotFound" />
     </template>
@@ -58,6 +60,10 @@ const rightMenuRef = ref(null);
 const isPostPage = computed(() => {
   const routePath = decodeURIComponent(route.path);
   return routePath.includes("/posts/");
+});
+const isRepositoryPage = computed(() => {
+  const routePath = decodeURIComponent(route.path);
+  return routePath.includes("/repository/");
 });
 
 // 开启右键菜单
@@ -160,8 +166,8 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   padding: 1rem 2rem;
   // 手动实现加载动画
-  animation: show 0.5s forwards;
-  animation-duration: 0.5s;
+  animation: show 0.2s forwards;
+  animation-duration: 0.2s;
   display: block;
   &.loading {
     display: none;
@@ -169,6 +175,9 @@ onBeforeUnmount(() => {
   @media (max-width: 768px) {
     padding: 1rem 1.5rem;
     &.is-post {
+      padding: 0;
+    }
+    &.is-repository {
       padding: 0;
     }
   }

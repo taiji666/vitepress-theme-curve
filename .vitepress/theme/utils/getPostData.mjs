@@ -20,7 +20,19 @@ const getPostMDFilePaths = async () => {
     throw error;
   }
 };
-
+const getPagesMDFilePaths = async () => {
+  try {
+    // 获取所有 md 文件路径
+    let paths = await globby(["**.md"], {
+      ignore: ["node_modules",  ".vitepress", "README.md"],
+    });
+    // 过滤路径，只包括 'pages' 目录下的文件
+    return paths.filter((item) => item.includes("pages/repository/"));
+  } catch (error) {
+    console.error("获取文章路径时出错:", error);
+    throw error;
+  }
+};
 /**
  * 基于 frontMatter 日期降序排序文章
  * @param {Object} obj1 - 第一篇文章对象
@@ -47,7 +59,10 @@ const comparePostPriority = (a, b) => {
 export const getAllPosts = async () => {
   try {
     // 获取所有 Markdown 文件的路径
-    let paths = await getPostMDFilePaths();
+    let Postpaths = await getPostMDFilePaths();
+    let Pagespaths = await getPagesMDFilePaths();
+    let paths = Postpaths.concat(Pagespaths);
+    console.log("path\n",paths);
     // 读取和处理每个 Markdown 文件的内容
     let posts = await Promise.all(
       paths.map(async (item) => {
@@ -93,7 +108,55 @@ export const getAllPosts = async () => {
     throw error;
   }
 };
-
+export const getAllRepository = async () => {
+  try {
+    // 获取所有 Markdown 文件的路径
+    let paths = await getPagesMDFilePaths();
+    // 读取和处理每个 Markdown 文件的内容
+    let posts = await Promise.all(
+      paths.map(async (item) => {
+        try {
+          // 读取文件内容
+          const content = await fs.readFile(item, "utf-8");
+          // 文件的元数据
+          const stat = await fs.stat(item);
+          // 获取文件创建时间和最后修改时间
+          const { birthtimeMs, mtimeMs } = stat;
+          // 解析 front matter
+          const { data } = matter(content);
+          const { title, date, categories, description, tags, top, cover } = data;
+          // 计算文章的过期天数
+          const expired = Math.floor(
+            (new Date().getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24),
+          );
+          // 返回文章对象
+          return {
+            id: generateId(item),
+            title: title || "未命名文章",
+            date: date ? new Date(date).getTime() : birthtimeMs,
+            lastModified: mtimeMs,
+            expired,
+            tags,
+            categories,
+            description,
+            regularPath: `/${item.replace(".md", ".html")}`,
+            top,
+            cover,
+          };
+        } catch (error) {
+          console.error(`处理文章文件 '${item}' 时出错:`, error);
+          throw error;
+        }
+      }),
+    );
+    // 根据日期排序文章
+    posts.sort(comparePostPriority);
+    return posts;
+  } catch (error) {
+    console.error("获取所有文章时出错:", error);
+    throw error;
+  }
+};
 /**
  * 获取所有标签及其相关文章的统计信息
  * @param {Object[]} postData - 包含文章信息的数组

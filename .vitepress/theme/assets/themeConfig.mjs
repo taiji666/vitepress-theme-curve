@@ -1,29 +1,79 @@
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 获取当前脚本的目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 定义要扫描的目录
+const repositoryPath = path.join(__dirname, '../../../pages/repository');
+/**
+ * 扫描指定目录下的文件和文件夹，并返回一个包含文件和文件夹信息的数组。
+ * @param {string} dirPath 要扫描的目录路径。
+ * @returns {Promise<Array<{text: string, link: string, icon?: string}>>} 包含文件和文件夹信息的数组。
+ */
+async function scanRepository(dirPath) {
+  try {
+    const files = await fs.promises.readdir(dirPath);
+    console.log(files);
+    const Ritems = [];
+    for (const file of files) {
+      const filePath = path.join(dirPath, file);
+      const stats = await fs.promises.stat(filePath);
+
+      if (stats.isDirectory()) {
+        // 如果是文件，则添加到 items 数组中，link 指向该文件
+        Ritems.push({
+          text: file, // 文件名作为 text
+          link: `/pages/repository/${file}`, // 文件路径作为 link
+          icon: 'fish', // 可以设置一个默认的 icon
+        });}
+    //   } else if (stats.isDirectory()) {
+    //     // 如果是文件夹，则添加到 items 数组中，link 指向该文件夹
+    //     items.push({
+    //       text: file, // 文件夹名作为 text
+    //       link: `/pages/repository/${file}`, // 文件夹路径作为 link
+    //       icon: 'folder', // 可以设置一个默认的 icon
+    //     });
+    //   }
+    // }
+  }    
+  console.log(Ritems);
+  return Ritems;
+}catch (error) {
+    console.error('Error scanning repository:', error);
+    return []; // 发生错误时返回一个空数组
+  }
+}
+
 // 主题配置
 export const themeConfig = {
   // 站点信息
   siteMeta: {
     // 站点标题
-    title: "Curve",
+    title: "Time",
     // 站点描述
-    description: "Hello World",
+    description: "Where is time",
     // 站点logo
-    logo: "/images/logo/logo.webp",
+    logo: "/images/logo/favicon.svg",
     // 站点地址
-    site: "https://blog.imsyy.top",
+    site: "https://www.doit.ip-ddns.com",
     // 语言
     lang: "zh-CN",
     // 作者
     author: {
       name: "Admin",
-      cover: "/images/logo/logo.webp",
-      email: "114514@gmail.com",
-      link: "https://www.imsyy.top",
+      cover: "/images/logo/favicon.webp",
+      email: "hellowangdada@outlook.com",
+      link: "https://www.doit.ip-ddns.com/",
     },
   },
   // 备案信息
-  icp: "萌ICP备114514号",
+  // icp: "萌ICP备114514号",
   // 建站日期
-  since: "2020-07-28",
+  since: "2025-07-28",
   // 每页文章数据
   postSize: 8,
   // inject
@@ -40,7 +90,7 @@ export const themeConfig = {
           rel: "alternate",
           type: "application/rss+xml",
           title: "RSS",
-          href: "https://blog.imsyy.top/rss.xml",
+          href: "https://www.doit.ip-ddns.com/rss.xml",
         },
       ],
       // 预载 CDN
@@ -127,11 +177,8 @@ export const themeConfig = {
       ],
     },
     {
-      text: "友链",
-      items: [
-        { text: "友链鱼塘", link: "/pages/friends", icon: "fish" },
-        { text: "友情链接", link: "/pages/link", icon: "people" },
-      ],
+      text: "文档库",
+      items: await scanRepository(repositoryPath),
     },
     {
       text: "我的",
@@ -152,11 +199,11 @@ export const themeConfig = {
           name: "主站",
           url: "/",
         },
-        {
-          icon: "/images/logo/logo.webp",
-          name: "博客镜像站",
-          url: "https://blog-backup.imsyy.top/",
-        },
+        // {
+        //   icon: "/images/logo/logo.webp",
+        //   name: "博客镜像站",
+        //   url: "https://blog-backup.imsyy.top/",
+        // },
       ],
     },
     {
@@ -299,19 +346,19 @@ export const themeConfig = {
           { text: "版权协议", link: "/pages/cc" },
         ],
       },
-      {
-        text: "服务",
-        items: [
-          { text: "站点状态", link: "https://status.imsyy.top/", newTab: true },
-          { text: "一个导航", link: "https://nav.imsyy.top/", newTab: true },
-          { text: "站点订阅", link: "https://blog.imsyy.top/rss.xml", newTab: true },
-          {
-            text: "反馈投诉",
-            link: "https://eqnxweimkr5.feishu.cn/share/base/form/shrcnCXCPmxCKKJYI3RKUfefJre",
-            newTab: true,
-          },
-        ],
-      },
+      // {
+      //   text: "服务",
+      //   items: [
+      //     { text: "站点状态", link: "https://status.imsyy.top/", newTab: true },
+      //     { text: "一个导航", link: "https://nav.imsyy.top/", newTab: true },
+      //     { text: "站点订阅", link: "https://blog.imsyy.top/rss.xml", newTab: true },
+      //     {
+      //       text: "反馈投诉",
+      //       link: "https://eqnxweimkr5.feishu.cn/share/base/form/shrcnCXCPmxCKKJYI3RKUfefJre",
+      //       newTab: true,
+      //     },
+      //   ],
+      // },
     ],
   },
   // 评论
@@ -439,3 +486,5 @@ export const themeConfig = {
     "51la": "",
   },
 };
+
+console.log(themeConfig.nav[2].items);
