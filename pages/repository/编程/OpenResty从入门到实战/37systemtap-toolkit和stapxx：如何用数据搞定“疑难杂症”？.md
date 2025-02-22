@@ -1,10 +1,12 @@
 ---
 title: 37systemtap-toolkit和stapxx：如何用数据搞定“疑难杂症”？
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             37 systemtap-toolkit和stapxx：如何用数据搞定“疑难杂症”？
                             你好，我是温铭。
+```
 
 正如上节课介绍过的，作为服务端开发工程师，我们并不会对动态调试的工具集做深入的学习，大都是停留在使用的这个层面上，最多去编写一些简单的 stap 脚本。更底层的，比如 CPU 缓存、体系结构、编译器等，那就是性能工程师的领域了。
 
@@ -25,25 +27,33 @@ ngx-lua-shdict 这个工具，可以分析 Nginx 的共享内存字典，并且�
 下面是一个从共享内存字典中获取数据的命令行示例：
 
 # 假设 nginx worker pid 是 5050
+```bash
 $ ./ngx-lua-shdict -p 5050 -f --dict dogs --key Jim --luajit20
 Tracing 5050 (/opt/nginx/sbin/nginx)...
+```
 
+```text
 type: LUA_TBOOLEAN
 value: true
 expires: 1372719243270
 flags: 0xa
+```
 
 
 类似的，你可以用 -w选项，来追踪指定 key 的字典写操作：
 
+```text
 $./ngx-lua-shdict -p 5050 -w --key Jim --luajit20
 Tracing 5050 (/opt/nginx/sbin/nginx)...
+```
 
 Hit Ctrl-C to end
 
+```text
 set Jim exptime=4626322717216342016
 replace Jim exptime=4626322717216342016
 ^C
+```
 
 
 让我们看看这个工具是怎么实现的吧。ngx-lua-shdict 是一个 perl 的脚本，但具体的实现和 perl 并没有关系，perl 只是被用来生成了 stap 脚本并运行起来：
@@ -58,24 +68,30 @@ probe process("$nginx_path").function("ngx_http_lua_shdict_set_helper")
 
 这就是我们在上节课中提到的探针probe，探测的是 ngx_http_lua_shdict_set_helper 这个函数。而这个函数的调用，都是在 lua-nginx-module 模块的 lua-nginx-module/src/ngx_http_lua_shdict.c 文件中：
 
+```text
 static int
 ngx_http_lua_shdict_add(lua_State *L)
 {
 return ngx_http_lua_shdict_set_helper(L, NGX_HTTP_LUA_SHDICT_ADD);
 }
+```
 
+```text
 static int
 ngx_http_lua_shdict_safe_add(lua_State *L)
 {
 return ngx_http_lua_shdict_set_helper(L, NGX_HTTP_LUA_SHDICT_ADD
+```
 |NGX_HTTP_LUA_SHDICT_SAFE_STORE);
 }
 
+```text
 static int
 ngx_http_lua_shdict_replace(lua_State *L)
 {
 return ngx_http_lua_shdict_set_helper(L, NGX_HTTP_LUA_SHDICT_REPLACE);
 }
+```
 
 
 这样，我们只要探测这个函数，就可以追踪到共享字典的所有操作了。
@@ -90,32 +106,39 @@ on CPU 和 off CPU
 
 例如，我们可以用下列代码，对一个正在运行的 Nginx worker 进程（PID 是 8736）采样 5 秒钟：
 
+```bash
 $ ./sample-bt -p 8736 -t 5 -u > a.bt
 WARNING: Tracing 8736 (/opt/nginx/sbin/nginx) in user-space only...
 WARNING: Missing unwind data for module, rerun with 'stap -d stap_df60590ce8827444bfebaf5ea938b5a_11577'
 WARNING: Time's up. Quitting now...(it may take a while)
 WARNING: Number of errors: 0, skipped probes: 24
+```
 
 
 它输出的结果文件 a.bt， 可以使用 FlameGraph 工具集来生成火焰图:
 
+```text
 stackcollapse-stap.pl a.bt > a.cbt
 flamegraph.pl a.cbt > a.svg
+```
 
 
 这里的a.svg ，就是生成的火焰图，你可以用浏览器打开查看。不过要注意，在采样期间，我们需要保持一定的请求压力，否则采样数为 0 的话，就没办法生成火焰图了。
 
 接着我们再来看下如何采样 off CPU，你需要使用的脚本是 systemtap-toolkit 中的 sample-bt-off-cpu。它的使用方法和 sample-bt 类似，我也写在了下面的代码中：
 
+```bash
 $ ./sample-bt-off-cpu -p 10901 -t 5 > a.bt
 WARNING: Tracing 10901 (/opt/nginx/sbin/nginx)...
 WARNING: _stp_read_address failed to access memory location
 WARNING: Time's up. Quitting now...(it may take a while)
 WARNING: Number of errors: 0, skipped probes: 23
+```
 
 
 在stapxx 中，分析延迟的工具是epoll-loop-blocking-distr，它会对指定的用户进程进行采样，并输出连续的 epoll_wait 系统调用之间的延迟分布：
 
+```bash
 $ ./samples/epoll-loop-blocking-distr.sxx -x 19647 --arg time=60
 Start tracing 19647...
 Please wait for 60 seconds.
@@ -136,6 +159,7 @@ value |-------------------------------------------------- count
  1024 |                                                       2
  2048 |                                                       0
  4096 |                                                       0
+```
 
 
 你可以看到，这个输出结果显示，绝大部分延迟都小于 1 毫秒，但也有少数是在 200 毫秒以上的，这些就是需要关注的。
@@ -153,20 +177,28 @@ value |-------------------------------------------------- count
 # making the ./stap++ tool visible in PATH:
     $ export PATH=$PWD:$PATH
 
+```markdown
     # assuming an nginx worker process's pid is 27327
     $ ./samples/ngx-single-req-latency.sxx -x 27327
     Start tracing process 27327 (/opt/nginx/sbin/nginx)...
+```
 
+```text
     POST /api_json
         total: 143596us, accept() ~ header-read: 43048us, rewrite: 8us, pre-access: 7us, access: 6us, content: 100507us
         upstream: connect=29us, time-to-first-byte=99157us, read=103us
+```
 
+```bash
     $ ./samples/ngx-single-req-latency.sxx -x 27327
     Start tracing process 27327 (/opt/nginx/sbin/nginx)...
+```
 
+```text
     GET /robots.txt
         total: 61198us, accept() ~ header-read: 33410us, rewrite: 7us, pre-access: 7us, access: 5us, content: 27750us
         upstream: connect=30us, time-to-first-byte=18955us, read=96us
+```
 
 
 这个工具会跟踪它启动后遇到的第一个请求。输出的内容和 opentracing 非常类似，你甚至可以把 systemtap-toolkit 和 stapxx ，当作是 OpenResty 中 APM（应用性能管理）的非侵入版本。

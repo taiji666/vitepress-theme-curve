@@ -1,9 +1,9 @@
 ---
 title: 27性能：如何理解JavaScript中的并行、并发？（上）
-date: 1739706057.6064274
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
-                            27 性能：如何理解JavaScript中的并行、并发？（上）
+# 27 性能：如何理解JavaScript中的并行、并发？（上）
                             你好，我是石川。
 
 在上一个单元，我们在JS之道的编程模式和JS之法的语法、算法的基础上，又学习了JS之术的设计模式，从今天开始，我们将开启JS之术非功能性优化篇。从前面的学习中，我们可以看到，无论是编程模式、算法还是设计模式都不是独立存在，而是一环扣一环的。那我们今天要讲到的并行、并发，其实也是延续上一讲提到的异步编程模式。
@@ -14,25 +14,15 @@ categories: [JavaScript进阶实战课]
 
 在说到JavaScript中的并发和并行前，我们先来看看程序、线程和进程之间的关系。在一个程序当中，可以有多个进程。在一个进程里，也可以有多个线程。内存在进程间是不共享的，而在线程里，是可以共享的。通过下图，你可以有更直观的理解。
 
-
-
 并发是同一时间段进行的任务，而并行是两个在同一时刻进行的任务。除非是多核CPU，否则如果只有一个CPU的话，多线程本身并不支持并行，而只能通过线程间的切换执行来做到并发。从下图中，你可以对并发和并行有更直观的认识。
-
-
 
 前后端语言如何支持线程并行开发
 
 如果单从语言的层面来看，JavaScript本身没有线程的规范，也没有内置的对外暴露给开发者用来创建线程的接口。所以JavaScript本身的执行是单线程的，也就是说JavaScript的执行环境中只有一个虚机、指令指针和垃圾回收器。即使是在不同的 realms 中，如浏览器端不同的iframe或服务器端不同的context中，也都只有一条JavaScript指令在同一时间内执行。以此我们可以看出，JavaScript本身并不是多线程友好的。
 
-
-
 这一点和其它的前端语言很不同，我们知道在iOS、安卓和unity的开发中，开发者分别有GradeCentralDispatch、WorkManager和Job System这些支持并行开发的强大工具包。之所以这些语言不仅支持多线程，还助力并行的开发，是因为这些语言所编写的程序都和前端用户有深度的交互。特别在unity的例子里，需要大量的3D运算，所以必须非常重视性能，让应用快速地做出响应。JavaScript同样作为前端语言，在这方面对比其它的前端语言显得有些不足。
 
-
-
 和前端不同，在很多的后端高级语言，如Ruby或Python中，无论CPU是单核还是多核，线程都是被全局解释器锁（GIL，global interpreter lock）限制并行的，而只支持并发。所以在做多线程开发的时候，一定要注意并行是否受限制，因为如果并行受限，只允许并发的话，那么线程间切换的成本可能高于它带来的好处。在JavaScript的环境中，并没有限制线程的GIL锁，但是JS也有自己的限制，就是它会限制对象在线程间直接的共享，所以这从某个角度来讲也影响了线程在前端的使用。
-
-
 
 JavaScript中的多线程并行开发
 
@@ -58,6 +48,7 @@ JavaScript中用Web Worker支持并行
 
 要创建一个Web Worker非常简单，我们只需要类似下面的一个new语句。之后，如果可以通过postMessage在main.js和worker.js之间传递信息，双方也可以通过onMessage来接收来自对方的消息。
 
+```javascript
 // main.js
 var worker = new Worker('worker.js');
 worker.postMessage('Hello world');
@@ -71,20 +62,15 @@ self.onmessage = (msg) => {
   console.log('message from main', msg.data);
 }
 
+```
 
 在JavaScript中，有几种不同的工作线程，分别为dedicated worker、shared worker和service worker。我们可以分别来看看它们的作用。这里我们先来看看dedicated worker。
 
 dedicated worker 只在一个realm中可以使用。它也可以有很多的层级，但是如果层级过多，可能会引起逻辑的混乱，所以在使用上还是要注意。
 
-
-
 和dedicated worker相对的是 shared worker，顾名思义，如果说dedicated是专属的，那么shared则是可共享的，所以shared worker可以被不同的标签页、iframe和worker访问。但shared worker 也不是没有限制，它的限制是只能被在同源上跑的JavaScript访问。在概念上，shared worker是成立的，但是目前支持 shared worker 的虚机或浏览器非常少，并且几乎没法polyfill，所以在这里我们就不做深入的讲解了。
 
-
-
 最后，我们再来看看 service worker，它既然叫做服务，那就和后端有关。它的特点就是在前端的页面都关闭的情况下，也可以运行。我们之前一讲提到响应式设计模式的时候，说过的预缓存和服务器推送等概念，离不开service worker的身影。它可以在首次收到浏览器请求时将加载的和可以缓存的内容一同推送给前端做预缓存，当前端再次发起请求时，可以先看是否有缓存，只有在没有的情况下，再从服务端请求。通过这种模式，我们可以大大提高Web应用的性能。
-
-
 
 信息传递模式
 
@@ -104,6 +90,7 @@ JavaScript的设计是帧同步（lock step）的，也就是说在main.js所运
 
 比如如果我们需要传递的是下面这样一个带有参数的函数调用，在这个时候，我们需要先将函数调用转化为一个序列，也就是一个对应的是我们的本地调用远程过程调用，叫做PRC（Remote Procedure Call）。基于postMessage异步的特性，它返回的不是一个结果，而是一个await 的 promise。
 
+```javascript
 isOdd(3);
 is_odd|num:3
 
@@ -115,23 +102,23 @@ worker.onmessage = (result) => {
   // 'false'
 };
 
+```
 
 也就是说，在worker.js做完计算之后，会将结果返回。这时，会有另外一个问题，就是如果我们有很多个不同的请求，怎么能知道返回的结果和请求的对应关系呢？
 
-为了解决这个问题，我们可以用JSON格式的JSON-PRC。结构化拷贝算法支持除了Symbol以外的其它类型的原始数据，这里包含了布尔、null、undefined、数字、BigInt和我们用到的字符串。结构化拷贝算法也可以支持多种的数据结构，包括数组、字典和集合等。还有就是用来存储二进制数据的ArrayBuffer、ArrayBufferView和Blob也可以通过postMessage传递。ArrayBuffer也可以解决数据传递中性能的问题，但是函数（function）和（class）类是不能通过postMessage来传递的。
-
+```javascript
 // worker.postMessage
 {"jsonrpc": "2.0", "method": "isOdd", "params": [3], "id": 1}
 {"jsonrpc": "2.0", "method": "isEven", "params": [5], "id": 2}
 // worker.onmessage
 {"jsonrpc": "2.0", "result": "false", "id": 2}
 {"jsonrpc": "2.0", "result": "true", "id": 1}
-
-
+```
 命令和派发模式
 
 上面我们看到了请求和反馈间的映射，下面，我们再来看看命令和派发的映射。比如我们有两个功能，一个是判断奇数，另外一个是判断偶数，但是这两个数据是在两个不同代码路径上的，这个时候，我们也需要某种方式的映射。这里可以使用字典，或者更简单的对象结构也能够支持指令中这种映射关系。这种通过开发者自己实现的一个来保证指令派发的逻辑就叫做 command dispatcher 模式。
 
+```javascript
 var commands = {
   isOdd(num) { /*...*/ },
   isEven(num) { /*...*/ } 
@@ -143,7 +130,7 @@ function dispatch(method, args) {
   } 
   //...
 }
-
+```
 
 通过上述结构化拷贝算法，再加上请求和反馈，以及命令和派发模式，就可以通过 JS 引擎提供的 Web Worker 接口，在主线程和工作线程间实现信息的传递了。
 
@@ -156,7 +143,3 @@ function dispatch(method, args) {
 这道思考题也是下一讲的铺垫。我们课程中说，在信息传递层面，我们可以使用ArrayBuffer来提高性能，你知道它是如何做到的以及背后的原理吗?
 
 欢迎在留言区分享你的答案、交流学习心得或者提出问题，如果觉得有收获，也欢迎你把今天的内容分享给更多的朋友。我们下节课再见！
-
-                        
-                        
-                            

@@ -1,18 +1,20 @@
 ---
 title: 31pdb&amp;cProfile：调试和性能分析的法宝
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             31 pdb & cProfile：调试和性能分析的法宝
                             你好，我是景霄。
+```
 
 在实际生产环境中，对代码进行调试和性能分析，是一个永远都逃不开的话题。调试和性能分析的主要场景，通常有这么三个：
 
-
+```text
 一是代码本身有问题，需要我们找到root cause并修复；
 二是代码效率有问题，比如过度浪费资源，增加latency，因此需要我们debug；
 三是在开发新的feature时，一般都需要测试。
-
+```
 
 在遇到这些场景时，究竟应该使用哪些工具，如何正确的使用这些工具，应该遵循什么样的步骤等等，就是这节课我们要讨论的话题。
 
@@ -32,10 +34,10 @@ pdb的必要性
 
 如果结果值和预期相符，并能直接找到错误根源，显然是最好的。但实际情况往往是，
 
-
+```python
 要么与预期并不相符，需要重复以上步骤，继续debug；
 要么虽说与预期相符，但前面的操作只是缩小了错误代码的范围，所以仍得继续添加print()语句，再一次运行相应的代码模块（又要5min），进行debug。
-
+```
 
 你可以看到，这样的效率就很低下了。哪怕只是遇到稍微复杂一点的case，两、三个工程师一下午的时间可能就没了。
 
@@ -55,58 +57,67 @@ pdb的必要性
 
 首先，要启动pdb调试，我们只需要在程序中，加入“import pdb”和“pdb.set_trace()”这两行代码就行了，比如下面这个简单的例子：
 
+```python
 a = 1
 b = 2
 import pdb
 pdb.set_trace()
 c = 3
 print(a + b + c)
-
+```
 
 当我们运行这个程序时时，它的输出界面是下面这样的，表示程序已经运行到了“pdb.set_trace()”这行，并且暂停了下来，等待用户输入。
 
+```text
 > /Users/jingxiao/test.py(5)<module>()
 -> c = 3
 
-
 这时，我们就可以执行，在IDE断点调试器中可以执行的一切操作，比如打印，语法是"p <expression>"：
+```
 
+```text
 (pdb) p a
 1
 (pdb) p b
 2
-
+```
 
 你可以看到，我打印的是a和b的值，分别为1和2，与预期相符。为什么不打印c呢？显然，打印c会抛出异常，因为程序目前只运行了前面几行，此时的变量c还没有被定义：
 
+```text
 (pdb) p c
 *** NameError: name 'c' is not defined
-
+```
 
 除了打印，常见的操作还有“n”，表示继续执行代码到下一行，用法如下：
 
+```python
 (pdb) n
 -> print(a + b + c)
-
+```
 
 而命令”l“，则表示列举出当前代码行上下的11行源代码，方便开发者熟悉当前断点周围的代码状态：
 
+```python
 (pdb) l
-  1  	a = 1
-  2  	b = 2
-  3  	import pdb
-  4  	pdb.set_trace()
-  5  ->	c = 3
-  6  	print(a + b + c)
-
+  1   a = 1
+  2   b = 2
+  3   import pdb
+  4   pdb.set_trace()
+  5  -> c = 3
+  6   print(a + b + c)
+```
 
 命令“s“，就是 step into 的意思，即进入相对应的代码内部。这时，命令行中会显示”--Call--“的字样，当你执行完内部的代码块后，命令行中则会出现”--Return--“的字样。
 
 我们来看下面这个例子：
 
+```python
 def func():
     print('enter func()')
+```
 
+```python
 a = 1
 b = 2
 import pdb
@@ -114,52 +125,64 @@ pdb.set_trace()
 func()
 c = 3
 print(a + b + c)
+```
 
 # pdb
+
+```text
+>
 > /Users/jingxiao/test.py(9)<module>()
--> func()
 (pdb) s
 --Call--
+```
+
 > /Users/jingxiao/test.py(1)func()
+
+```python
 -> def func():
 (Pdb) l
-  1  ->	def func():
-  2  		print('enter func()')
+  1  -> def func():
+  2    print('enter func()')
   3
   4
-  5  	a = 1
-  6  	b = 2
-  7  	import pdb
-  8  	pdb.set_trace()
-  9  	func()
- 10  	c = 3
- 11  	print(a + b + c)
+  5   a = 1
+  6   b = 2
+  7   import pdb
+  8   pdb.set_trace()
+  9   func()
+ 10   c = 3
+ 11   print(a + b + c)
+```
 
 (Pdb) n
 > /Users/jingxiao/test.py(2)func()
+
+```python
 -> print('enter func()')
 (Pdb) n
 enter func()
 --Return--
+
+
 > /Users/jingxiao/test.py(2)func()->None
 -> print('enter func()')
 
 (Pdb) n
 > /Users/jingxiao/test.py(10)<module>()
 -> c = 3
-
+```
 
 这里，我们使用命令”s“进入了函数func()的内部，显示”--Call--“；而当我们执行完函数func()内部语句并跳出后，显示”--Return--“。
 
 另外，
 
-
+```text
 与之相对应的命令”r“，表示step out，即继续执行，直到当前的函数完成返回。
 命令”b [ ([filename:]lineno | function) [, condition] ]“可以用来设置断点。比方说，我想要在代码中的第10行，再加一个断点，那么在pdb模式下输入”b 11“即可。
 而”c“则表示一直执行程序，直到遇到下一个断点。
+```
 
-
-当然，除了这些常用命令，还有许多其他的命令可以使用，这里我就不在一一赘述了。你可以参考对应的官方文档（https://docs.python.org/3/library/pdb.html#module-pdb），来熟悉这些用法。
+当然，除了这些常用命令，还有许多其他的命令可以使用，这里我就不在一一赘述了。你可以参考对应的官方文档（<https://docs.python.org/3/library/pdb.html#module-pdb），来熟悉这些用法。>
 
 用cProfile进行性能分析
 
@@ -173,6 +196,7 @@ enter func()
 
 举个例子，比如我想计算斐波拉契数列，运用递归思想，我们很容易就能写出下面这样的代码：
 
+```python
 def fib(n):
     if n == 0:
         return 0
@@ -180,48 +204,50 @@ def fib(n):
         return 1
     else:
         return fib(n-1) + fib(n-2)
+```
 
+```python
 def fib_seq(n):
     res = []
     if n > 0:
         res.extend(fib_seq(n-1))
     res.append(fib(n))
     return res
+```
 
 fib_seq(30)
-
 
 接下来，我想要测试一下这段代码总的效率以及各个部分的效率。那么，我就只需在开头导入cProfile这个模块，并且在最后运行cProfile.run()就可以了：
 
 import cProfile
-# def fib(n)
-# def fib_seq(n):
-cProfile.run('fib_seq(30)')
 
+# def fib(n)
+
+# def fib_seq(n)
+
+cProfile.run('fib_seq(30)')
 
 或者更简单一些，直接在运行脚本的命令中，加入选项“-m cProfile”也很方便：
 
 python3 -m cProfile xxx.py
 
-
 运行完毕后，我们可以看到下面这个输出界面：
-
-
 
 这里有一些参数你可能比较陌生，我来简单介绍一下：
 
-
+```text
 ncalls，是指相应代码/函数被调用的次数；
 tottime，是指对应代码/函数总共执行所需要的时间（注意，并不包括它调用的其他代码/函数的执行时间）；
 tottime percall，就是上述两者相除的结果，也就是tottime / ncalls；
 cumtime，则是指对应代码/函数总共执行所需要的时间，这里包括了它调用的其他代码/函数的执行时间；
 cumtime percall，则是cumtime和ncalls相除的平均结果。
-
+```
 
 了解这些参数后，再来看这张图。我们可以清晰地看到，这段程序执行效率的瓶颈，在于第二行的函数fib()，它被调用了700多万次。
 
 有没有什么办法可以提高改进呢？答案是肯定的。通过观察，我们发现，程序中有很多对fib()的调用，其实是重复的，那我们就可以用字典来保存计算过的结果，防止重复。改进后的代码如下所示：
 
+```python
 def memoize(f):
     memo = {}
     def helper(x):
@@ -229,7 +255,9 @@ def memoize(f):
             memo[x] = f(x)
         return memo[x]
     return helper
+```
 
+```python
 @memoize
 def fib(n):
     if n == 0:
@@ -238,21 +266,20 @@ def fib(n):
         return 1
     else:
         return fib(n-1) + fib(n-2)
+```
 
-
+```python
 def fib_seq(n):
     res = []
     if n > 0:
         res.extend(fib_seq(n-1))
     res.append(fib(n))
     return res
+```
 
 fib_seq(30)
 
-
 这时，我们再对其进行profile，你就会得到新的输出结果，很明显，效率得到了极大的提高。
-
-
 
 这个简单的例子，便是cProfile的基本用法，也是我今天想讲的重点。当然，cProfile还有很多其他功能，还可以结合stats类来使用，你可以阅读相应的 官方文档 来了解。
 
@@ -267,7 +294,3 @@ fib_seq(30)
 最后，留一个开放性的交流问题。你在平时的工作中，常用的调试和性能分析工具是什么呢？有发现什么独到的使用技巧吗？你曾用到过pdb、cProfile或是其他相似的工具吗？
 
 欢迎在下方留言与我讨论，也欢迎你把这篇文章分享出去。我们一起交流，一起进步。
-
-                        
-                        
-                            

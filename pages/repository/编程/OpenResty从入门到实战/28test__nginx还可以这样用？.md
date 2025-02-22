@@ -1,10 +1,12 @@
 ---
 title: 28test__nginx还可以这样用？
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             28 test__nginx 还可以这样用？
                             你好，我是温铭。
+```
 
 在前面两个章节中，你已经掌握了 test::nginx 的大部分使用方法，我相信你已经能够看明白 OpenResty 项目中大部分的测试案例集了。这对于学习 OpenResty 和它的周边库而言，已经足够了。
 
@@ -22,8 +24,6 @@ ONLY
 
 那么，有没有什么方法只运行你指定的某一个测试案例呢？ ONLY 这个标记可以轻松实现这一点：
 
-=== TEST 1: sanity
-=== TEST 2: get
 --- ONLY
 
 
@@ -38,6 +38,10 @@ SKIP
 === TEST 1: sanity
 === TEST 2: get
 --- SKIP
+```text
+=== TEST 1: sanity
+=== TEST 2: get
+```
 
 
 从这段伪码你可以看到，它的用法和ONLY类似。因为我们是测试驱动开发，需要先编写测试案例；而在集体编码实现时，可能由于实现难度或者优先级的关系，导致某个功能需要延后实现。那么这时候，你就可以先跳过对应的测试案例集，等实现完成后，再把 SKIP 标记去掉即可。
@@ -46,8 +50,6 @@ LAST
 
 还有一个常用的标记是 LAST，它的用法也很简单，在它之前的测试案例集都会被执行，后面的就会被忽略掉：
 
-=== TEST 1: sanity
-=== TEST 2: get
 --- LAST
 === TEST 3: set
 
@@ -71,15 +73,19 @@ plan tests => repeat_each() * (3 * blocks());
 
 === TEST 1: sanity
 --- config
+--- request
+GET /t
+--- response_body
+```css
+=== TEST 1: sanity
+=== TEST 2: get
     location /t {
         content_by_lua_block {
             ngx.say("hello")
         }
     }
---- request
-GET /t
---- response_body
 hello
+```
 
 
 我相信所有人都会得出 plan = 1 的结论，因为测试中只对 response_body 进行了校验。
@@ -106,9 +112,12 @@ plan tests => repeat_each() * (3 * blocks()) + 2;
 
 这时候，你就可以使用 add_block_preprocessor 指令，来增加一段 perl 代码，比如下面这样来写：
 
+```css
 add_block_preprocessor(sub {
     my $block = shift;
+```
 
+```css
     if (!defined $block->config) {
         $block->set_value("config", <<'_END_');
     location = /t {
@@ -117,21 +126,26 @@ add_block_preprocessor(sub {
     _END_
     }
 });
+```
 
 
 这个预处理器，就会为所有的测试案例，都增加一段 config 的配置，而里面的内容就是 location /t。这样，在你后面的测试案例里，就都可以省略掉 config，直接访问即可：
 
-=== TEST 1:
 --- request
     GET /t?a=3
 --- response_body
+```text
+=== TEST 1:
 3
+```
 
-=== TEST 2:
 --- request
     GET /t?a=blah
 --- response_body
+```text
+=== TEST 2:
 blah
+```
 
 
 自定义函数
@@ -140,6 +154,7 @@ blah
 
 下面是一个示例，它增加了一个读取文件的函数，并结合 eval 指令，一起实现了 POST 文件的功能：
 
+```css
 sub read_file {
     my $infile = shift;
     open my $in, $infile
@@ -148,6 +163,7 @@ sub read_file {
     close $in;
     $content;
 }
+```
 
 our $CONTENT = read_file("t/test.jpg");
 
@@ -155,7 +171,6 @@ run_tests;
 
 __DATA__
 
-=== TEST 1: sanity
 --- request eval
 "POST /\n$::CONTENT"
 
@@ -193,3 +208,4 @@ reindex
                         
                         
                             
+=== TEST 1: sanity

@@ -1,18 +1,22 @@
 ---
 title: 09为什么lua-resty-core性能更高一些？
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             09 为什么 lua-resty-core 性能更高一些？
                             你好，我是温铭。
+```
 
 前面两节课我们说了，Lua 是一种嵌入式开发语言，核心保持了短小精悍，你可以在 Redis、NGINX 中嵌入 Lua，来帮助你更灵活地完成业务逻辑。同时，Lua 也可以调用已有的 C 函数和数据结构，避免重复造轮子。
 
 在 Lua 中，你可以用 Lua C API 来调用 C 函数，而在 LuaJIT 中还可以使用 FFI。对 OpenResty 而言：
 
 
+```text
 在核心的 lua-nginx-module 中，调用 C 函数的 API，都是使用 Lua C API 来完成的；
 而在 lua-resty-core 中，则是把 lua-nginx-module 已有的部分 API，使用 FFI 的模式重新实现了一遍。
+```
 
 
 看到这里你估计纳闷了：为什么要用 FFI 重新实现一遍？
@@ -23,8 +27,10 @@ Lua CFunction
 
 我们先来看下， lua-nginx-module 中用 Lua C API 是如何实现的。我们在项目的代码中搜索 decode_base64，可以找到它的代码实现在 ngx_http_lua_string.c 中：
 
+```text
 lua_pushcfunction(L, ngx_http_lua_ngx_decode_base64);
 lua_setfield(L, -2, "decode_base64");
+```
 
 
 上面的代码看着就头大，不过还好，我们不用深究那两个 lua_ 开头的函数，以及它们参数的具体作用，只需要知道一点——这里注册了一个 CFunction：ngx_http_lua_ngx_decode_base64， 而它与 ngx.base64_decode 这个对外暴露的 API 是对应关系。
@@ -38,10 +44,12 @@ static int ngx_http_lua_ngx_decode_base64(lua_State *L);
 
 它的实现如下（这里我已经去掉了错误处理的代码）：
 
+```text
 static int
  ngx_http_lua_ngx_decode_base64(lua_State *L)
  {
      ngx_str_t p, src;
+```
 
     src.data = (u_char *) luaL_checklstring(L, 1, &src.len);
 
@@ -49,15 +57,21 @@ static int
 
      p.data = lua_newuserdata(L, p.len);
 
+```text
      if (ngx_decode_base64(&p, &src) == NGX_OK) {
          lua_pushlstring(L, (char *) p.data, p.len);
+```
 
+```css
      } else {
          lua_pushnil(L);
      }
+```
 
+```text
      return 1;
  }
+```
 
 
 这段代码中，最主要的是 ngx_base64_decoded_length 和 ngx_decode_base64， 它们都是 NGINX 自身提供的 C 函数。
@@ -70,10 +84,13 @@ LuaJIT FFI
 
 我们还是以 base64_decode为例，它的 FFI 实现分散在两个仓库中： lua-resty-core 和 lua-nginx-module。我们先来看下前者里面实现的代码：
 
+```text
 ngx.decode_base64 = function (s)
      local slen = #s
      local dlen = base64_decoded_length(slen)
+```
 
+```text
      local dst = get_string_buf(dlen)
      local pdlen = get_size_ptr()
      local ok = C.ngx_http_lua_ffi_decode_base64(s, slen, dst, pdlen)
@@ -82,6 +99,7 @@ ngx.decode_base64 = function (s)
      end
      return ffi_string(dst, pdlen[0])
  end
+```
 
 
 你会发现，相比 CFunction，FFI 实现的代码清爽了很多，它具体的实现是 lua-nginx-module 仓库中的ngx_http_lua_ffi_decode_base64，如果你对这里感兴趣，可以自己去查看这个函数的实现，特别简单，这里我就不贴代码了。
@@ -91,9 +109,11 @@ ngx.decode_base64 = function (s)
 没错，OpenResty 中的函数都是有命名规范的，你可以通过命名推测出它的用处。比如：
 
 
+```text
 ngx_http_lua_ffi_ ，是用 FFI 来处理 NGINX HTTP 请求的 Lua 函数；
 ngx_http_lua_ngx_ ，是用 Cfunction 来处理 NGINX HTTP 请求的 Lua 函数；
 其他 ngx_ 和 lua_ 开头的函数，则分别属于 NGINX 和 Lua 的内置函数。
+```
 
 
 更进一步，OpenResty 中的 C 代码，也有着严格的代码规范，这里我推荐阅读官方的 C 代码风格指南。对于有意学习 OpenResty 的 C 代码并提交 PR 的开发者来说，这是必备的一篇文档。否则，即使你的 PR 写得再好，也会因为代码风格问题被反复评论并要求修改。
@@ -108,10 +128,12 @@ LuaJIT FFI GC
 
 举个例子，比如你使用 ffi.C.malloc 申请了一块内存，那你就需要用配对的 ffi.C.free 来释放。LuaJIT 的官方文档中有一个对应的示例：
 
+```text
 local p = ffi.gc(ffi.C.malloc(n), ffi.C.free)
  ...
  p = nil -- Last reference to p is gone.
  -- GC will eventually run finalizer: ffi.C.free(p)
+```
 
 
 这段代码中，ffi.C.malloc(n) 申请了一段内存，同时 ffi.gc 就给它注册了一个析构的回调函数 ffi.C.free。这样一来，p 这个 cdata 在被 LuaJIT GC 的时候，就会自动调用 ffi.C.free，来释放 C 级别的内存。而 cdata 是由 LuaJIT 负责 GC的 ，所以上述代码中的 p 会被 LuaJIT 自动释放。
@@ -119,8 +141,10 @@ local p = ffi.gc(ffi.C.malloc(n), ffi.C.free)
 这里要注意，如果你要在 OpenResty 中申请大块的内存，我更推荐你用 ffi.C.malloc 而不是 ffi.new。原因也很明显：
 
 
+```text
 ffi.new 返回的是一个 cdata，这部分内存由 LuaJIT 管理；
 LuaJIT GC 的管理内存是有上限的，OpenResty 中的 LuaJIT 并未开启 GC64 选项，所以单个 worker 内存的上限只有2G。一旦超过 LuaJIT 的内存管理上限，就会导致报错。
+```
 
 
 在使用 FFI 的时候，我们还需要特别注意内存泄漏的问题。不过，凡人皆会犯错，只要是人写的代码，百密一疏，总会出现 bug。那么，有没有什么工具可以检测内存泄漏呢？

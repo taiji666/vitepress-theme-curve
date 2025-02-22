@@ -1,10 +1,12 @@
 ---
 title: 45使用os包中的API（下）
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             45 使用os包中的API （下）
                             你好，我是郝林，今天我们继续分享使用os包中的API。
+```
 
 我们在上一篇文章中。从“os.File类型都实现了哪些io包中的接口”这一问题出发，介绍了一系列的相关内容。今天我们继续围绕这一知识点进行扩展。
 
@@ -19,18 +21,22 @@ categories: [Go核心36讲]
 除此之外，我们还可以为这里的文件设置额外的操作模式，可选项如下所示。
 
 
+```text
 os.O_APPEND：当向文件中写入内容时，把新内容追加到现有内容的后边。
 os.O_CREATE：当给定路径上的文件不存在时，创建一个新文件。
 os.O_EXCL：需要与os.O_CREATE一同使用，表示在给定的路径上不能有已存在的文件。
 os.O_SYNC：在打开的文件之上实施同步I/O。它会保证读写的内容总会与硬盘上的数据保持同步。
 os.O_TRUNC：如果文件已存在，并且是常规的文件，那么就先清空其中已经存在的任何内容。
+```
 
 
 对于以上操作模式的使用，os.Create函数和os.Open函数都是现成的例子。
 
+```text
 func Create(name string) (*File, error) {
  return OpenFile(name, O_RDWR|O_CREATE|O_TRUNC, 0666)
 }
+```
 
 
 os.Create函数在调用os.OpenFile函数的时候，给予的操作模式是os.O_RDWR、os.O_CREATE和os.O_TRUNC的组合。
@@ -39,9 +45,11 @@ os.Create函数在调用os.OpenFile函数的时候，给予的操作模式是os.
 
 并且，它返回的File值的读取方法和写入方法都是可用的。这里需要注意，多个操作模式是通过按位或操作符|组合起来的。
 
+```text
 func Open(name string) (*File, error) {-
 return OpenFile(name, O_RDONLY, 0)-
 }
+```
 
 我在前面说过，os.Open函数的功能是：以只读模式打开已经存在的文件。其根源就是它在调用os.OpenFile函数的时候，只提供了一个单一的操作模式os.O_RDONLY。
 

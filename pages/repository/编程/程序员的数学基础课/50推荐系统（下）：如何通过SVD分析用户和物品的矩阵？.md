@@ -1,10 +1,12 @@
 ---
 title: 50推荐系统（下）：如何通过SVD分析用户和物品的矩阵？
-date: 1739706057.510867
+date: 2025-02-22
 categories: [程序员的数学基础课]
 ---
+```text
                             50 推荐系统（下）：如何通过SVD分析用户和物品的矩阵？
                             你好，我是黄申。
+```
 
 上一节，我们讲了如何使用矩阵操作，实现基于用户或者物品的协同过滤。实际上，推荐系统是个很大的课题，你可以尝试不同的想法。比如，对于用户给电影评分的案例，是不是可以使用SVD奇异值的分解，来分解用户评分的矩阵，并找到“潜在”的电影主题呢？如果在一定程度上实现这个目标，那么我们可以通过用户和主题，以及电影和主题之间的关系来进行推荐。今天，我们继续使用MovieLens中的一个数据集，尝试Python代码中的SVD分解，并分析一些结果所代表的含义。
 
@@ -52,8 +54,10 @@ Python中的SVD实现和结果分析
 
 和上节的代码类似，首先我们需要加载用户对电影的评分。不过，由于非并行SVD分解的时间复杂度是3次方数量级，而空间复杂度是2次方数量级，所以对硬件资源要求很高。这里为了节省测试的时间，我增加了一些语句，只取大约十分之一的数据。
 
+```python
 import pandas as pd
 from numpy import *
+```
 
 
 # 加载用户对电影的评分数据
@@ -61,30 +65,40 @@ df_ratings = pd.read_csv("/Users/shenhuang/Data/ml-latest-small/ratings.csv")
 
 
 # 获取用户的数量和电影的数量，这里我们只取前1/10来减小数据规模
+```text
 user_num = int(df_ratings["userId"].max() / 10)
 movie_num = int(df_ratings["movieId"].max() / 10)
+```
 
 
 # 构造用户对电影的二元关系矩阵
 user_rating = [[0.0] * movie_num for i in range(user_num)]
 
 
+```text
 i = 0
 for index, row in df_ratings.iterrows():   # 获取每行的index、row
+```
 
 
+```markdown
   # 由于用户和电影的ID都是从1开始，为了和Python的索引一致，减去1
   userId = int(row["userId"]) - 1
   movieId = int(row["movieId"]) - 1
+```
 
 
+```markdown
   # 我们只取前1/10来减小数据规模
   if (userId >= user_num) or (movieId >= movie_num):
     continue
+```
 
 
+```markdown
   # 设置用户对电影的评分
   user_rating[userId][movieId] = row["rati
+```
 
 
 之后，二维数组转为矩阵，以及标准化矩阵的代码和之前是一致的。
@@ -98,8 +112,10 @@ from sklearn.preprocessing import scale
 
 
 # 对每一行的数据，进行标准化
+```python
 x_s = scale(x, with_mean=True, with_std=True, axis=1)
 print("标准化后的矩阵：", x_s
+```
 
 
 Python的numpy库，已经实现了一种SVD分解，我们只调用一个函数就行了。
@@ -108,10 +124,12 @@ Python的numpy库，已经实现了一种SVD分解，我们只调用一个函数
 from numpy import linalg as LA
 
 
+```python
 u,sigma,vt = LA.svd(x_s, full_matrices=False, compute_uv=True)
 print("U矩阵：", u)
 print("Sigma奇异值：", sigma)
 print("V矩阵：", vt)
+```
 
 
 最后输出的Sigma奇异值大概是这样的：
@@ -124,26 +142,33 @@ Sigma奇异值： [416.56942602 285.42546812 202.25724866 ... 79.26188177  76.35
 为了验证一下SVD的效果，我们还可以加载电影的元信息，包括电影的标题和类型等等。我在这里使用了一个基于哈希的Python字典结构来存储电影ID到标题和类型的映射。
 
 # 加载电影元信息
+```text
 df_movies = pd.read_csv("/Users/shenhuang/Data/ml-latest-small/movies.csv")
 dict_movies = {}
+```
 
 
+```python
 for index, row in df_movies.iterrows():   # 获取每行的index、row
   dict_movies[row["movieId"]] = "{0},{1}".format(row["title"], row["genres"])
 print(dict_movies)
+```
 
 
 我刚刚提到，分解之后所得到的奇异值\(σ\)对应了一个“主题”，\(σ\)值的大小表示这个主题在整个电影集合中的重要程度，而V中的右奇异向量表示每部电影和这些“主题”的关系强弱。所以，我们可以对分解后的每个奇异值，通过\(V\)中的向量，找找看哪些电影和这个奇异值所对应的主题更相关，然后看看SVD分解所求得的电影主题是不是合理。比如，我们可以使用下面的代码，来查看和向量\(Vt1\),相关的电影主要有哪些。
 
 # 输出和某个奇异值高度相关的电影，这些电影代表了一个主题
+```python
 print(max(vt[1,:]))
 for i in range(movie_num):
     if (vt[1][i] > 0.1):
         print(i + 1, vt[1][i], dict_movies[i + 1])
+```
 
 
 需要注意的是，向量中的电影ID和原始的电影ID差1，所以在读取dict_movies时需要使用(i + 1)。这个向量中最大的分值大约是0.173，所以我把阈值设置为0.1，并输出了所有分值大于0.1的电影，电影列表如下：
 
+```text
 0.17316444479201024
 260 0.14287410901699643 Star Wars: Episode IV - A New Hope (1977),Action|Adventure|Sci-Fi
 1196 0.1147295905497075 Star Wars: Episode V - The Empire Strikes Back (1980),Action|Adventure|Sci-Fi
@@ -154,6 +179,7 @@ for i in range(movie_num):
 4993 0.12445203514448012 Lord of the Rings: The Fellowship of the Ring, The (2001),Adventure|Fantasy
 5952 0.12535012292041953 Lord of the Rings: The Two Towers, The (2002),Adventure|Fantasy
 7153 0.10972312192709989 Lord of the Rings: The Return of the King, The (2003),Action|Adventure|Drama|Fantasy
+```
 
 
 从这个列表可以看出，这个主题是关于科幻或者奇幻类的动作冒险题材。
@@ -161,14 +187,17 @@ for i in range(movie_num):
 使用类似的代码和同样的阈值0.1，我们来看看和向量\(Vt5\),相关的电影主要有哪些。
 
 # 输出和某个奇异值高度相关的电影，这些电影代表了一个主题
+```python
 print(max(vt[5,:]))
 for i in range(movie_num):
     if (vt[5][i] > 0.1):
         print(i + 1, vt[5][i], dict_movies[i + 1])
+```
 
 
 电影列表如下：
 
+```text
 0.13594520920117012
 21 0.13557812349701226 Get Shorty (1995),Comedy|Crime|Thriller
 50 0.11870851441884082 Usual Suspects, The (1995),Crime|Mystery|Thriller
@@ -180,6 +209,7 @@ for i in range(movie_num):
 357 0.11108191756350501 Four Weddings and a Funeral (1994),Comedy|Romance
 527 0.1305895737838763 Schindler's List (1993),Drama|War
 595 0.11155774544755555 Beauty and the Beast (1991),Animation|Children|Fantasy|Musical|Romance|IMAX
+```
 
 
 从这个列表可以看出，这个主题更多的是关于剧情类题材。就目前所看的两个向量来说，SVD在一定程度上区分了不同的电影主题，你也可以使用类似的方式查看更多的向量，以及对应的电影名称和类型。

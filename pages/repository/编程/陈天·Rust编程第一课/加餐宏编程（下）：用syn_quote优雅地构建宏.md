@@ -1,10 +1,12 @@
 ---
 title: 加餐宏编程（下）：用syn_quote优雅地构建宏
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             加餐 宏编程（下）：用 syn_quote 优雅地构建宏
                             你好，我是陈天。
+```
 
 上堂课我们用最原始的方式构建了一个 RawBuilder 派生宏，本质就是从 TokenStream 中抽取需要的数据，然后生成包含目标代码的字符串，最后再把字符串转换成 TokenStream。
 
@@ -20,6 +22,7 @@ syn crate 简介
 
 syn 还提供了对 derive macro 的特殊支持——DeriveInput 类型：
 
+```html
 pub struct DeriveInput {
     pub attrs: Vec<Attribute>,
     pub vis: Visibility,
@@ -27,17 +30,19 @@ pub struct DeriveInput {
     pub generics: Generics,
     pub data: Data,
 }
-
+```
 
 通过 DeriveInput 类型，我们可以很方便地解析派生宏。比如这样：
 
-#[proc_macro_derive(Builder)]
+# [proc_macro_derive(Builder)]
+
+```javascript
 pub fn derive_builder(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
     ...
 }
-
+```
 
 只需要使用 parse_macro_input!(input as DeriveInput)，我们就不必和 TokenStream 打交道，而是使用解析出来的 DeriveInput。上一讲我们从 TokenStream 里拿出来 struct 的名字，都费了一番功夫，这里直接访问 DeriveInput 的 ident 域就达到同样的目的，是不是非常人性化。
 
@@ -47,6 +52,7 @@ Parse trait
 
 要回答这个问题，我们直接看代码找答案（来源）：
 
+```javascript
 macro_rules! parse_macro_input {
     ($tokenstream:ident as $ty:ty) => {
         match $crate::parse_macro_input::parse::<$ty>($tokenstream) {
@@ -68,12 +74,13 @@ macro_rules! parse_macro_input {
         $crate::parse_macro_input!($tokenstream as _)
     };
 }
+```
 
-
-结合上一讲的内容，相信你不难理解，如果我们调用 parse_macro_input!(input as DeriveInput)，实际上它执行了 $crate::parse_macro_input::parse::<DeriveInput>(input)。
+结合上一讲的内容，相信你不难理解，如果我们调用 parse_macro_input!(input as DeriveInput)，实际上它执行了```$crate::parse_macro_input::parse::<DeriveInput>(input)```。
 
 那么，这个 parse 函数究竟从何而来？继续看代码（来源）：
 
+```cpp
 pub fn parse<T: ParseMacroInput>(token_stream: TokenStream) -> Result<T> {
     T::parse.parse(token_stream)
 }
@@ -87,16 +94,17 @@ impl<T: Parse> ParseMacroInput for T {
         <T as Parse>::parse(input)
     }
 }
-
+```
 
 从这段代码我们得知，任何实现了 ParseMacroInput trait 的类型 T，都支持 parse() 函数。进一步的，任何 T，只要实现了 Parse trait，就自动实现了 ParseMacroInput trait。
 
 而这个 Parse trait，就是一切魔法背后的源泉：
 
+```html
 pub trait Parse: Sized {
     fn parse(input: ParseStream<'_>) -> Result<Self>;
 }
-
+```
 
 syn 下面几乎所有的数据结构都实现了 Parse trait，包括 DeriveInput。所以，如果我们想自己构建一个数据结构，可以通过 parse_macro_input! 宏从 TokenStream 里读取内容，并写入这个数据结构，最好的方式是为我们的数据结构实现 Parse trait。
 
@@ -112,12 +120,13 @@ quote crate 简介
 
 有的，可以使用 quote crate。它提供了一个 quote! 宏，会替换代码中所有的 #(...)，生成 TokenStream。比如要写一个 hello() 方法，可以这样：
 
+```text
 quote! {
     fn hello() {
         println!("Hello world!");
     }
 }
-
+```
 
 这比使用字符串模板生成代码的方式更直观，功能更强大，而且保留代码的所有语义。
 
@@ -133,13 +142,14 @@ quote! 做替换的方式和 macro_rules! 非常类似，也支持重复匹配�
 
 我们在上一讲中创建的项目中添加更多的依赖：
 
+```text
 [dependencies]
 anyhow = "1"
 askama = "0.11" # 处理 jinjia 模板，模板需要放在和 src 平行的 templates 目录下
 proc-macro2 = "1" # proc-macro 的封装
 quote = "1" # 用于生成代码的 TokenStream
 syn = { version = "1", features = ["extra-traits"] } # 用于解析 TokenStream，使用 extra-traits 可以用于 Debug
-
+```
 
 注意 syn crate 默认所有数据结构都不带一些基本的 trait，比如 Debug，所以如果你想打印数据结构的话，需要使用 extra-traits feature。
 
@@ -149,13 +159,15 @@ Step1：看看 DeriveInput 都输出什么？
 
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(Builder)]
+# [proc_macro_derive(Builder)]
+
+```javascript
 pub fn derive_builder(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     println!("{:#?}", input);
     TokenStream::default()
 }
-
+```
 
 通过 parse_macro_input!，我们得到了一个 DeriveInput 结构的数据。这里可以打印一下，看看会输出什么。
 
@@ -163,22 +175,25 @@ pub fn derive_builder(input: TokenStream) -> TokenStream {
 
 use macros::{Builder, RawBuilder};
 
-#[allow(dead_code)]
-#[derive(Debug, RawBuilder, Builder)]
+# [allow(dead_code)]
+
+# [derive(Debug, RawBuilder, Builder)]
+
+```html
 pub struct Command {
     executable: String,
     args: Vec<String>,
     env: Vec<String>,
     current_dir: Option<String>,
 }
-
+```
 
 然后运行 cargo run --example command，就可以看到非常详尽的 DeriveInput 的输出：
 
-
+```css
 对于 struct name，可以直接从 ident 中获取
 对于 fields，需要从 data 内部的 DataStruct { fields } 中取。目前，我们只关心每个 field 的 ident 和 ty。
-
+```
 
 Step2：定义自己的用于处理 derive 宏的数据结构
 
@@ -186,17 +201,20 @@ Step2：定义自己的用于处理 derive 宏的数据结构
 
 所以对比着上一讲，可以定义如下数据结构：
 
+```css
 struct Fd {
     name: Ident,
     ty: Type,
-		optional: bool,
+  optional: bool,
 }
+```
 
+```html
 pub struct BuilderContext {
     name: Ident,
     fields: Vec<Fd>,
 }
-
+```
 
 Step3：把 DeriveInput 转换成自己的数据结构
 
@@ -204,6 +222,7 @@ Step3：把 DeriveInput 转换成自己的数据结构
 
 所以来写两个 From trait 的实现，分别把 Field 转换成 Fd，DeriveInput 转换成 BuilderContext：
 
+```html
 /// 把一个 Field 转换成 Fd
 impl From<Field> for Fd {
     fn from(f: Field) -> Self {
@@ -216,12 +235,16 @@ impl From<Field> for Fd {
         }
     }
 }
+```
 
+```javascript
 /// 把 DeriveInput 转换成 BuilderContext
 impl From<DeriveInput> for BuilderContext {
     fn from(input: DeriveInput) -> Self {
         let name = input.ident;
+```
 
+```javascript
         let fields = if let Data::Struct(DataStruct {
             fields: Fields::Named(FieldsNamed { named, .. }),
             ..
@@ -231,22 +254,24 @@ impl From<DeriveInput> for BuilderContext {
         } else {
             panic!("Unsupported data type");
         };
-
         let fds = fields.into_iter().map(Fd::from).collect();
         Self { name, fields: fds }
     }
 }
+```
 
+```html
 // 如果是 T = Option<Inner>，返回 (true, Inner)；否则返回 (false, T)
 fn get_option_inner(ty: Type) -> (bool, Type) {
     todo!()
 }
-
+```
 
 是不是简单的有点难以想象？
 
 注意在从 input 中获取 fields 时，我们用了一个嵌套很深的模式匹配：
 
+```cpp
 if let Data::Struct(DataStruct {
     fields: Fields::Named(FieldsNamed { named, .. }),
     ..
@@ -254,7 +279,7 @@ if let Data::Struct(DataStruct {
 {
     named
 }
-
+```
 
 如果没有强大的模式匹配的支持，获取 FieldsNamed 会是非常冗长的代码。你可以仔细琢磨这两个 From 的实现，它很好地体现了 Rust 的优雅。
 
@@ -264,6 +289,7 @@ Step4：使用 quote 生成代码
 
 准备好 BuilderContext，就可以生成代码了。来写一个 render() 方法：
 
+```javascript
 impl BuilderContext {
     pub fn render(&self) -> TokenStream {
         let name = &self.name;
@@ -284,14 +310,12 @@ impl BuilderContext {
             /// Builder 结构每个字段赋值的方法，以及 build() 方法
             impl #builder_name {
                 #(#methods)*
-
                 pub fn build(mut self) -> Result<#name, &'static str> {
                     Ok(#name {
                         #(#assigns,)*
                     })
                 }
             }
-
             /// 为使用 Builder 的原结构提供 builder() 方法，生成 Builder 结构
             impl #name {
                 fn builder() -> #builder_name {
@@ -300,7 +324,9 @@ impl BuilderContext {
             }
         }
     }
+```
 
+```html
     // 为 XXXBuilder 生成 Option<T> 字段
     // 比如：executable: String -> executable: Option<String>
     fn gen_optionized_fields(&self) -> Vec<TokenStream> {
@@ -319,7 +345,7 @@ impl BuilderContext {
         todo!();
     }
 }
-
+```
 
 可以看到，quote! 包裹的代码，和上一讲在 template 中写的代码非常类似，只不过循环的地方使用了 quote! 内部的重复语法 #(...)*。
 
@@ -329,26 +355,33 @@ Step5：完整实现
 
 好，我们创建 src/builder.rs 文件（记得在 src/lib.rs 里引入），然后写入代码：
 
+```cpp
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{
     Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, GenericArgument, Path, Type,
     TypePath,
 };
+```
 
+```css
 /// 我们需要的描述一个字段的所有信息
 struct Fd {
     name: Ident,
     ty: Type,
     optional: bool,
 }
+```
 
+```html
 /// 我们需要的描述一个 struct 的所有信息
 pub struct BuilderContext {
     name: Ident,
     fields: Vec<Fd>,
 }
+```
 
+```html
 /// 把一个 Field 转换成 Fd
 impl From<Field> for Fd {
     fn from(f: Field) -> Self {
@@ -361,12 +394,16 @@ impl From<Field> for Fd {
         }
     }
 }
+```
 
+```javascript
 /// 把 DeriveInput 转换成 BuilderContext
 impl From<DeriveInput> for BuilderContext {
     fn from(input: DeriveInput) -> Self {
         let name = input.ident;
+```
 
+```javascript
         let fields = if let Data::Struct(DataStruct {
             fields: Fields::Named(FieldsNamed { named, .. }),
             ..
@@ -376,40 +413,54 @@ impl From<DeriveInput> for BuilderContext {
         } else {
             panic!("Unsupported data type");
         };
+```
 
+```javascript
         let fds = fields.into_iter().map(Fd::from).collect();
         Self { name, fields: fds }
     }
 }
+```
 
+```javascript
 impl BuilderContext {
     pub fn render(&self) -> TokenStream {
         let name = &self.name;
         // 生成 XXXBuilder 的 ident
         let builder_name = Ident::new(&format!("{}Builder", name), name.span());
+```
 
+```javascript
         let optionized_fields = self.gen_optionized_fields();
         let methods = self.gen_methods();
         let assigns = self.gen_assigns();
+```
 
+```css
         quote! {
             /// Builder 结构
             #[derive(Debug, Default)]
             struct #builder_name {
                 #(#optionized_fields,)*
             }
+```
 
+```css
             /// Builder 结构每个字段赋值的方法，以及 build() 方法
             impl #builder_name {
                 #(#methods)*
+```
 
+```css
                 pub fn build(mut self) -> Result<#name, &'static str> {
                     Ok(#name {
                         #(#assigns,)*
                     })
                 }
             }
+```
 
+```cpp
             /// 为使用 Builder 的原结构提供 builder() 方法，生成 Builder 结构
             impl #name {
                 fn builder() -> #builder_name {
@@ -418,7 +469,9 @@ impl BuilderContext {
             }
         }
     }
+```
 
+```cpp
     // 为 XXXBuilder 生成 Option<T> 字段
     // 比如：executable: String -> executable: Option<String>
     fn gen_optionized_fields(&self) -> Vec<TokenStream> {
@@ -427,7 +480,9 @@ impl BuilderContext {
             .map(|Fd { name, ty, .. }| quote! { #name: std::option::Option<#ty> })
             .collect()
     }
+```
 
+```html
     // 为 XXXBuilder 生成处理函数
     // 比如：methods: fn executable(mut self, v: impl Into<String>) -> Self { self.executable = Some(v); self }
     fn gen_methods(&self) -> Vec<TokenStream> {
@@ -489,10 +544,11 @@ fn get_option_inner(ty: &Type) -> (bool, &Type) {
     }
     return (false, ty);
 }
-
+```
 
 这段代码仔细阅读的话并不难理解，可能 get_option_inner() 拗口一些。你需要对着 DeriveInput 的 Debug 信息对应的部分比对着看，去推敲如何做模式匹配。比如：
 
+```css
 ty: Path(
     TypePath {
         qself: None,
@@ -537,18 +593,20 @@ ty: Path(
         },
     },
 ),
-
+```
 
 这本身并不难，难的是心细以及足够的耐心。如果你对某个数据结构拿不准该怎么匹配，可以在 syn 的文档中查找这个数据结构，了解它的定义。
 
 好，如果你理解了这个代码，我们就可以更新 src/lib.rs 里定义的 derive_builder 了：
 
-#[proc_macro_derive(Builder)]
+# [proc_macro_derive(Builder)]
+
+```javascript
 pub fn derive_builder(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     builder::BuilderContext::from(input).render().into()
 }
-
+```
 
 可以直接从 DeriveInput 中生成一个 BuilderContext，然后 render()。注意 quote 得到的是 proc_macro2::TokenStream，所以需要调用一下 into() 转换成 proc_macro::TokenStream。
 
@@ -556,12 +614,15 @@ pub fn derive_builder(input: TokenStream) -> TokenStream {
 
 use macros::Builder;
 
-#[allow(dead_code)]
-#[derive(Debug, Builder)]
+# [allow(dead_code)]
+
+# [derive(Debug, Builder)]
+
+```css
 pub struct Command {
     ...
 }
-
+```
 
 运行之，你可以得到正确的结果。
 
@@ -573,7 +634,9 @@ one more thing：支持 attributes
 
 在 proc-macro-workshop 里 Builder 宏的第 7 个练习中，就有这样一个需求：
 
-#[derive(Builder)]
+# [derive(Builder)]
+
+```html
 pub struct Command {
     executable: String,
     #[builder(each = "arg")]
@@ -582,7 +645,9 @@ pub struct Command {
     env: Vec<String>,
     current_dir: Option<String>,
 }
+```
 
+```javascript
 fn main() {
     let command = Command::builder()
         .executable("cargo".to_owned())
@@ -590,23 +655,26 @@ fn main() {
         .arg("--release".to_owned())
         .build()
         .unwrap();
+```
 
+```text
     assert_eq!(command.executable, "cargo");
     assert_eq!(command.args, vec!["build", "--release"]);
 }
-
+```
 
 这里，如果字段定义了 builder attributes，并且提供了 each 参数，那么用户不断调用 arg 来依次添加参数。这样使用起来，直观多了。
 
 分析一下这个需求。想要支持这样的功能，首先要能够解析 attributes，然后要能够根据 each attribute 的内容生成对应的代码，比如这样：
 
+```css
 pub fn arg(mut self, v: String) -> Self {
     let mut data = self.args.take().unwrap_or_default();
     data.push(v);
     self.args = Some(data);
     self
 }
-
+```
 
 syn 提供的 DeriveInput 并没有对 attributes 额外处理，所有的 attributes 被包裹在一个 TokenTree::Group 中。
 
@@ -616,14 +684,16 @@ syn 提供的 DeriveInput 并没有对 attributes 额外处理，所有的 attri
 
 在 src/lib.rs 中，我们再创建一个 BuilderWithAttrs 的派生宏：
 
-#[proc_macro_derive(BuilderWithAttr, attributes(builder))]
+# [proc_macro_derive(BuilderWithAttr, attributes(builder))]
+
+```javascript
 pub fn derive_builder_with_attr(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     builder_with_attr::BuilderContext::from(input)
         .render()
         .into()
 }
-
+```
 
 和之前不同的是，这里多了一个 attributes(builder) 属性，这是告诉编译器，请允许代码中出现的 #[builder(...)]，它是我这个宏认识并要处理的。
 
@@ -631,8 +701,11 @@ pub fn derive_builder_with_attr(input: TokenStream) -> TokenStream {
 
 use macros::BuilderWithAttr;
 
-#[allow(dead_code)]
-#[derive(Debug, BuilderWithAttr)]
+# [allow(dead_code)]
+
+# [derive(Debug, BuilderWithAttr)]
+
+```html
 pub struct Command {
     executable: String,
     #[builder(each = "arg")]
@@ -641,7 +714,9 @@ pub struct Command {
     env: Vec<String>,
     current_dir: Option<String>,
 }
+```
 
+```javascript
 fn main() {
     let command = Command::builder()
         .executable("cargo".to_owned())
@@ -649,12 +724,14 @@ fn main() {
         .arg("--release".to_owned())
         .build()
         .unwrap();
+```
 
+```text
     assert_eq!(command.executable, "cargo");
     assert_eq!(command.args, vec!["build", "--release"]);
     println!("{:?}", command);
 }
-
+```
 
 这里，我们不仅希望支持 each 属性，还支持 default —— 如果用户没有为这个域提供数据，就使用 default 对应的代码来初始化。
 
@@ -662,26 +739,31 @@ fn main() {
 
 在 Cargo.toml 中，加入对 darling 的引用：
 
+```text
 [dependencies]
 darling = "0.13"
-
+```
 
 然后，在 src/builder_with_attr.rs 中，添加用于捕获 attributes 的数据结构：
 
 use darling::FromField;
 
-#[derive(Debug, Default, FromField)]
-#[darling(default, attributes(builder))]
+# [derive(Debug, Default, FromField)]
+
+# [darling(default, attributes(builder))]
+
+```html
 struct Opts {
     each: Option<String>,
     default: Option<String>,
 }
-
+```
 
 因为我们捕获的是 field 级别的 attributes，所以这个数据结构需要实现 FromField trait（通过 FromTrait 派生宏），并且告诉 darling 要从哪个 attributes 中捕获（这里是从 builder 中捕获）。
 
 不过先需要修改一下 Fd，让它包括 Opts，并且在 From 的实现中初始化 opts：
 
+```css
 /// 我们需要的描述一个字段的所有信息
 struct Fd {
     name: Ident,
@@ -689,7 +771,9 @@ struct Fd {
     optional: bool,
     opts: Opts,
 }
+```
 
+```javascript
 /// 把一个 Field 转换成 Fd
 impl From<Field> for Fd {
     fn from(f: Field) -> Self {
@@ -705,12 +789,13 @@ impl From<Field> for Fd {
         }
     }
 }
-
+```
 
 好，现在 Fd 就包含 Opts 的信息了，我们可以利用这个信息来生成 methods 和 assigns。
 
 接下来先看 gen_methods 怎么修改。如果 Fd 定义了 each attribute，且它是个 Vec 的话，我们就生成不一样的代码，否则的话，像之前那样生成代码。来看实现：
 
+```javascript
 // 为 XXXBuilder 生成处理函数
 // 比如：methods: fn executable(mut self, v: impl Into<String>) -> Self { self.executable = Some(v); self }
 fn gen_methods(&self) -> Vec<TokenStream> {
@@ -743,20 +828,25 @@ fn gen_methods(&self) -> Vec<TokenStream> {
         })
         .collect()
 }
-
+```
 
 这里，我们重构了一下 get_option_inner() 的代码，因为 get_vec_inner() 和它有相同的逻辑：
 
+```html
 // 如果是 T = Option<Inner>，返回 (true, Inner)；否则返回 (false, T)
 fn get_option_inner(ty: &Type) -> (bool, &Type) {
     get_type_inner(ty, "Option")
 }
+```
 
+```html
 // 如果是 T = Vec<Inner>，返回 (true, Inner)；否则返回 (false, T)
 fn get_vec_inner(ty: &Type) -> (bool, &Type) {
     get_type_inner(ty, "Vec")
 }
+```
 
+```javascript
 fn get_type_inner<'a>(ty: &'a Type, name: &str) -> (bool, &'a Type) {
     // 首先模式匹配出 segments
     if let Type::Path(TypePath {
@@ -781,10 +871,11 @@ fn get_type_inner<'a>(ty: &'a Type, name: &str) -> (bool, &'a Type) {
     }
     return (false, ty);
 }
-
+```
 
 最后，我们为 gen_assigns() 提供对 default attribute 的支持：
 
+```html
 fn gen_assigns(&self) -> Vec<TokenStream> {
     self.fields
         .iter()
@@ -794,7 +885,9 @@ fn gen_assigns(&self) -> Vec<TokenStream> {
                     #name: self.#name.take()
                 };
             }
+```
 
+```text
             // 如果定义了 default，那么把 default 里的字符串转换成 TokenStream
             // 使用 unwrap_or_else 在没有值的时候，使用缺省的结果
             if let Some(default) = opts.default.as_ref() {
@@ -803,14 +896,16 @@ fn gen_assigns(&self) -> Vec<TokenStream> {
                     #name: self.#name.take().unwrap_or_else(|| #ast)
                 };
             }
+```
 
+```text
             quote! {
                 #name: self.#name.take().ok_or(concat!(stringify!(#name), " needs to be set!"))?
             }
         })
         .collect()
 }
-
+```
 
 如果你完成了这些改动，运行 cargo run --example command_with_attr 就会得到正确的结果。完整的代码，可以去 GitHub repo 上获取。
 
@@ -835,7 +930,3 @@ fn gen_assigns(&self) -> Vec<TokenStream> {
 学完了这两课，如果你还觉得不过瘾，可以继续完成 proc-macro-workshop 里Builder 以外的其它例子。这些例子你耐心地把它们全做一遍，一定会有很大的收获。
 
 学习愉快，如果你觉得有收获，也欢迎你分享给你身边的朋友，邀他一起讨论。
-
-                        
-                        
-                            

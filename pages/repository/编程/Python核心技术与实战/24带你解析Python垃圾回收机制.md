@@ -1,10 +1,12 @@
 ---
 title: 24带你解析Python垃圾回收机制
-date: 1739706057.5437288
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             24 带你解析 Python 垃圾回收机制
                             你好，我是景霄。
+```
 
 众所周知，我们当代的计算机都是图灵机架构。图灵机架构的本质，就是一条无限长的纸带，对应着我们今天的存储器。在工程学的演化中，逐渐出现了寄存器、易失性存储器（内存）和永久性存储器（硬盘）等产品。其实，这本身来自一个矛盾：速度越快的存储器，单位价格也越昂贵。因此，妥善利用好每一寸高速存储器的空间，永远是系统设计的一个核心。
 
@@ -14,10 +16,10 @@ categories: [Python核心技术与实战]
 
 而对于服务器，这种设计为永不中断的系统来说，内存管理则显得更为重要，不然很容易引发内存泄漏。什么是内存泄漏呢？
 
-
+```text
 这里的泄漏，并不是说你的内存出现了信息安全问题，被恶意程序利用了，而是指程序本身没有设计好，导致程序未能释放已不再使用的内存。
 内存泄漏也不是指你的内存在物理上消失了，而是意味着代码在分配了某段内存后，因为设计错误，失去了对这段内存的控制，从而造成了内存的浪费。
-
+```
 
 那么，Python 又是怎么解决这些问题的？换句话说，对于不会再用到的内存空间，Python 是通过什么机制来回收这些空间的呢？
 
@@ -31,33 +33,44 @@ categories: [Python核心技术与实战]
 
 我们来看一个例子：
 
+```python
 import os
 import psutil
+```
 
 # 显示当前 python 程序占用的内存大小
+
+```python
 def show_memory_info(hint):
     pid = os.getpid()
     p = psutil.Process(pid)
-    
+```
+
+```python
     info = p.memory_full_info()
     memory = info.uss / 1024. / 1024
     print('{} memory used: {} MB'.format(hint, memory))
+```
 
-
+```python
 def func():
     show_memory_info('initial')
     a = [i for i in range(10000000)]
     show_memory_info('after a created')
+```
 
+```text
 func()
 show_memory_info('finished')
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 47.19140625 MB
 after a created memory used: 433.91015625 MB
 finished memory used: 48.109375 MB
-
+```
 
 通过这个示例，你可以看到，调用函数 func()，在列表 a 被创建之后，内存占用迅速增加到了 433 MB：而在函数调用结束后，内存则返回正常。
 
@@ -65,41 +78,51 @@ finished memory used: 48.109375 MB
 
 明白了这个原理后，我们稍微修改一下代码：
 
+```python
 def func():
     show_memory_info('initial')
     global a
     a = [i for i in range(10000000)]
     show_memory_info('after a created')
+```
 
+```text
 func()
 show_memory_info('finished')
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 48.88671875 MB
 after a created memory used: 433.94921875 MB
 finished memory used: 433.94921875 MB
-
+```
 
 新的这段代码中，global a 表示将 a 声明为全局变量。那么，即使函数返回后，列表的引用依然存在，于是对象就不会被垃圾回收掉，依然占用大量内存。
 
 同样，如果我们把生成的列表返回，然后在主程序中接收，那么引用依然存在，垃圾回收就不会被触发，大量内存仍然被占用着：
 
+```python
 def func():
     show_memory_info('initial')
     a = [i for i in derange(10000000)]
     show_memory_info('after a created')
     return a
+```
 
+```text
 a = func()
 show_memory_info('finished')
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 47.96484375 MB
 after a created memory used: 434.515625 MB
 finished memory used: 434.515625 MB
-
+```
 
 这是最常见的几种情况。由表及里，下面，我们深入看一下 Python 内部的引用计数机制。老规矩，先来看代码：
 
@@ -108,23 +131,28 @@ import sys
 a = []
 
 # 两次引用，一次来自 a，一次来自 getrefcount
+
 print(sys.getrefcount(a))
 
+```python
 def func(a):
     # 四次引用，a，python 的函数调用栈，函数参数，和 getrefcount
     print(sys.getrefcount(a))
+```
 
 func(a)
 
 # 两次引用，一次来自 a，一次来自 getrefcount，函数 func 调用已经不存在
+
 print(sys.getrefcount(a))
 
 ########## 输出 ##########
 
+```text
 2
 4
 2
-
+```
 
 简单介绍一下，sys.getrefcount() 这个函数，可以查看一个变量的引用次数。这段代码本身应该很好理解，不过别忘了，getrefcount 本身也会引入一次计数。
 
@@ -140,20 +168,23 @@ b = a
 
 print(sys.getrefcount(a)) # 三次
 
+```text
 c = b
 d = b
 e = c
 f = e
 g = d
+```
 
 print(sys.getrefcount(a)) # 八次
 
 ########## 输出 ##########
 
+```text
 2
 3
 8
-
+```
 
 看到这段代码，需要你稍微注意一下，a、b、c、d、e、f、g 这些变量全部指代的是同一个对象，而sys.getrefcount() 函数并不是统计一个指针，而是要统计一个对象被引用的次数，所以最后一共会有八次引用。
 
@@ -171,28 +202,33 @@ a = [i for i in range(10000000)]
 
 show_memory_info('after a created')
 
+```text
 del a
 gc.collect()
+```
 
+```python
 show_memory_info('finish')
 print(a)
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 48.1015625 MB
 after a created memory used: 434.3828125 MB
 finish memory used: 48.33203125 MB
 
+
 ---------------------------------------------------------------------------
 NameError                                 Traceback (most recent call last)
 <ipython-input-12-153e15063d8a> in <module>
-     11 
+     11
      12 show_memory_info('finish')
 ---> 13 print(a)
 
 NameError: name 'a' is not defined
-
-
+```
 到这里，是不是觉得垃圾回收非常简单呀？
 
 我想，肯定有人觉得自己都懂了，那么，如果此时有面试官问：引用次数为 0 是垃圾回收启动的充要条件吗？还有没有其他可能性呢？
@@ -205,6 +241,7 @@ NameError: name 'a' is not defined
 
 请仔细观察下面这段代码：
 
+```python
 def func():
     show_memory_info('initial')
     a = [i for i in range(10000000)]
@@ -212,16 +249,20 @@ def func():
     show_memory_info('after a, b created')
     a.append(b)
     b.append(a)
+```
 
+```text
 func()
 show_memory_info('finished')
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 47.984375 MB
 after a, b created memory used: 822.73828125 MB
 finished memory used: 821.73046875 MB
-
+```
 
 这里，a 和 b 互相引用，并且，作为局部变量，在函数 func 调用结束后，a 和 b 这两个指针从程序意义上已经不存在了。但是，很明显，依然有内存占用！为什么呢？因为互相引用，导致它们的引用数都不为 0。
 
@@ -233,6 +274,7 @@ finished memory used: 821.73046875 MB
 
 事实上，Python 本身能够处理这种情况，我们刚刚讲过的，可以显式调用 gc.collect() ，来启动垃圾回收。
 
+```python
 import gc
 
 def func():
@@ -242,17 +284,21 @@ def func():
     show_memory_info('after a, b created')
     a.append(b)
     b.append(a)
+```
 
+```text
 func()
 gc.collect()
 show_memory_info('finished')
+```
 
 ########## 输出 ##########
 
+```text
 initial memory used: 49.51171875 MB
 after a, b created memory used: 824.1328125 MB
 finished memory used: 49.98046875 MB
-
+```
 
 所以你看，Python 的垃圾回收机制并没有那么弱。
 
@@ -282,31 +328,33 @@ Python 将所有对象分为三代。刚刚创立的对象是第 0 代；经过�
 
 import objgraph
 
+```text
 a = [1, 2, 3]
 b = [4, 5, 6]
+```
 
+```text
 a.append(b)
 b.append(a)
+```
 
 objgraph.show_refs([a])
-
-
-
 
 而另一个非常有用的函数，是 show_backrefs()。下面同样为示例代码和生成图，你可以自己先阅读一下：
 
 import objgraph
 
+```text
 a = [1, 2, 3]
 b = [4, 5, 6]
+```
 
+```text
 a.append(b)
 b.append(a)
+```
 
 objgraph.show_backrefs([a])
-
-
-
 
 相比刚才的引用调用图，这张图显得稍微复杂一些。不过，我仍旧推荐你掌握它，因为这个 API 有很多有用的参数，比如层数限制（max_depth）、宽度限制（too_many）、输出格式控制（filename output）、节点过滤（filter, extra_ignore）等。所以，建议你使用之前，先认真看一下文档。
 
@@ -314,19 +362,15 @@ objgraph.show_backrefs([a])
 
 最后，带你来总结一下。今天这节课，我们深入了解了Python 的垃圾回收机制，我主要强调下面这几点：
 
-
+```text
 垃圾回收是 Python 自带的机制，用于自动释放不会再用到的内存空间；
 引用计数是其中最简单的实现，不过切记，这只是充分非必要条件，因为循环引用需要通过不可达判定，来确定是否可以回收；
 Python 的自动回收算法包括标记清除和分代收集，主要针对的是循环引用的垃圾收集；
 调试内存泄漏方面， objgraph 是很好的可视化分析工具。
-
+```
 
 思考题
 
 最后给你留一道思考题。你能否自己实现一个垃圾回收判定算法呢？我的要求很简单，输入是一个有向图，给定起点，表示程序入口点；给定有向边，输出不可达节点。
 
 希望你可以认真思考这个问题，并且在留言区写下你的答案与我讨论。也欢迎你把这篇文章分享出去，我们一起交流，一起进步。
-
-                        
-                        
-                            

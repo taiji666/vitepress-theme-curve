@@ -1,10 +1,12 @@
 ---
 title: 37包管理和分发：通过NPM做包的管理和分发
-date: 1739706057.6210232
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             37 包管理和分发：通过NPM做包的管理和分发
                             你好，我是石川。
+```
 
 在前面几讲中，我们看到无论是响应式编程框架React，还是测试用的Jest、Puppeteer工具，亦或是做代码检查和样式优化的ESLint、Prettier工具，都离不开第三方库，而我们在之前的例子中，都是通过NPM下载和安装工具的。
 
@@ -24,9 +26,11 @@ NPM（Node Package Manager）虽然它叫做 Node 包管理，但是其实你也
 
 如果模块是在Git上管理的，可以在包所在的根目录下，将模块加进来。或者，我们也可以选择直接在目录下写一个模块。以下面的 printMsg 模块为例，这里通过 export 导出的模块，可以在其它的程序中通过 require() 导入引用。
 
+```javascript
 exports.printMsg = function() {
   console.log("This is a message from the demo package");
 }
+```
 
 
 在我们创建了一个包之后，在正式发布前，最好先通过 npm install 自己测试一下。确保无误之后，我们可以通过 npm publish 对包进行发布。无论是公开还是私有包的发布，都需要在发布前在NPM的注册页面上创建一个用户。为了安全，发布包以前，最好通过2FA的双因子认证。
@@ -46,11 +50,13 @@ npm token create --cidr=192.0.2.0/24
 
 之后，我们可以将令牌设置为CI/CD服务器中的环境变量或密钥。例如，在GitHub Actions中，我们可以将令牌添加为密钥。然后根据该密钥，创建一个名为 NPM_TOKEN 的环境变量，将密钥提供给工作流。
 
+```markdown
 steps:
   - run: |
       npm install
   - env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
 
 
 这里值得强调的是，这里的令牌具有可以读取私有包，代表我们发布新包，更改用户或包设置的权限。所以从安全的角度考虑，我们必须保护好令牌。千万不能将令牌添加到版本控制或存在不安全的地方。最好是将令牌存储在密码管理器、云提供商的安全存储或CI/CD工具提供的安全存储器中。如果可能，应该使用我们前面讲到的具有最低权限的粒度访问令牌，并为令牌设置较短的过期时间。

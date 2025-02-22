@@ -1,10 +1,12 @@
 ---
 title: 43元编程：通过Proxies和Reflect赋能元编程
-date: 1739706057.6210232
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             43 元编程：通过Proxies和Reflect赋能元编程
                             你好，我是石川。
+```
 
 今天，我们来到了这个单元最后的一课。前面的两节课中，我们分别学习了微前端和大前端“一大一小”两个趋势，今天我们再来看看“元”编程。那么，元编程中的“元”代表什么呢？“元”有“之上”或“超出一般限制”的意思。听上去，比较玄乎，实际上，要理解和使用元编程，并不难，甚至你可能每天都在用，只是没有觉察到而已。所以今天，就让我们来一步步了解下元编程的概念及使用。
 
@@ -52,6 +54,7 @@ categories: [JavaScript进阶实战课]
 
 当我们想将一个值安全地插入到 HTML 字符串中时，模版会非常得有用。我们拿 html`` 为例，在使用标签构建最终字符串之前，标签会对每个值执行 HTML 转义。
 
+```javascript
 function html(str, ...val) {
     var escaped = val.map(v => String(v)
                                   .replace("&", "&amp;")
@@ -62,9 +65,12 @@ function html(str, ...val) {
     }
     return result;
 }
+```
 
+```javascript
 var operator = "&";
 html`<b>x ${operator} y</b>`             // => "<b>x &amp; y</b>"
+```
 
 
 下面，我们再来看看 Reflect 对象。Reflect 并不是一个类，和 Math 对象类似，它的属性只是定义了一组相关的函数。ES6 中添加的这些函数都在一个命名空间中，它们模仿核心语言的行为，并且复制了各种预先存在于对象函数的特性。
@@ -75,28 +81,35 @@ Proxy 和 Reflect
 
 在 ES6 和更高版本中提供的 Proxy 类可以算是 JavaScript 中最强大的元编程功能了。它允许我们编写改变 JavaScript 对象基本行为的代码。我们在前面提到的 Reflect API 是一组函数，它使我们可以直接访问 JavaScript 对象上的一组基本操作。当我们创建 Proxy 对象时，我们指定了另外两个对象，目标对象和处理程序对象。
 
+```javascript
 var target = {
   message1: "hello",
   message2: "world",
 };
 var handler = {};
+```
 
 var proxy = new Proxy(target, handler);
 
 
 生成的代理对象没有自己的状态或行为。无论何时对其执行操作（读取属性、写入属性、定义新属性、查找原型、将其作为函数调用），它都会将这些操作分派给处理程序对象或目标对象。代理对象支持的操作与 Reflect API 定义的操作相同。Proxy 的工作机制是，如果 handler 是空的，那么代理对象只是一层透明的装饰器。所以在上面的例子中，如果我们执行代理，那么它返回的结果就是目标对象上本来自有的属性。
 
+```javascript
 console.log(proxy.message1); // hello
 console.log(proxy.message2); // world
+```
 
 
 通常，我们会把 Proxy 和 Reflect 结合起来使用，这样的好处是，对于我们不想自定义的部分，我们可以使用 Reflect 来调用对象内置的方法。
 
+```javascript
 const target = {
   message1: "hello",
   message2: "world",
 };
+```
 
+```javascript
 const handler = {
   get(target, prop, receiver) {
     if (prop === "message2") {
@@ -108,6 +121,7 @@ const handler = {
 var proxy = new Proxy(target, handler);
 console.log(proxy.message1); // hello
 console.log(proxy.message2); // Jackson
+```
 
 
 总结

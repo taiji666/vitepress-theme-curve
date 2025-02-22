@@ -1,10 +1,12 @@
 ---
 title: 28性能：如何理解JavaScript中的并行、并发？（下）
-date: 1739706057.6064274
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             28 性能：如何理解JavaScript中的并行、并发？（下）
                             你好，我是石川。
+```
 
 在上一讲中，我们初步介绍了并发和并行的概念，对比了不同语言对多线程开发的支持。我们也通过postMessage，学习了用信息传递的方式在主线程和Worker线程间实现交互。但是，我们也发现了JavaScript对比其它语言，在多线程方面还有不足，似乎信息传递本身不能让数据在不同的线程中真正做到共享，而只是互传拷贝的信息。
 
@@ -34,15 +36,21 @@ SAB是一个共享的ArrayBuffer内存块。在说到SAB前，我们先看看Arr
 
 那一个ArrayBuffer和我们经常用的数组有什么区别呢？一起来看下面的代码，一个普通的数组中可以有数字、字符串、对象等不同类型的数据，但是在ArrayBuffer当中，我们唯一可用的就是字节。
 
+```text
 // 数组
 [5, {prop: "value"}, "一个字符串"]；
+```
 
+```text
 [0] = 5；
 [1] = {prop: "value"}；
 [2] = "一个字符串"；
+```
 
+```text
 // ArrayBuffer
 [01001011101000000111]
+```
 
 
 这里的字节虽然可以用一串数字表示，但是有个问题是，机器怎么能知道它的单位呢？比如我前面介绍的，这串数字本身是没意义的，只有根据不同的8、32或者64比特单位，它才能具有意义。这时，我们就需要一个view来给它分段。
@@ -51,31 +59,43 @@ SAB是一个共享的ArrayBuffer内存块。在说到SAB前，我们先看看Arr
 
 所以一个ArrayBuffer中的数据是不能直接被操作，而要通过 TypedArray 或 DataView 来操作。
 
+```javascript
 // main.js
 var worker = new Worker('worker.js');
+```
 
+```javascript
 // 创建一个1KB大小的ArrayBuffer
 var buffer = new SharedArrayBuffer(1024); 
+```
 
+```javascript
 // 创建一个TypedArray的DataView
 var view = new Uint8Array(buffer); 
+```
 
+```text
 // 传递信息
 worker.postMessage(buffer);
+```
 
+```javascript
 setTimeout(() => {
   // buffer中的第1个字节
   console.log('later', view[0]); // later 5
   // buffer中foo的属性值
   console.log('prop', buffer.foo); // prop 32
 }, 1000);
+```
 
+```javascript
 // worker.js
 self.onmessage = ({data: buffer}) => {
   buffer.foo = 32;
   var view = new Uint8Array(buffer);
   view[0] = 5;
 }
+```
 
 
 其实一个ArrayBuffer或SAB在初始化的时候，也是要用到postMessage和结构化拷贝算法的。但是和信息传递不同的是，这里在请求端发起请求时传入的数据，被拷贝后，如果在接收端做了修改，这个修改后的数据的指向和之前的数据是一致的。我们可以对比下普通的postMessage和ArrayBuffer以及SAB的区别。
@@ -143,10 +163,12 @@ Actor Model模式
 这里，我们针对数据量较大的信息传递时，应该注意一些优化策略：
 
 
+```text
 我们可以将任务切分成小块儿依次传递；
 每次我们可以选择传递delta，也就是有变化的部分，而不是将全量数据进行传递；
 如果我们传递的频率过高，也可以将消息捆绑来传递；
 最后一点就是通过ArrayBuffer提高性能。
+```
 
 
 总结

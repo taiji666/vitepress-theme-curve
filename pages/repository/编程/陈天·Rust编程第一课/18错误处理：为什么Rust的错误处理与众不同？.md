@@ -1,10 +1,12 @@
 ---
 title: 18错误处理：为什么Rust的错误处理与众不同？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             18 错误处理：为什么Rust的错误处理与众不同？
                             你好，我是陈天。
+```
 
 作为被线上业务毒打过的开发者，我们都对墨菲定律刻骨铭心。任何一个系统，只要运行的时间足够久，或者用户的规模足够大，极小概率的错误就一定会发生。比如，主机的磁盘可能被写满、数据库系统可能会脑裂、上游的服务比如 CDN 可能会宕机，甚至承载服务的硬件本身可能损坏等等。
 
@@ -18,9 +20,11 @@ categories: [陈天·Rust编程第一课]
 对我们开发者来说，错误处理包含这么几部分：
 
 
+```text
 当错误发生时，用合适的错误类型捕获这个错误。
 错误捕获后，可以立刻处理，也可以延迟到不得不处理的地方再处理，这就涉及到错误的传播（propagate）。
 最后，根据不同的错误类型，给用户返回合适的、帮助他们理解问题所在的错误消息。
+```
 
 
 作为一门极其注重用户体验的编程语言，Rust 从其它优秀的语言中，尤其是 Haskell ，吸收了错误处理的精髓，并以自己独到的方式展现出来。
@@ -49,8 +53,10 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 func Fread(file *File, b []byte) (n int, err error)
 
 
+```text
 Golang这样，区分开错误返回和正常返回，相对 C 来说进了一大步。-
 但是使用返回值的方式，始终有个致命的问题：在调用者调用时，错误就必须得到处理或者显式的传播。
+```
 
 如果函数 A 调用了函数 B，在 A 返回错误的时候，就要把 B 的错误转换成 A 的错误，显示出来。如下图所示：-
 
@@ -76,6 +82,7 @@ Golang这样，区分开错误返回和正常返回，相对 C 来说进了一�
 
 我们看下面用来切换背景图片的（伪）代码：
 
+```css
 void transition(...) {
   lock(&mutex);
   delete background;
@@ -83,6 +90,7 @@ void transition(...) {
   background = new Background(...);
   unlock(&mutex);
 }
+```
 
 
 试想，如果在创建新的背景时失败，抛出异常，会跳过后续的处理流程，一路栈回溯到 try catch 的代码，那么，这里锁住的 mutex 无法得到释放，而已有的背景被清空，新的背景没有创建，程序进入到一个奇怪的状态。
@@ -123,20 +131,26 @@ Option 和 Result
 
 Option 是一个 enum，其定义如下：
 
+```html
 pub enum Option<T> {
     None,
     Some(T),
 }
+```
 
 
+```text
 它可以承载有值/无值这种最简单的错误类型。-
 Result 是一个更加复杂的 enum，其定义如下：
+```
 
 #[must_use = "this `Result` may be an `Err` variant, which should be handled"]
+```text
 pub enum Result<T, E> {
     Ok(T),
     Err(E),
 }
+```
 
 
 当函数出错时，可以返回 Err(E)，否则 Ok(T)。
@@ -154,34 +168,42 @@ pub enum Result<T, E> {
 
 所以在 Rust 代码中，如果你只想传播错误，不想就地处理，可以用 ? 操作符，比如（代码）:
 
+```cpp
 use std::fs::File;
 use std::io::Read;
+```
 
+```cpp
 fn read_file(name: &str) -> Result<String, std::io::Error> {
   let mut f = File::open(name)?;
   let mut contents = String::new();
   f.read_to_string(&mut contents)?;
   Ok(contents)
 }
+```
 
 
 通过 ? 操作符，Rust 让错误传播的代价和异常处理不相上下，同时又避免了异常处理的诸多问题。
 
 ? 操作符内部被展开成类似这样的代码：
 
+```javascript
 match result {
   Ok(v) => v,
   Err(e) => return Err(e.into())
 }
+```
 
 
 所以，我们可以方便地写出类似这样的代码，简洁易懂，可读性很强：
 
+```text
 fut
   .await?
   .process()?
   .next()
   .await?;
+```
 
 
 整个代码的执行流程如下：-
@@ -196,12 +218,14 @@ Rust 还为 Option 和 Result 提供了大量的辅助函数，如 map/map_err/a
 
 通过这些函数，你可以很方便地对错误处理引入 Railroad oriented programming 范式。比如用户注册的流程，你需要校验用户输入，对数据进行处理，转换，然后存入数据库中。你可以这么撰写这个流程：
 
+```text
 Ok(data)
   .and_then(validate)
   .and_then(process)
   .map(transform)
   .and_then(store)
   .map_error(...)
+```
 
 
 执行流程如下图所示：-
@@ -228,6 +252,7 @@ let params: NoiseParams = "Noise_XX_25519_AESGCM_SHA256".parse().unwrap();
 
 use std::panic;
 
+```javascript
 fn main() {
     let result = panic::catch_unwind(|| {
         println!("hello!");
@@ -239,6 +264,7 @@ fn main() {
     assert!(result.is_err());
     println!("panic captured: {:#?}", result);
 }
+```
 
 
 当然，和异常处理一样，并不意味着你可以滥用这一特性，我想，这也是 Rust 把抛出异常称作 panic! ，而捕获异常称作 catch_unwind的原因，让初学者望而生畏，不敢轻易使用。这也是一个不错的用户体验。
@@ -251,12 +277,14 @@ Error trait 和错误类型的转换
 
 上文中，我们讲到 Result 里 E 是一个代表错误的数据类型。为了规范这个代表错误的数据类型的行为，Rust 定义了 Error trait：
 
+```css
 pub trait Error: Debug + Display {
     fn source(&self) -> Option<&(dyn Error + 'static)> { ... }
     fn backtrace(&self) -> Option<&Backtrace> { ... }
     fn description(&self) -> &str { ... }
     fn cause(&self) -> Option<&dyn Error> { ... }
 }
+```
 
 
 我们可以定义我们自己的数据类型，然后为其实现 Error trait。
@@ -266,6 +294,7 @@ pub trait Error: Debug + Display {
 use thiserror::Error;
 #[derive(Error, Debug)]
 #[non_exhaustive]
+```cpp
 pub enum DataStoreError {
     #[error("data store disconnected")]
     Disconnect(#[from] io::Error),
@@ -279,6 +308,7 @@ pub enum DataStoreError {
     #[error("unknown data store error")]
     Unknown,
 }
+```
 
 
 如果你在撰写一个 Rust 库，那么 thiserror 可以很好地协助你对这个库里所有可能发生的错误进行建模。
@@ -292,9 +322,11 @@ pub enum DataStoreError {
 这一讲我们讨论了错误处理的三种方式：使用返回值、异常处理和类型系统。而Rust 站在巨人的肩膀上，采各家之长，形成了我们目前看到的方案：主要用类型系统来处理错误，辅以异常来应对不可恢复的错误。
 
 
+```text
 相比 C/Golang 直接用返回值的错误处理方式，Rust 在类型上更完备，构建了逻辑更为严谨的 Option 类型和 Result 类型，既避免了错误被不慎忽略，也避免了用啰嗦的表达方式传递错误；
 相对于 C++/Java 使用异常的方式，Rust 区分了可恢复错误和不可恢复错误，分别使用 Option/Result，以及 panic!/catch_unwind 来应对，更安全高效，避免了异常安全带来的诸多问题；
 而对比它的老师 Haskell，Rust 的错误处理更加实用简洁，这得益于它强大的元编程功能，使用 ？操作符来简化错误的传递。
+```
 
 
 总结一下：Rust 的错误处理很实用、足够强大、处理起来又不会过于冗长，充分使用 Rust 语言本身的能力，大大简化了错误传递的代码，简洁明了，几乎接近于异常处理的方式。
@@ -309,6 +341,7 @@ pub enum DataStoreError {
 
 拓展阅读
 
+```text
 1.Exception handling considered harmful-
 2.Exception safety-
 3.Why does go not have exceptions-
@@ -317,6 +350,7 @@ pub enum DataStoreError {
 6.Erlang NIF-
 7.thiserror-
 8.anyhow
+```
 
                         
                         

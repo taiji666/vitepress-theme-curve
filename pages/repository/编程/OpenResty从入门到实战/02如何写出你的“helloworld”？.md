@@ -1,21 +1,27 @@
 ---
 title: 02如何写出你的“helloworld”？
-date: 1739706057.145951
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             02 如何写出你的“hello world”？
                             你好，我是温铭。今天起，就要开始我们的正式学习之旅。
+```
 
 每当我们开始学习一个新的开发语言或者平台，都会从最简单的hello world开始，OpenResty 也不例外。让我们先跳过安装的步骤，直接看下，最简单的 OpenResty 程序是怎么编写和运行的：
 
+```bash
 $ resty -e "ngx.say('hello world')"
 hello world
+```
 
 
 这应该是你见过的最简单的那种 hello world 代码写法，和 Python 类似：
 
+```bash
 $ python -c 'print("hello world")'
 hello world
+```
 
 
 这背后其实是 OpenResty 哲学的一种体现，代码要足够简洁，也好让你打消“从入门到放弃“的念头。我们今天的内容，就专门围绕着这行代码来展开聊一聊。
@@ -27,8 +33,10 @@ resty -e "ngx.say('hello world'); ngx.sleep(10)" &
 
 我们加了一行 sleep 休眠的代码，让 resty 运行的程序打印出字符串后，并不退出。这样，我们就有机会一探究竟：
 
+```bash
 $ ps -ef | grep nginx
 501 25468 25462   0  7:24下午 ttys000    0:00.01 /usr/local/Cellar/openresty/''1.13.6.2/nginx/sbin/nginx -p /tmp/resty_AfNwigQVOB/ -c conf/nginx.conf
+```
 
 
 终于看了熟悉的 NGINX 进程。看来，resty 本质上是启动了一个 NGINX 服务，那么resty 又是一个什么程序呢？我先卖个关子，咱后面再讲。
@@ -39,8 +47,10 @@ OpenResty 的安装
 
 和其他的开源软件一样，OpenResty 的安装有多种方法，比如使用操作系统的包管理器、源码编译或者 docker 镜像。我推荐你优先使用 yum、apt-get、brew 这类包管理系统，来安装 OpenResty。这里我们使用 Mac 系统来做示例：
 
+```text
 brew tap openresty/brew
 brew install openresty
+```
 
 
 使用其他操作系统也是类似的，先要在包管理器中添加 OpenResty 的仓库地址，然后用包管理工具来安装。具体步骤，你可以参考官方文档。
@@ -67,12 +77,15 @@ brew install openresty
 
 Source0: https://www.openssl.org/source/openssl-%{version}.tar.gz
 
+```text
 Patch0: https://raw.githubusercontent.com/openresty/openresty/master/patches/openssl-1.1.0d-sess_set_get_cb_yield.patch
 Patch1: https://raw.githubusercontent.com/openresty/openresty/master/patches/openssl-1.1.0j-parallel_build_fix.patch
+```
 
 
 同时，我们可以看下 OpenResty 在 CentOS 中的[打包脚本]，看看是否还有其他隐藏的点：
 
+```text
 BuildRequires: perl-File-Temp
 BuildRequires: gcc, make, perl, systemtap-sdt-devel
 BuildRequires: openresty-zlib-devel >= 1.2.11-3
@@ -81,6 +94,7 @@ BuildRequires: openresty-pcre-devel >= 8.42-1
 Requires: openresty-zlib >= 1.2.11-3
 Requires: openresty-openssl >= 1.1.0h-1
 Requires: openresty-pcre >= 8.42-1
+```
 
 
 从这里可以看出，OpenResty 不仅维护了自己的 OpenSSL 版本，还维护了自己的 zlib 和 PCRE 版本。不过后面两个只是调整了编译参数，并没有维护自己的补丁。
@@ -95,31 +109,39 @@ OpenResty CLI
 
 安装完 OpenResty 后，默认就已经把 OpenResty 的 CLI：resty 安装好了。resty是个 1000 多行的 Perl 脚本，之前我们提到过，OpenResty 的周边工具都是 Perl 编写的，这个是由 OpenResty 作者的技术偏好决定的。
 
+```bash
 $ which resty
 /usr/local/bin/resty
 $ head -n 1 /usr/local/bin/resty
  #!/usr/bin/env perl
+```
 
 
 resty 的功能很强大，想了解完整的列表，你可以查看resty -h或者[官方文档]。下面，我挑两个有意思的功能介绍一下。
 
+```bash
 $ resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
                                dict:set("Tom", 56)
                                print(dict:get("Tom"))'
 56
+```
 
 
 先来看第一个例子。这个示例结合了 NGINX 配置和 Lua 代码，一起完成了一个共享内存字典的设置和查询。dogs 1m 是 NGINX 的一段配置，声明了一个共享内存空间，名字是 dogs，大小是 1m；在 Lua 代码中用字典的方式使用共享内存。另外还有--http-include 和 --main-include来设置 NGINX 配置文件。所以，上面的例子也可以写为：
 
+```python
 resty --http-conf 'lua_shared_dict dogs 1m;' -e 'local dict = ngx.shared.dogs
                                dict:set("Tom", 56)
                                print(dict:get("Tom"))'
+```
 
 
 OpenResty 世界中常用的调试工具，比如gdb、valgrind、sysetmtap和Mozilla rr ，也可以和 resty 一起配合使用，方便你平时的开发和测试。它们分别对应着 resty 不同的指令，内部的实现其实很简单，就是多套了一层命令行调用。我们以 valgrind 为例：
 
+```bash
 $ resty --valgrind  -e "ngx.say('hello world'); "
 ERROR: failed to run command "valgrind /usr/local/Cellar/openresty/1.13.6.2/nginx/sbin/nginx -p /tmp/resty_hTFRsFBhVl/ -c conf/nginx.conf": No such file or directory
+```
 
 
 在后面调试、测试和性能分析的章节，会涉及到这些工具的使用。它们不仅适用于 OpenResty 世界，也是服务端的通用工具，让我们循序渐进地来学习吧。
@@ -140,17 +162,22 @@ ERROR: failed to run command "valgrind /usr/local/Cellar/openresty/1.13.6.2/ngin
 
 我们先来创建工作目录。
 
+```text
 mkdir geektime
 cd geektime
 mkdir logs/ conf/
+```
 
 
 下面是一个最简化的 nginx.conf，在根目录下新增 OpenResty 的content_by_lua指令，里面嵌入了ngx.say的代码：
 
+```css
 events {
     worker_connections 1024;
 }
+```
 
+```css
 http {
     server {
         listen 8080;
@@ -161,6 +188,7 @@ http {
         }
     }
 }
+```
 
 
 请先确认下，是否已经把openresty加入到PATH环境中；然后，启动 OpenResty 服务就可以了：
@@ -170,12 +198,14 @@ openresty -p `pwd` -c conf/nginx.conf
 
 没有报错的话，OpenResty 的服务就已经成功启动了。你可以打开浏览器，或者使用 curl 命令，来查看结果的返回：
 
+```bash
 $ curl -i 127.0.0.1:8080
 HTTP/1.1 200 OK
 Server: openresty/1.13.6.2
 Content-Type: text/plain
 Transfer-Encoding: chunked
 Connection: keep-alive
+```
 
 hello, world
 

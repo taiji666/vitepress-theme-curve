@@ -1,10 +1,12 @@
 ---
 title: 00开篇词JavaScript的进阶之路
-date: 1739706057.586173
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             00 开篇词 JavaScript的进阶之路
                             你好，我是石川，欢迎和我一起学习JavaScript。
+```
 
 JavaScript的前身Mocha，是布兰登·艾克（Brendan Eich）在1995年用10天时间设计出来的。我第一次接触JavaScript，是从它诞生算起的10年后，在学校学习的，那时的网站更多是静态的信息展示类网页。所以当时，JavaScript和它刚发明出来时类似，更多是一门脚本语言。可以说，整个前端在那个年代和之前的很长时间，都被认为是一个很业余的技能。
 
@@ -31,8 +33,10 @@ JavaScript的前身Mocha，是布兰登·艾克（Brendan Eich）在1995年用10
 我认为造成这个问题的原因主要有两个：一是早期写JavaScript的很多程序员的编程基础并不扎实，知识点很杂，导致大家对JS的理解不够深入；二是后来入局的一些大咖，很多都是从其它语言转来的，他们认为一些知识没法分享和讲解。
 
 
+```text
 拿函数式编程中的Monad举例，道格拉斯·克罗克福特（Douglas Crockford，他帮助改良了JavaScript）就曾经说过：Once someone understands Monads, they lose the ability to explain it to anybody else.-
 大意是你一旦会用Monad，你就不知道怎么给别人解释它了。
+```
 
 
 这就使得JavaScript的开发者两极分化很严重，一部分一直停留在入门级，一部分出道即巅峰。
@@ -60,8 +64,10 @@ JavaScript的前身Mocha，是布兰登·艾克（Brendan Eich）在1995年用10
 但是我也发现，如果脱离了实际的语言和它解决的问题，来解释编程模式，就会高度抽象，显得比较形而上，还是拿函数式编程中很重要的概念Monad来说明，其官方解释是这样的：
 
 
+```text
 All told, a monad in X is just a monoid in the category of endofunctors of X, with product × replaced by composition of endofunctors and unit set by the identity endofunctor.-
 总而言之，X 中的单子只是 X 的内函子类别中的一个monoid，乘积 × 被内函子的组合替换，单位由恒等函子设置。
+```
 
 
 这样的解释，相信会让想要了解函数式编程的你头皮发麻，更不要说去掌握它的强大功能了。虽然它的解释并没有错，因为这就是一个数学上的概念，需要严谨且客观。但问题是，它和我们做开发有什么关系呢？
@@ -155,9 +161,11 @@ JavaScript之势
 那如果这么难，如何才能真正坚持学习课程呢？我没有标准答案，但是我想结合自己的一些经验，来给你分享一些可行的方法，希望能对你有所帮助。
 
 
+```text
 第一就是在学习一节知识时，尽量一鼓作气，有些概念即使模糊，你硬着头皮看下去也比停顿去深入了解某个点强。实在遇到困难的地方，你可以简单查下资料，但只要查到刚刚能让你继续往下读的内容即可，千万不要偏离了每节课的主题。
 第二是可以反馈意见，我们承诺会帮助；如果你对某个知识点有更简单的描述、更独特的见解，也欢迎你在评论区多分享。
 第三是可以让你的好朋友也一起学习课程，一起成长。读万卷书，不如行万里路，行万里路有时不如沟通和交流，这就像是编程中的Peer programming。
+```
 
 
 另外，为了让你学起来没那么难，我也借用函数式和面向对象编程模式中常用的两个思想，“声明式”和“基于接口而非实现”来设计这门课。也就是把这个过程当做一个对话，尽量用平实的语言、易读的代码和直观的图片，来帮助你理解一些生涩难懂的概念。
@@ -167,8 +175,10 @@ JavaScript之势
 延伸阅读
 
 
+```python
 Cynefin framework
 Import on Interaction
+```
 
 
                         

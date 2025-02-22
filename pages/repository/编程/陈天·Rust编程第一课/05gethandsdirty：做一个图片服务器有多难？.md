@@ -1,10 +1,12 @@
 ---
 title: 05gethandsdirty：做一个图片服务器有多难？
-date: 1739706057.3685184
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             05 get hands dirty：做一个图片服务器有多难？
                             你好，我是陈天。
+```
 
 上一讲我们只用了百来行代码就写出了 HTTPie 这个小工具，你是不是有点意犹未尽，今天我们就来再写一个实用的小例子，看看Rust还能怎么玩。
 
@@ -20,8 +22,7 @@ Thumbor 是 Python 下的一个非常著名的图片服务器，被广泛应用�
 
 我们看它的例子：
 
-http://<thumbor-server>/300x200/smart/thumbor.readthedocs.io/en/latest/_images/logo-thumbor.png
-
+```http://<thumbor-server>/300x200/smart/thumbor.readthedocs.io/en/latest/_images/logo-thumbor.png```
 
 在这个例子里，Thumbor 可以对这个图片最后的 URL 使用 smart crop 剪切，并调整大小为 300x200 的尺寸输出，用户访问这个 URL 会得到一个 300x200 大小的缩略图。
 
@@ -39,7 +40,6 @@ Thumbor 给出的答案是，把要使用的处理方法的接口，按照一定
 
 /hmac/trim/AxB:CxD/(adaptative-)(full-)fit-in/-Ex-F/HALIGN/VALIGN/smart/filters:FILTERNAME(ARGUMENT):FILTERNAME(ARGUMENT)/*IMAGE-URI*
 
-
 但这样不容易扩展，解析起来不方便，也很难满足对图片做多个有序操作的要求，比如对某个图片我想先加滤镜再加水印，对另一个图片我想先加水印再加滤镜。
 
 另外，如果未来要加更多的参数，一个不小心，还很可能和已有的参数冲突，或者造成 API 的破坏性更新（breaking change）。作为开发者，我们永远不要低估产品经理那颗什么奇葩想法都有的躁动的心。
@@ -48,24 +48,29 @@ Thumbor 给出的答案是，把要使用的处理方法的接口，按照一定
 
 这样的有序操作，对应到代码中，可以用列表来表述，列表中每个操作可以是一个 enum，像这样：
 
+```html
 // 解析出来的图片处理的参数
 struct ImageSpec {
     specs: Vec<Spec>
 }
+```
 
+```css
 // 每个参数的是我们支持的某种处理方式
 enum Spec {
     Resize(Resize),
     Crop(Crop),
     ...
 }
+```
 
+```css
 // 处理图片的 resize
 struct Resize {
     width: u32,
     height: u32
 }
-
+```
 
 现在需要的数据结构有了，刚才分析了 thumbor 使用的方式拓展性不好，那我们如何设计一个任何客户端可以使用的、体现在 URL 上的接口，使其能够解析成我们设计的数据结构呢？
 
@@ -77,6 +82,7 @@ struct Resize {
 
 message ImageSpec { repeated Spec specs = 1; }
 
+```css
 message Spec {
   oneof data {
     Resize resize = 1;
@@ -84,17 +90,17 @@ message Spec {
     ...
   }
 }
+```
 
 ...
 
-
 这样我们就可以在 URL 中，嵌入通过 protobuf 生成的 base64 字符串，来提供可扩展的图片处理参数。处理过的 URL 长这个样子：
 
-http://localhost:3000/image/CgoKCAjYBBCgBiADCgY6BAgUEBQKBDICCAM/<encoded origin url>
-
+```<http://localhost:3000/image/CgoKCAjYBBCgBiADCgY6BAgUEBQKBDICCAM/><encoded origin url>```
 
 CgoKCAjYBBCgBiADCgY6BAgUEBQKBDICCAM 描述了我们上面说的图片的处理流程：先做 resize，之后对 resize 的结果添加一个水印，最后统一使用一个滤镜。它可以用下面的代码实现：
 
+```cpp
 fn print_test_url(url: &str) {
     use std::borrow::Borrow;
     let spec1 = Spec::new_resize(600, 800, resize::SampleFilter::CatmullRom);
@@ -105,15 +111,13 @@ fn print_test_url(url: &str) {
     let test_image = percent_encode(url.as_bytes(), NON_ALPHANUMERIC).to_string();
     println!("test url: http://localhost:3000/image/{}/{}", s, test_image);
 }
-
+```
 
 使用 protobuf 的好处是，序列化后的结果比较小巧，而且任何支持 protobuf 的语言都可以生成或者解析这个接口。
 
 好，接口我们敲定好，接下来就是做一个 HTTP 服务器提供这个接口。在 HTTP 服务器对 /image 路由的处理流程里，我们需要从 URL 中获取原始的图片，然后按照 image spec 依次处理，最后把处理完的字节流返回给用户。
 
 在这个流程中，显而易见能够想到的优化是，为原始图片的获取过程，提供一个 LRU（Least Recently Used）缓存，因为访问外部网络是整个路径中最缓慢也最不可控的环节。
-
-
 
 分析完后，是不是感觉 thumbor 也没有什么复杂的？不过你一定会有疑问：200 行代码真的可以完成这么多工作么？我们先写着，完成之后再来统计一下。
 
@@ -123,6 +127,7 @@ protobuf 的定义和编译
 
 我们照样先 “cargo new thumbor” 生成项目，然后在项目的 Cargo.toml 中添加这些依赖：
 
+```text
 [dependencies]
 axum = "0.2" # web 服务器
 anyhow = "1" # 错误处理
@@ -141,10 +146,12 @@ tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] 
 tower-http = { version = "0.1", features = ["add-extension", "compression-full", "trace" ] } # http 中间件
 tracing = "0.1" # 日志和追踪
 tracing-subscriber = "0.2" # 日志和追踪
+```
 
+```text
 [build-dependencies]
 prost-build = "0.8" # 编译 protobuf
-
+```
 
 在项目根目录下，生成一个 abi.proto 文件，写入我们支持的图片处理服务用到的数据结构：
 
@@ -152,21 +159,28 @@ syntax = "proto3";
 
 package abi; // 这个名字会被用作编译结果，prost 会产生：abi.rs
 
+```css
 // 一个 ImageSpec 是一个有序的数组，服务器按照 spec 的顺序处理
 message ImageSpec { repeated Spec specs = 1; }
+```
 
+```css
 // 处理图片改变大小
 message Resize {
   uint32 width = 1;
   uint32 height = 2;
+```
 
+```css
   enum ResizeType {
     NORMAL = 0;
     SEAM_CARVE = 1;
   }
+```
 
   ResizeType rtype = 3;
 
+```css
   enum SampleFilter {
     UNDEFINED = 0;
     NEAREST = 1;
@@ -175,10 +189,14 @@ message Resize {
     GAUSSIAN = 4;
     LANCZOS3 = 5;
   }
+```
 
+```text
   SampleFilter filter = 4;
 }
+```
 
+```css
 // 处理图片截取
 message Crop {
   uint32 x1 = 1;
@@ -186,7 +204,9 @@ message Crop {
   uint32 x2 = 3;
   uint32 y2 = 4;
 }
+```
 
+```css
 // 处理水平翻转
 message Fliph {}
 // 处理垂直翻转
@@ -204,13 +224,17 @@ message Filter {
   }
   Filter filter = 1;
 }
+```
 
+```css
 // 处理水印
 message Watermark {
   uint32 x = 1;
   uint32 y = 2;
 }
+```
 
+```css
 // 一个 spec 可以包含上述的处理方式之一
 message Spec {
   oneof data {
@@ -223,19 +247,20 @@ message Spec {
     Watermark watermark = 7;
   }
 }
-
+```
 
 这包含了我们支持的图片处理服务，以后可以轻松扩展它来支持更多的操作。
 
 protobuf 是一个向下兼容的工具，所以在服务器不断支持更多功能时，还可以和旧版本的客户端兼容。在 Rust 下，我们可以用 prost 来使用和编译 protobuf。同样，在项目根目录下，创建一个 build.rs，写入以下代码：
 
+```cpp
 fn main() {
     prost_build::Config::new()
         .out_dir("src/pb")
         .compile_protos(&["abi.proto"], &["."])
         .unwrap();
 }
-
+```
 
 build.rs 可以在编译 cargo 项目时，做额外的编译处理。这里我们使用 prost_build 把 abi.proto 编译到 src/pb 目录下。
 
@@ -245,20 +270,27 @@ build.rs 可以在编译 cargo 项目时，做额外的编译处理。这里我�
 
 另外，我们还写了一个测试确保功能的正确性，你可以 cargo test 测试一下。记得在 main.rs 里添加 mod pb; 引入这个模块。
 
+```cpp
 use base64::{decode_config, encode_config, URL_SAFE_NO_PAD};
 use photon_rs::transform ::SamplingFilter;
 use prost::Message;
 use std::convert::TryFrom;
+```
 
+```text
 mod abi; // 声明 abi.rs
 pub use abi::*;
+```
 
+```html
 impl ImageSpec {
     pub fn new(specs: Vec<Spec>) -> Self {
         Self { specs }
     }
 }
+```
 
+```javascript
 // 让 ImageSpec 可以生成一个字符串
 impl From<&ImageSpec> for String {
     fn from(image_spec: &ImageSpec) -> Self {
@@ -266,17 +298,23 @@ impl From<&ImageSpec> for String {
         encode_config(data, URL_SAFE_NO_PAD)
     }
 }
+```
 
+```cpp
 // 让 ImageSpec 可以通过一个字符串创建。比如 s.parse().unwrap()
 impl TryFrom<&str> for ImageSpec {
     type Error = anyhow::Error;
+```
 
+```javascript
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let data = decode_config(value, URL_SAFE_NO_PAD)?;
         Ok(ImageSpec::decode(&data[..])?)
     }
 }
+```
 
+```javascript
 // 辅助函数，photon_rs 相应的方法里需要字符串
 impl filter::Filter {
     pub fn to_str(&self) -> Option<&'static str> {
@@ -288,7 +326,9 @@ impl filter::Filter {
         }
     }
 }
+```
 
+```javascript
 // 在我们定义的 SampleFilter 和 photon_rs 的 SamplingFilter 间转换
 impl From<resize::SampleFilter> for SamplingFilter {
     fn from(v: resize::SampleFilter) -> Self {
@@ -302,7 +342,9 @@ impl From<resize::SampleFilter> for SamplingFilter {
         }
     }
 }
+```
 
+```cpp
 // 提供一些辅助函数，让创建一个 spec 的过程简单一些
 impl Spec {
     pub fn new_resize_seam_carve(width: u32, height: u32) -> Self {
@@ -315,7 +357,9 @@ impl Spec {
             })),
         }
     }
+```
 
+```cpp
     pub fn new_resize(width: u32, height: u32, filter: resize::SampleFilter) -> Self {
         Self {
             data: Some(spec::Data::Resize(Resize {
@@ -326,7 +370,9 @@ impl Spec {
             })),
         }
     }
+```
 
+```cpp
     pub fn new_filter(filter: filter::Filter) -> Self {
         Self {
             data: Some(spec::Data::Filter(Filter {
@@ -334,20 +380,27 @@ impl Spec {
             })),
         }
     }
+```
 
+```cpp
     pub fn new_watermark(x: u32, y: u32) -> Self {
         Self {
             data: Some(spec::Data::Watermark(Watermark { x, y })),
         }
     }
 }
+```
 
-#[cfg(test)]
+# [cfg(test)]
+
+```cpp
 mod tests {
     use super::*;
     use std::borrow::Borrow;
     use std::convert::TryInto;
+```
 
+```javascript
     #[test]
     fn encoded_spec_could_be_decoded() {
         let spec1 = Spec::new_resize(600, 600, resize::SampleFilter::CatmullRom);
@@ -357,7 +410,7 @@ mod tests {
         assert_eq!(image_spec, s.as_str().try_into().unwrap());
     }
 }
-
+```
 
 引入 HTTP 服务器
 
@@ -365,33 +418,46 @@ mod tests {
 
 根据 axum 的文档，我们可以构建出下面的代码：
 
+```cpp
 use axum::{extract::Path, handler::get, http::StatusCode, Router};
 use percent_encoding::percent_decode_str;
 use serde::Deserialize;
 use std::convert::TryInto;
+```
 
+```text
 // 引入 protobuf 生成的代码，我们暂且不用太关心他们
 mod pb;
+```
 
 use pb::*;
 
 // 参数使用 serde 做 Deserialize，axum 会自动识别并解析
-#[derive(Deserialize)]
+# [derive(Deserialize)]
+
+```css
 struct Params {
     spec: String,
     url: String,
 }
+```
 
-#[tokio::main]
+# [tokio::main]
+
+```cpp
 async fn main() {
     // 初始化 tracing
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     // 构建路由
     let app = Router::new()
         // `GET /image` 会执行 generate 函数，并把 spec 和 url 传递过去
         .route("/image/:spec/:url", get(generate));
+```
 
+```javascript
     // 运行 web 服务器
     let addr = "127.0.0.1:3000".parse().unwrap();
     tracing::debug!("listening on {}", addr);
@@ -400,7 +466,9 @@ async fn main() {
         .await
         .unwrap();
 }
+```
 
+```html
 // 目前我们就只把参数解析出来
 async fn generate(Path(Params { spec, url }): Path<Params>) -> Result<String, StatusCode> {
     let url = percent_decode_str(&url).decode_utf8_lossy();
@@ -408,19 +476,24 @@ async fn generate(Path(Params { spec, url }): Path<Params>) -> Result<String, St
         .as_str()
         .try_into()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-		Ok(format!("url: {}\n spec: {:#?}", url, spec))
+  Ok(format!("url: {}\n spec: {:#?}", url, spec))
 }
-
+```
 
 把它们添加到 main.rs 后，使用 cargo run 运行服务器。然后我们就可以用上一讲做的 HTTPie 测试（eat your own dog food）：
 
+```text
 httpie get "http://localhost:3000/image/CgoKCAjYBBCgBiADCgY6BAgUEBQKBDICCAM/https%3A%2F%2Fimages%2Epexels%2Ecom%2Fphotos%2F2470905%2Fpexels%2Dphoto%2D2470905%2Ejpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26dpr%3D2%26h%3D750%26w%3D1260"
 HTTP/1.1 200 OK
+```
 
+```text
 content-type: "text/plain"
 content-length: "901"
-date: "Wed, 25 Aug 2021 18:03:50 GMT"
+date: 2025-02-22
+```
 
+```css
 url: https://images.pexels.com/photos/2470905/pexels-photo-2470905.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260
  spec: ImageSpec {
     specs: [
@@ -456,7 +529,7 @@ url: https://images.pexels.com/photos/2470905/pexels-photo-2470905.jpeg?auto=com
             ),
         },
     ],
-
+```
 
 Wow，Web 服务器的接口部分我们已经能够正确处理了。
 
@@ -470,6 +543,7 @@ Wow，Web 服务器的接口部分我们已经能够正确处理了。
 
 我们把 main.rs 的代码，改成下面的代码：
 
+```cpp
 use anyhow::Result;
 use axum::{
     extract::{Extension, Path},
@@ -490,19 +564,25 @@ use std::{
 use tokio::sync::Mutex;
 use tower::ServiceBuilder;
 use tracing::{info, instrument};
+```
 
 mod pb;
 
 use pb::*;
 
-#[derive(Deserialize)]
+# [derive(Deserialize)]
+
+```css
 struct Params {
     spec: String,
     url: String,
 }
 type Cache = Arc<Mutex<LruCache<u64, Bytes>>>;
+```
 
-#[tokio::main]
+# [tokio::main]
+
+```javascript
 async fn main() {
     // 初始化 tracing
     tracing_subscriber::fmt::init();
@@ -516,20 +596,26 @@ async fn main() {
                 .layer(AddExtensionLayer::new(cache))
                 .into_inner(),
         );
+```
 
+```javascript
     // 运行 web 服务器
     let addr = "127.0.0.1:3000".parse().unwrap();
+```
 
     print_test_url("https://images.pexels.com/photos/1562477/pexels-photo-1562477.jpeg?auto=compress&cs=tinysrgb&dpr=3&h=750&w=1260");
 
     info!("Listening on {}", addr);
 
+```cpp
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
+```
 
+```html
 async fn generate(
     Path(Params { spec, url }): Path<Params>,
     Extension(cache): Extension<Cache>,
@@ -538,26 +624,35 @@ async fn generate(
         .as_str()
         .try_into()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
+```
 
+```javascript
     let url: &str = &percent_decode_str(&url).decode_utf8_lossy();
     let data = retrieve_image(&url, cache)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
+```
 
     // TODO: 处理图片
 
     let mut headers = HeaderMap::new();
 
+```cpp
     headers.insert("content-type", HeaderValue::from_static("image/jpeg"));
     Ok((headers, data.to_vec()))
 }
+```
 
-#[instrument(level = "info", skip(cache))]
+# [instrument(level = "info", skip(cache))]
+
+```javascript
 async fn retrieve_image(url: &str, cache: Cache) -> Result<Bytes> {
     let mut hasher = DefaultHasher::new();
     url.hash(&mut hasher);
     let key = hasher.finish();
+```
 
+```javascript
     let g = &mut cache.lock().await;
     let data = match g.get(&key) {
         Some(v) => {
@@ -572,10 +667,14 @@ async fn retrieve_image(url: &str, cache: Cache) -> Result<Bytes> {
             data
         }
     };
+```
 
+```text
     Ok(data)
 }
+```
 
+```cpp
 // 调试辅助函数
 fn print_test_url(url: &str) {
     use std::borrow::Borrow;
@@ -587,16 +686,19 @@ fn print_test_url(url: &str) {
     let test_image = percent_encode(url.as_bytes(), NON_ALPHANUMERIC).to_string();
     println!("test url: http://localhost:3000/image/{}/{}", s, test_image);
 }
+```
 
-
+```text
 这段代码看起来多，其实主要就是添加了 retrieve_image 这个函数。对于图片的网络请求，我们先把 URL 做个哈希，在 LRU 缓存中查找，找不到才用 reqwest 发送请求。-
 你可以 cargo run 运行一下现在的代码：
+```
 
 ❯ RUST_LOG=info cargo run --quiet
 
+```text
 test url: http://localhost:3000/image/CgoKCAj0AxCgBiADCgY6BAgUEBQKBDICCAM/https%3A%2F%2Fimages%2Epexels%2Ecom%2Fphotos%2F1562477%2Fpexels%2Dphoto%2D1562477%2Ejpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26dpr%3D3%26h%3D750%26w%3D1260
 Aug 26 16:43:45.747  INFO server2: Listening on 127.0.0.1:3000
-
+```
 
 为了测试方便，我放了个辅助函数可以生成一个测试 URL，在浏览器中打开后会得到一个和源图一模一样的图片。这就说明，网络处理的部分，我们就搞定了。
 
@@ -606,10 +708,9 @@ Aug 26 16:43:45.747  INFO server2: Listening on 127.0.0.1:3000
 
 我扫了一下它的源代码，感觉它不算一个特别优秀的库，内部有太多无谓的内存拷贝，所以性能还有不少提升空间。就算如此，从 photon_rs 自己的 benchmark 看，也比 PIL/ImageMagick 性能好太多，这也算是 Rust 性能强大的一个小小佐证吧。
 
-
-
 因为 photo_rs 使用简单，这里我们也不太关心更高的性能，就暂且用它。然而，作为一个有追求的开发者，我们知道，有朝一日可能要用不同的 image 引擎替换它，所以我们设计一个 Engine trait：
 
+```html
 // Engine trait：未来可以添加更多的 engine，主流程只需要替换 engine
 pub trait Engine {
     // 对 engine 按照 specs 进行一系列有序的处理
@@ -617,27 +718,33 @@ pub trait Engine {
     // 从 engine 中生成目标图片，注意这里用的是 self，而非 self 的引用
     fn generate(self, format: ImageOutputFormat) -> Vec<u8>;
 }
-
+```
 
 它提供两个方法，apply 方法对 engine 按照 specs 进行一系列有序的处理，generate 方法从 engine 中生成目标图片。
 
 那么 apply 方法怎么实现呢？我们可以再设计一个 trait，这样可以为每个 Spec 生成对应处理：
 
+```html
 // SpecTransform：未来如果添加更多的 spec，只需要实现它即可
 pub trait SpecTransform<T> {
     // 对图片使用 op 做 transform
     fn transform(&mut self, op: T);
 }
-
+```
 
 好，有了这个思路，我们创建 src/engine 目录，并添加 src/engine/mod.rs，在这个文件里添加对 trait 的定义：
 
+```cpp
 use crate::pb::Spec;
 use image::ImageOutputFormat;
+```
 
+```cpp
 mod photon;
 pub use photon::Photon;
+```
 
+```html
 // Engine trait：未来可以添加更多的 engine，主流程只需要替换 engine
 pub trait Engine {
     // 对 engine 按照 specs 进行一系列有序的处理
@@ -645,16 +752,19 @@ pub trait Engine {
     // 从 engine 中生成目标图片，注意这里用的是 self，而非 self 的引用
     fn generate(self, format: ImageOutputFormat) -> Vec<u8>;
 }
+```
 
+```html
 // SpecTransform：未来如果添加更多的 spec，只需要实现它即可
 pub trait SpecTransform<T> {
     // 对图片使用 op 做 transform
     fn transform(&mut self, op: T);
 }
-
+```
 
 接下来我们再生成一个文件 src/engine/photon.rs，对 photon 实现 Engine trait，这个文件主要是一些功能的实现细节，就不详述了，你可以看注释。
 
+```cpp
 use super::{Engine, SpecTransform};
 use crate::pb::*;
 use anyhow::Result;
@@ -665,7 +775,9 @@ use photon_rs::{
     effects, filters, multiple, native::open_image_from_bytes, transform, PhotonImage,
 };
 use std::convert::TryFrom;
+```
 
+```javascript
 lazy_static! {
     // 预先把水印文件加载为静态变量
     static ref WATERMARK: PhotonImage = {
@@ -676,19 +788,27 @@ lazy_static! {
         transform::resize(&watermark, 64, 64, transform::SamplingFilter::Nearest)
     };
 }
+```
 
+```text
 // 我们目前支持 Photon engine
 pub struct Photon(PhotonImage);
+```
 
+```cpp
 // 从 Bytes 转换成 Photon 结构
 impl TryFrom<Bytes> for Photon {
     type Error = anyhow::Error;
+```
 
+```cpp
     fn try_from(data: Bytes) -> Result<Self, Self::Error> {
         Ok(Self(open_image_from_bytes(&data)?))
     }
 }
+```
 
+```javascript
 impl Engine for Photon {
     fn apply(&mut self, specs: &[Spec]) {
         for spec in specs.iter() {
@@ -705,37 +825,49 @@ impl Engine for Photon {
             }
         }
     }
+```
 
+```html
     fn generate(self, format: ImageOutputFormat) -> Vec<u8> {
         image_to_buf(self.0, format)
     }
 }
+```
 
+```javascript
 impl SpecTransform<&Crop> for Photon {
     fn transform(&mut self, op: &Crop) {
         let img = transform::crop(&mut self.0, op.x1, op.y1, op.x2, op.y2);
         self.0 = img;
     }
 }
+```
 
+```cpp
 impl SpecTransform<&Contrast> for Photon {
     fn transform(&mut self, op: &Contrast) {
         effects::adjust_contrast(&mut self.0, op.contrast);
     }
 }
+```
 
+```cpp
 impl SpecTransform<&Flipv> for Photon {
     fn transform(&mut self, _op: &Flipv) {
         transform::flipv(&mut self.0)
     }
 }
+```
 
+```cpp
 impl SpecTransform<&Fliph> for Photon {
     fn transform(&mut self, _op: &Fliph) {
         transform::fliph(&mut self.0)
     }
 }
+```
 
+```javascript
 impl SpecTransform<&Filter> for Photon {
     fn transform(&mut self, op: &Filter) {
         match filter::Filter::from_i32(op.filter) {
@@ -745,7 +877,9 @@ impl SpecTransform<&Filter> for Photon {
         }
     }
 }
+```
 
+```javascript
 impl SpecTransform<&Resize> for Photon {
     fn transform(&mut self, op: &Resize) {
         let img = match resize::ResizeType::from_i32(op.rtype).unwrap() {
@@ -762,34 +896,43 @@ impl SpecTransform<&Resize> for Photon {
         self.0 = img;
     }
 }
+```
 
+```cpp
 impl SpecTransform<&Watermark> for Photon {
     fn transform(&mut self, op: &Watermark) {
         multiple::watermark(&mut self.0, &WATERMARK, op.x, op.y);
     }
 }
+```
 
+```javascript
 // photon 库竟然没有提供在内存中对图片转换格式的方法，只好手工实现
 fn image_to_buf(img: PhotonImage, format: ImageOutputFormat) -> Vec<u8> {
     let raw_pixels = img.get_raw_pixels();
     let width = img.get_width();
     let height = img.get_height();
+```
 
+```javascript
     let img_buffer = ImageBuffer::from_vec(width, height, raw_pixels).unwrap();
     let dynimage = DynamicImage::ImageRgba8(img_buffer);
+```
 
+```cpp
     let mut buffer = Vec::with_capacity(32768);
     dynimage.write_to(&mut buffer, format).unwrap();
     buffer
 }
-
+```
 
 好，图片处理引擎就搞定了。这里用了一个水印图片，你可以去 GitHub repo 下载，然后放在项目根目录下。我们同样把 engine 模块加入 main.rs，并引入 Photon：
 
+```cpp
 mod engine;
 use engine::{Engine, Photon};
 use image::ImageOutputFormat;
-
+```
 
 还记得 src/main.rs 的代码中，我们留了一个 TODO 么？
 
@@ -797,26 +940,32 @@ use image::ImageOutputFormat;
 
 let mut headers = HeaderMap::new();
 
+```cpp
 headers.insert("content-type", HeaderValue::from_static("image/jpeg"));
 Ok((headers, data.to_vec()))
-
+```
 
 我们把这段替换掉，使用刚才写好的 Photon 引擎处理：
 
+```cpp
 // 使用 image engine 处理
 let mut engine: Photon = data
     .try_into()
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 engine.apply(&spec.specs);
+```
 
 let image = engine.generate(ImageOutputFormat::Jpeg(85));
 
+```cpp
 info!("Finished processing: image size {}", image.len());
 let mut headers = HeaderMap::new();
+```
 
+```cpp
 headers.insert("content-type", HeaderValue::from_static("image/jpeg"));
 Ok((headers, image))
-
+```
 
 这样整个服务器的全部流程就完成了，完整的代码可以在 GitHub repo 访问。
 
@@ -824,37 +973,38 @@ Ok((headers, image))
 
 RUST_LOG=info target/release/thumbor
 
-
 打开测试链接，在浏览器中可以看到左下角的处理后图片。（原图片来自 pexels，发布者 Min An）
-
-
 
 成功了！这就是我们的 Thumbor 服务根据用户的请求缩小到 500x800、加了水印和 Marine 滤镜后的效果。
 
 从日志看，第一次请求时因为没有缓存，需要请求源图，所以总共花了 400ms；如果你再刷新一下，后续对同一图片的请求，会命中缓存，花了大概 200ms。
 
+```css
 Aug 25 15:09:28.035  INFO thumbor: Listening on 127.0.0.1:3000
 Aug 25 15:09:30.523  INFO retrieve_image{url="<https://images.pexels.com/photos/1562477/pexels-photo-1562477.jpeg?auto=compress&cs=tinysrgb&dpr=3&h=750&w=1260>"}: thumbor: Retrieve url
 Aug 25 15:09:30.950  INFO thumbor: Finished processing: image size 52674
 Aug 25 15:09:35.037  INFO retrieve_image{url="<https://images.pexels.com/photos/1562477/pexels-photo-1562477.jpeg?auto=compress&cs=tinysrgb&dpr=3&h=750&w=1260>"}: thumbor: Match cache 13782279907884137652
 Aug 25 15:09:35.254  INFO thumbor: Finished processing: image size 52674
-
+```
 
 这个版本目前是一个没有详细优化过的版本，性能已经足够好。而且，像 Thumbor 这样的图片服务，前面还有 CDN（Content Distribution Network）扛压力，只有 CDN 需要回源时，才会访问到，所以也可以不用太优化。
 
-
-
 最后来看看目标完成得如何。如果不算 protobuf 生成的代码，Thumbor 这个项目，到目前为止我们写了 324 行代码：
 
-❯ tokei src/main.rs src/engine/* src/pb/mod.rs
--------------------------------------------------------------------------------
- Language            Files        Lines         Code     Comments       Blanks
--------------------------------------------------------------------------------
- Rust                    4          394          324           22           48
--------------------------------------------------------------------------------
- Total                   4          394          324           22           48
 -------------------------------------------------------------------------------
 
+Language            Files        Lines         Code     Comments       Blanks
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+
+Total                   4          394          324           22           48
+-------------------------------------------------------------------------------
+
+```text
+❯ tokei src/main.rs src/engine/* src/pb/mod.rs
+ Rust                    4          394          324           22           48
+```
 
 三百多行代码就把一个图片服务器的核心部分搞定了，不仅如此，还充分考虑到了架构的可扩展性，用 trait 实现了主要的图片处理流程，并且引入了缓存来避免不必要的网络请求。虽然比我们预期的 200 行代码多了 50% 的代码量，但我相信它进一步佐证了 Rust 强大的表达能力。
 
@@ -882,21 +1032,17 @@ Aug 25 15:09:35.254  INFO thumbor: Finished processing: image size 52674
 
 我们看如何添加新功能：
 
-
+```text
 首先添加新的 proto，定义新的 spec
 然后为 spec 实现 SpecTransform trait 和一些辅助函数
 最后在 Engine 中使用 spec
-
+```
 
 如果要换图片引擎呢？也很简单：
 
-
+```text
 添加新的图片引擎，像 Photon 那样，实现 Engine trait 以及为每种 spec 实现 SpecTransform Trait。
 在 main.rs 里使用新的引擎。
-
+```
 
 欢迎在留言区分享你的思考，如果你觉得有收获，也欢迎你分享给你身边的朋友，邀他一起挑战。你的 Rust 学习第五次打卡成功，我们下一讲见！
-
-                        
-                        
-                            

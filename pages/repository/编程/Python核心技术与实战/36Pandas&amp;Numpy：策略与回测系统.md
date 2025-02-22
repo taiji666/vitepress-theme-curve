@@ -1,10 +1,12 @@
 ---
 title: 36Pandas&amp;Numpy：策略与回测系统
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             36 Pandas & Numpy：策略与回测系统
                             大家好，我是景霄。
+```
 
 上节课，我们介绍了交易所的数据抓取，特别是orderbook和tick数据的抓取。今天这节课，我们考虑的是，怎么在这些历史数据上测试一个交易策略。
 
@@ -38,29 +40,40 @@ K线的“小蜡烛” – OHLC
 
 数据下载完成后，我们可以利用Pandas读取，比如下面这段代码。
 
+```python
 def assert_msg(condition, msg):
     if not condition:
         raise Exception(msg)
+```
     
+```python
 def read_file(filename):
     # 获得文件绝对路径
     filepath = path.join(path.dirname(__file__), filename)
+```
     
+```markdown
     # 判定文件是否存在
     assert_msg(path.exists(filepath), "文件不存在")
+```
     
+```markdown
     # 读取CSV文件并返回
     return pd.read_csv(filepath,
                        index_col=0, 
                        parse_dates=True,
                        infer_datetime_format=True)
+```
 
+```python
 BTCUSD = read_file('BTCUSD_GEMINI.csv')
 assert_msg(BTCUSD.__len__() > 0, '读取失败')
 print(BTCUSD.head())
+```
 
 
 ########## 输出 ##########
+```text
 Time                 Symbol      Open      High       Low     Close     Volume
 Date                                                                          
 2019-07-08 00:00:00  BTCUSD  11475.07  11540.33  11469.53  11506.43  10.770731
@@ -68,13 +81,16 @@ Date
 2019-07-07 22:00:00  BTCUSD  11526.25  11572.74  11333.59  11423.00  48.937730
 2019-07-07 21:00:00  BTCUSD  11515.80  11562.65  11478.20  11526.25  25.323908
 2019-07-07 20:00:00  BTCUSD  11547.98  11624.88  11423.94  11515.80  63.211972
+```
 
 
 这段代码提供了两个工具函数。
 
 
+```text
 一个是read_file，它的作用是，用pandas读取csv文件。
 另一个是assert_msg，它的作用类似于assert，如果传入的条件（contidtion）为否，就会抛出异常。不过，你需要提供一个参数，用于指定要抛出的异常信息。
+```
 
 
 回测框架
@@ -86,8 +102,10 @@ Date
 我们想要学习量化交易，使用大型成熟的回测框架，自然是第一选择。
 
 
+```text
 比如Zipline，就是一个热门的事件驱动型回测框架，背后有大型社区和文档的支持。
 PyAlgoTrade也是事件驱动的回测框架，文档相对完整，整合了知名的技术分析（Techique Analysis）库TA-Lib。在速度和灵活方面，它比Zipline 强。不过，它的一大硬伤是不支持 Pandas 的模块和对象。
+```
 
 
 显然，对于我们Python学习者来说，第一类也就是向量型回测框架，才是最适合我们练手的项目了。那么，我们就开始吧。
@@ -95,19 +113,23 @@ PyAlgoTrade也是事件驱动的回测框架，文档相对完整，整合了知
 首先，我先为你梳理下回测流程，也就是下面五步：
 
 
+```text
 读取OHLC数据；
 对OHLC进行指标运算；
 策略根据指标向量决定买卖；
 发给模拟的”交易所“进行交易；
 最后，统计结果。
+```
 
 
 对此，使用之前学到的面向对象思维方式，我们可以大致抽取三个类：
 
 
+```text
 交易所类（ ExchangeAPI）：负责维护账户的资金和仓位，以及进行模拟的买卖；
 策略类（Strategy）：负责根据市场信息生成指标，根据指标决定买卖；
 回测类框架（Backtest）：包含一个策略类和一个交易所类，负责迭代地对每个数据点调用策略执行。
+```
 
 
 接下来，我们先从最外层的大框架开始。这样的好处在于，我们是从上到下、从外往内地思考，虽然还没有开始设计依赖项（Backtest的依赖项是ExchangeAPI和Strategy），但我们可以推测出它们应有的接口形式。推测接口的本质，其实就是推测程序的输入。
@@ -125,11 +147,13 @@ PyAlgoTrade也是事件驱动的回测框架，文档相对完整，整合了知
 它的输入是：
 
 
+```text
 OHLC数据；
 初始资金；
 手续费率；
 交易所类；
 策略类。
+```
 
 
 输出则是：
@@ -140,17 +164,22 @@ OHLC数据；
 
 对此，你可以参考下面这段代码：
 
+```python
 class Backtest:
     """
     Backtest回测类，用于读取历史行情数据、执行策略、模拟交易并估计
     收益。
+```
 
     初始化的时候调用Backtest.run来时回测
 
+```text
     instance, or `backtesting.backtesting.Backtest.optimize` to
     optimize it.
     """
+```
 
+```text
     def __init__(self,
                  data: pd.DataFrame,
                  strategy_type: type(Strategy),
@@ -160,7 +189,9 @@ class Backtest:
         """
         构造回测对象。需要的参数包括：历史数据，策略对象，初始资金数量，手续费率等。
         初始化过程包括检测输入类型，填充数据空值等。
+```
 
+```text
         参数：
         :param data:            pd.DataFrame        pandas Dataframe格式的历史OHLCV数据
         :param broker_type:     type(ExchangeAPI)   交易所API类型，负责执行买卖操作以及账户状态的维护
@@ -168,76 +199,105 @@ class Backtest:
         :param cash:            float               初始资金数量
         :param commission:       float               每次交易手续费率。如2%的手续费此处为0.02
         """
+```
 
+```text
         assert_msg(issubclass(strategy_type, Strategy), 'strategy_type不是一个Strategy类型')
         assert_msg(issubclass(broker_type, ExchangeAPI), 'strategy_type不是一个Strategy类型')
         assert_msg(isinstance(commission, Number), 'commission不是浮点数值类型')
+```
 
         data = data.copy(False)
 
+```markdown
         # 如果没有Volumn列，填充NaN
         if 'Volume' not in data:
             data['Volume'] = np.nan
+```
 
+```markdown
         # 验证OHLC数据格式
         assert_msg(len(data.columns & {'Open', 'High', 'Low', 'Close', 'Volume'}) == 5,
                    ("输入的`data`格式不正确，至少需要包含这些列："
                     "'Open', 'High', 'Low', 'Close'"))
+```
 
+```markdown
         # 检查缺失值
         assert_msg(not data[['Open', 'High', 'Low', 'Close']].max().isnull().any(),
             ('部分OHLC包含缺失值，请去掉那些行或者通过差值填充. '))
+```
 
+```python
         # 如果行情数据没有按照时间排序，重新排序一下
         if not data.index.is_monotonic_increasing:
             data = data.sort_index()
+```
 
+```markdown
         # 利用数据，初始化交易所对象和策略对象。
         self._data = data  # type: pd.DataFrame
         self._broker = broker_type(data, cash, commission)
         self._strategy = strategy_type(self._broker, self._data)
         self._results = None
+```
 
+```python
     def run(self):
         """
         运行回测，迭代历史数据，执行模拟交易并返回回测结果。
         Run the backtest. Returns `pd.Series` with results and statistics.
+```
 
+```text
         Keyword arguments are interpreted as strategy parameters.
         """
         strategy = self._strategy
         broker = self._broker
+```
 
+```markdown
         # 策略初始化
         strategy.init()
+```
 
+```markdown
         # 设定回测开始和结束位置
         start = 100
         end = len(self._data)
+```
 
+```markdown
         # 回测主循环，更新市场状态，然后执行策略
         for i in range(start, end):
             # 注意要先把市场状态移动到第i时刻，然后再执行策略。
             broker.next(i)
             strategy.next(i)
+```
 
+```markdown
         # 完成策略执行之后，计算结果并返回
         self._results = self._compute_result(broker)
         return self._results
+```
 
+```python
     def _compute_result(self, broker):
         s = pd.Series()
         s['初始市值'] = broker.initial_cash
         s['结束市值'] = broker.market_value
         s['收益'] = broker.market_value - broker.initial_cash
         return s
+```
 
 
 这段代码有点长，但是核心其实就两部分。
 
 
+```text
 初始化函数（init）：传入必要参数，对OHLC数据进行简单清洗、排序和验证。我们从不同地方下载的数据，可能格式不一样；而排序的方式也可能是从前往后。所以，这里我们把数据统一设置为按照时间从之前往现在的排序。
 执行函数（run）：这是回测框架的主要循环部分，核心是更新市场还有更新策略的时间。迭代完成所有的历史数据后，它会计算收益并返回。
+```
 
 
 你应该注意到了，此时，我们还没有定义策略和交易所API的结构。不过，通过回测的执行函数，我们可以确定这两个类的接口形式。
@@ -245,16 +305,20 @@ class Backtest:
 策略类（Strategy）的接口形式为：
 
 
+```text
 初始化函数init()，根据历史数据进行指标（Indicator）计算。
 步进函数next()，根据当前时间和指标，决定买卖操作，并发给交易所类执行。
+```
 
 
 交易所类（ExchangeAPI）的接口形式为：
 
 
+```text
 步进函数next()，根据当前时间，更新最新的价格；
 买入操作buy()，买入资产；
 卖出操作sell()，卖出资产。
+```
 
 
 交易策略
@@ -276,8 +340,10 @@ SMA，实质上就是对原始数组进行了一个简单平滑处理。比如�
 于是，我们想到，能不能对投资品的价格设置两个指标呢？这俩指标，一个是小窗口的SMA，一个是大窗口的SMA。
 
 
+```text
 如果小窗口的SMA曲线从下面刺破或者穿过大窗口SMA，那么说明，这个投资品的价格在短期内快速上涨，同时这个趋势很强烈，可能是一个买入的信号；
 反之，如果大窗口的SMA从下方突破小窗口SMA，那么说明，投资品的价格在短期内快速下跌，我们应该考虑卖出。
+```
 
 
 下面这幅图，就展示了这两种情况。
@@ -286,12 +352,15 @@ SMA，实质上就是对原始数组进行了一个简单平滑处理。比如�
 
 明白了这里的概念和原理后，接下来的操作就不难了。利用Pandas，我们可以非常简单地计算SMA和SMA交叉。比如，你可以引入下面两个工具函数：
 
+```python
 def SMA(values, n):
     """
     返回简单滑动平均
     """
     return pd.Series(values).rolling(n).mean()
+```
 
+```text
 def crossover(series1, series2) -> bool:
     """
     检查两个序列是否在结尾交叉
@@ -300,24 +369,31 @@ def crossover(series1, series2) -> bool:
     :return:         如果交叉返回True，反之False
     """
     return series1[-2] < series2[-2] and series1[-1] > series2[-1]
+```
 
 
 如代码所示，对于输入的一个数组，Pandas的rolling(k)函数，可以方便地计算窗内口大小为K的SMA数组；而想要检查某个时刻两个SMA是否交叉，你只需要查看两个数组末尾的两个元素即可。
 
 那么，基于此，我们就可以开发出一个简单的策略了。下面这段代码表示策略的核心思想，我做了详细的注释，你理解起来应该没有问题：
 
+```python
     def next(self, tick):
         # 如果此时快线刚好越过慢线，买入全部
         if crossover(self.sma1[:tick], self.sma2[:tick]):
             self.buy()
+```
 
+```python
         # 如果是慢线刚好越过快线，卖出全部
         elif crossover(self.sma2[:tick], self.sma1[:tick]):
             self.sell()
+```
 
+```markdown
         # 否则，这个时刻不执行任何操作。
         else:
             pass
+```
 
 
 说完策略的核心思想，我们开始搭建策略类的框子。
@@ -328,14 +404,19 @@ def crossover(series1, series2) -> bool:
 
 这个类的定义，你可以参考下面代码的实现：
 
+```python
 import abc
 import numpy as np
 from typing import Callable
+```
 
+```python
 class Strategy(metaclass=abc.ABCMeta):
     """
     抽象策略类，用于定义交易策略。
+```
 
+```python
     如果要定义自己的策略类，需要继承这个基类，并实现两个抽象方法：
     Strategy.init
     Strategy.next
@@ -343,7 +424,9 @@ class Strategy(metaclass=abc.ABCMeta):
     def __init__(self, broker, data):
         """
         构造策略对象。
+```
 
+```python
         @params broker:  ExchangeAPI    交易API接口，用于模拟交易
         @params data:    list           行情数据数据
         """
@@ -351,12 +434,16 @@ class Strategy(metaclass=abc.ABCMeta):
         self._broker = broker  # type: _Broker
         self._data = data  # type: _Data
         self._tick = 0
+```
 
+```text
     def I(self, func: Callable, *args) -> np.ndarray:
         """
         计算买卖指标向量。买卖指标向量是一个数组，长度和历史数据对应；
         用于判定这个时间点上需要进行"买"还是"卖"。
+```
 
+```python
         例如计算滑动平均：
         def init():
             self.sma = self.I(utils.SMA, self.data.Close, N)
@@ -364,14 +451,20 @@ class Strategy(metaclass=abc.ABCMeta):
         value = func(*args)
         value = np.asarray(value)
         assert_msg(value.shape[-1] == len(self._data.Close), '指示器长度必须和data长度相同')
+```
 
+```text
         self._indicators.append(value)
         return value
+```
 
+```python
     @property
     def tick(self):
         return self._tick
+```
 
+```python
     @abc.abstractmethod
     def init(self):
         """
@@ -381,23 +474,32 @@ class Strategy(metaclass=abc.ABCMeta):
         训练模型/初始化模型参数
         """
         pass
+```
 
+```python
     @abc.abstractmethod
     def next(self, tick):
         """
         步进函数，执行第tick步的策略。tick代表当前的"时间"。比如data[tick]用于访问当前的市场价格。
         """
         pass
+```
 
+```python
     def buy(self):
         self._broker.buy()
+```
 
+```python
     def sell(self):
         self._broker.sell()
+```
 
+```python
     @property
     def data(self):
         return self._data
+```
 
 
 为了方便访问成员，我们还定义了一些Python property。同时，我们的买卖请求是由策略类发出、由交易所API来执行的，所以我们的策略类里依赖于ExchangeAPI类。
@@ -406,30 +508,42 @@ class Strategy(metaclass=abc.ABCMeta):
 
 from utils import assert_msg, crossover, SMA
 
+```python
 class SmaCross(Strategy):
     # 小窗口SMA的窗口大小，用于计算SMA快线
     fast = 10
+```
 
+```markdown
     # 大窗口SMA的窗口大小，用于计算SMA慢线
     slow = 20
+```
 
+```python
     def init(self):
         # 计算历史上每个时刻的快线和慢线
         self.sma1 = self.I(SMA, self.data.Close, self.fast)
         self.sma2 = self.I(SMA, self.data.Close, self.slow)
+```
 
+```python
     def next(self, tick):
         # 如果此时快线刚好越过慢线，买入全部
         if crossover(self.sma1[:tick], self.sma2[:tick]):
             self.buy()
+```
 
+```python
         # 如果是慢线刚好越过快线，卖出全部
         elif crossover(self.sma2[:tick], self.sma1[:tick]):
             self.sell()
+```
 
+```markdown
         # 否则，这个时刻不执行任何操作。
         else:
             pass
+```
 
 
 模拟交易
@@ -460,6 +574,7 @@ class SmaCross(Strategy):
 
 from utils import read_file, assert_msg, crossover, SMA
 
+```python
 class ExchangeAPI:
     def __init__(self, data, cash, commission):
         assert_msg(0 < cash, "初始现金数量大于0，输入的现金数量：{}".format(cash))
@@ -470,58 +585,75 @@ class ExchangeAPI:
         self._position = 0
         self._cash = cash
         self._i = 0
+```
 
+```python
     @property
     def cash(self):
         """
         :return: 返回当前账户现金数量
         """
         return self._cash
+```
 
+```python
     @property
     def position(self):
         """
         :return: 返回当前账户仓位
         """
         return self._position
+```
 
+```python
     @property
     def initial_cash(self):
         """
         :return: 返回初始现金数量
         """
         return self._inital_cash
+```
 
+```python
     @property
     def market_value(self):
         """
         :return: 返回当前市值
         """
         return self._cash + self._position * self.current_price
+```
 
+```python
     @property
     def current_price(self):
         """
         :return: 返回当前市场价格
         """
         return self._data.Close[self._i]
+```
 
+```python
     def buy(self):
         """
         用当前账户剩余资金，按照市场价格全部买入
         """
         self._position = float(self._cash / (self.current_price * (1 + self._commission)))
         self._cash = 0.0
+```
 
+```python
     def sell(self):
         """
         卖出当前账户剩余持仓
         """
         self._cash += float(self._position * self.current_price * (1 - self._commission))
         self._position = 0.0
+```
 
+```python
     def next(self, tick):
         self._i = tick
+```
 
 
 其中的current_price（当前价格），可以方便地获得模拟交易所当前时刻的商品价格；而market_value，则可以获得当前总市值。在初始化函数的时候，我们检查手续费率和输入的现金数量，是不是在一个合理的范围。
@@ -530,27 +662,35 @@ class ExchangeAPI:
 
 首先，我们设置初始资金量为10000.00美元，交易所手续费率为0。这里你可以猜一下，如果我们从2015年到现在，都按照SMA来买卖，现在应该有多少钱呢？
 
+```python
 def main():
     BTCUSD = read_file('BTCUSD_GEMINI.csv')
     ret = Backtest(BTCUSD, SmaCross, ExchangeAPI, 10000.0, 0.00).run()
     print(ret)
+```
 
+```python
 if __name__ == '__main__':
     main()
+```
 
 
 铛铛铛，答案揭晓，程序将输出：
 
+```text
 初始市值     10000.000000
 结束市值     576361.772884
 收益         566361.772884
+```
 
 
 哇，结束时，我们将有57万美元，翻了整整57倍啊！简直不要太爽。不过，等等，这个手续费率为0，实在是有点碍眼，因为根本不可能啊。我们现在来设一个比较真实的值吧，大概千分之三，然后再来试试：
 
+```text
 初始市值    10000.000000
 结束市值     2036.562001
 收益      -7963.437999
+```
 
 
 什么鬼？我们变成赔钱了，只剩下2000美元了！这是真的吗？

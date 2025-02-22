@@ -1,10 +1,12 @@
 ---
 title: 14答疑（一）：Lua规则和NGINX配置文件产生冲突怎么办？
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             14 答疑（一）：Lua 规则和 NGINX 配置文件产生冲突怎么办？
                             你好，我是温铭。
+```
 
 专栏更新到现在，OpenResty第一版块入门篇，我们就已经学完了。恭喜你没有掉队，仍然在积极学习和实践操作，并且热情地留下了你的思考。
 
@@ -30,6 +32,7 @@ Q：当 OpenResty 中的 Lua 规则和 NGINX 配置文件产生冲突时，比�
 
 A：其实，这个具体要看 NGINX 配置的 rewrite 规则是怎么写的了，是 break 还是 last。这一点，在 OpenResty 的官方文档中有注明，并且配了一个示例代码：
 
+```css
  location /foo {
      rewrite ^ /bar;
      rewrite_by_lua 'ngx.exit(503)';
@@ -37,6 +40,7 @@ A：其实，这个具体要看 NGINX 配置的 rewrite 规则是怎么写的了
  location /bar {
      ...
  }
+```
 
 
 在示例代码的这个配置中，ngx.exit(503) 是不会被执行的。
@@ -80,12 +84,16 @@ local res, err = red:get("dog")
 我们可以用下面的代码，打印出 ngx.null 和它的类型：
 
 # 打印ngx.null
+```bash
 $ resty -e  'print(ngx.null)'
 null
+```
 
 # 打印类型
+```bash
 $ resty -e 'print(type(ngx.null))'
 userdata
+```
 
 
 你可以看到， ngx.null 并非nil，而是 userdata 类型。

@@ -1,6 +1,6 @@
 ---
 title: 5 “一等公民”的故事——聊聊 First-Class Function
-date: 1739708222.3973165
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 本节，我们来认识函数式编程的第二个关键特征：**函数是一等公民**
@@ -18,8 +18,10 @@ categories: [JavaScript 函数式编程实践指南]
 如果你在维基百科中搜索“头等函数”这一词条，你将找到这样一条描述：
 
 > a programming language is said to have **first-class functions** if it treats functions as first-class citizens.  
+```text
  （笔者译：如果一门编程语言将函数当做一等公民对待，那么这门语言被称作“拥有头等函数“）    
                                                     ——wikipedia
+```
 
 这条定义将“头等函数”与“函数是一等公民”划上了等号——“头等函数”就是“被当做一等公民对待的函数”。
 
@@ -34,9 +36,11 @@ categories: [JavaScript 函数式编程实践指南]
 
 “可以被当做变量一样用”意味着什么？它意味着：
 
+```markdown
 1.  可以被当作参数传递给其他函数
 1.  可以作为另一个函数的返回值
 1.  可以被赋值给一个变量
+```
 
 以上三条，就是“函数是一等公民”这句话的内涵。
 
@@ -109,7 +113,7 @@ fs.readFile(filePath, 'utf8', showData)
 
 函数作为返回值传递，基本上都是馋人家闭包的特性。比如下面这个例子：
 
-```
+```javascript
 function baseAdd(a) {
   return (b) => {
     return a + b
@@ -144,6 +148,7 @@ const result = addWithOne(2)
 
 这里需要强调的是，根据最新版的红宝书（《JavaScript 高级程序设计》第4版）定义，JavaScript 有且仅有以下 7 种数据类型：
 
+```markdown
 -   Undefined 类型
 -   Null 类型
 -   Boolean 类型
@@ -151,6 +156,7 @@ const result = addWithOne(2)
 -   String 类型
 -   Symbol 类型
 -   Object 类型
+```
 
 （作者注：结合最新的 ES 标准，还有一个新的类型 BigInt）
 
@@ -160,9 +166,11 @@ const result = addWithOne(2)
 
 对象能干啥？别的不说，咱对照“一等公民”的特征来一个一个看一下：
 
+```markdown
 1.  能不能赋值给变量？能！
 1.  能不能作为函数参数传递？能！
 1.  能不能作为返回值返回？能！
+```
 
 到这里我们不难看出，"First-Class Function（头等函数）" 的本质，其实是"First-Class Object（头等对象）”。JS 函数的本质，就是**可执行的对象**。
 
@@ -182,9 +190,11 @@ const result = addWithOne(2)
 
 如图中的表格所示，老爷子根据以下三个条件的满足情况，将值划分为了三种类型：
 
+```markdown
 1.  pass value as a parameter (能否当做参数传递）
 1.  return value from a procedure（能否作为返回值返回）
 1.  assign value into a variable（能否赋值给变量）
+```
 
 按照表格的示意，三个条件全部满足的，就认为它是“一等值”，也就是“一等公民”。只满足第一条的，则是“二等值”，一条也不满足的，属于”三等值”。
 

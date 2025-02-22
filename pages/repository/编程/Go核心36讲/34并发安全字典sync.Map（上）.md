@@ -1,10 +1,12 @@
 ---
 title: 34并发安全字典sync.Map（上）
-date: 1739706057.6688364
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             34 并发安全字典sync.Map （上）
                             在前面，我几乎已经把Go语言自带的同步工具全盘托出了。你是否已经听懂了会用了呢？
+```
 
 无论怎样，我都希望你能够多多练习、多多使用。它们和Go语言独有的并发编程方式并不冲突，相反，配合起来使用，绝对能达到“一加一大于二”的效果。
 
@@ -68,14 +70,19 @@ GitHub网站上已经有很多库提供了类似的数据结构。我在《Go并
 
 一般情况下，这种检查并不繁琐。而且，你要是把并发安全字典封装在一个结构体类型里面，那就更加方便了。你这时完全可以让Go语言编译器帮助你做类型检查。请看下面的代码：
 
+```css
 type IntStrMap struct {
  m sync.Map
 }
+```
 
+```text
 func (iMap *IntStrMap) Delete(key int) {
  iMap.m.Delete(key)
 }
+```
 
+```css
 func (iMap *IntStrMap) Load(key int) (value string, ok bool) {
  v, ok := iMap.m.Load(key)
  if v != nil {
@@ -83,23 +90,30 @@ func (iMap *IntStrMap) Load(key int) (value string, ok bool) {
  }
  return
 }
+```
 
+```text
 func (iMap *IntStrMap) LoadOrStore(key int, value string) (actual string, loaded bool) {
  a, loaded := iMap.m.LoadOrStore(key, value)
  actual = a.(string)
  return
 }
+```
 
+```css
 func (iMap *IntStrMap) Range(f func(key int, value string) bool) {
  f1 := func(key, value interface{}) bool {
   return f(key.(int), value.(string))
  }
  iMap.m.Range(f1)
 }
+```
 
+```text
 func (iMap *IntStrMap) Store(key int, value string) {
  iMap.m.Store(key, value)
 }
+```
 
 
 如上所示，我编写了一个名为IntStrMap的结构体类型，它代表了键类型为int、值类型为string的并发安全字典。在这个结构体类型中，只有一个sync.Map类型的字段m。并且，这个类型拥有的所有方法，都与sync.Map类型的方法非常类似。

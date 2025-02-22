@@ -1,10 +1,12 @@
 ---
 title: 24类型系统：如何在实战中使用traitobject？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             24 类型系统：如何在实战中使用trait object？
                             你好，我是陈天。
+```
 
 今天我们来看看 trait object 是如何在实战中使用的。
 
@@ -36,58 +38,79 @@ use std::{error::Error, process::Command};
 
 pub type BoxedError = Box<dyn Error + Send + Sync>;
 
+```html
 pub trait Executor {
     fn run(&self) -> Result<Option<i32>, BoxedError>;
 }
+```
 
+```text
 pub struct Shell<'a, 'b> {
     cmd: &'a str,
     args: &'b [&'a str],
 }
+```
 
+```css
 impl<'a, 'b> Shell<'a, 'b> {
     pub fn new(cmd: &'a str, args: &'b [&'a str]) -> Self {
         Self { cmd, args }
     }
 }
+```
 
+```javascript
 impl<'a, 'b> Executor for Shell<'a, 'b> {
     fn run(&self) -> Result<Option<i32>, BoxedError> {
         let output = Command::new(self.cmd).args(self.args).output()?;
         Ok(output.status.code())
     }
 }
+```
 
+```html
 /// 使用泛型参数
 pub fn execute_generics(cmd: &impl Executor) -> Result<Option<i32>, BoxedError> {
     cmd.run()
 }
+```
 
+```html
 /// 使用 trait object: &dyn T
 pub fn execute_trait_object(cmd: &dyn Executor) -> Result<Option<i32>, BoxedError> {
     cmd.run()
 }
+```
 
+```html
 /// 使用 trait object: Box<dyn T>
 pub fn execute_boxed_trait_object(cmd: Box<dyn Executor>) -> Result<Option<i32>, BoxedError> {
     cmd.run()
 }
+```
 
 #[cfg(test)]
+```css
 mod tests {
     use super::*;
+```
 
+```javascript
     #[test]
     fn shell_shall_work() {
         let cmd = Shell::new("ls", &[]);
         let result = cmd.run().unwrap();
         assert_eq!(result, Some(0));
     }
+```
 
+```javascript
     #[test]
     fn execute_shall_work() {
         let cmd = Shell::new("ls", &[]);
+```
 
+```javascript
         let result = execute_generics(&cmd).unwrap();
         assert_eq!(result, Some(0));
         let result = execute_trait_object(&cmd).unwrap();
@@ -97,6 +120,7 @@ mod tests {
         assert_eq!(result, Some(0));
     }
 }
+```
 
 
 其中，impl Executor 使用的是泛型参数的简化版本，而 &dyn Executor 和 Box 是 trait object，前者在栈上，后者分配在堆上。值得注意的是，分配在堆上的 trait object 也可以作为返回值返回，比如示例中的 Result, BoxedError> 里使用了 trait object。
@@ -105,6 +129,7 @@ mod tests {
 
 在参数中使用 trait object 比较简单，再来看一个实战中的例子巩固一下：
 
+```html
 pub trait CookieStore: Send + Sync {
     fn set_cookies(
         &self, 
@@ -113,6 +138,7 @@ pub trait CookieStore: Send + Sync {
     );
     fn cookies(&self, url: &Url) -> Option<HeaderValue>;
 }
+```
 
 
 这是我们之前使用过的 reqwest 库中的一个处理 CookieStore 的 trait。在 set_cookies 方法中使用了 &mut dyn Iterator 这样一个 trait object。
@@ -123,11 +149,13 @@ pub trait CookieStore: Send + Sync {
 
 之前已经出现过很多次了。比如上一讲已经详细介绍的，为何 KV server 里的 Storage trait 不能使用泛型参数来处理返回的 iterator，只能用 Box：
 
+```html
 pub trait Storage: Send + Sync + 'static {
     ...
     /// 遍历 HashTable，返回 kv pair 的 Iterator
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError>;
 }
+```
 
 
 再来看一些实战中会遇到的例子。
@@ -138,51 +166,66 @@ pub trait Storage: Send + Sync + 'static {
 
 // Rust 的 async trait 还没有稳定，可以用 async_trait 宏
 #[async_trait]
+```cpp
 pub trait Fetch {
     type Error;
     async fn fetch(&self) -> Result<String, Self::Error>;
 }
+```
 
 
 这里宏展开后，类似于：
 
+```html
 pub trait Fetch {
     type Error;
     fn fetch<'a>(&'a self) -> 
         Result<Pin<Box<dyn Future<Output = String> + Send + 'a>>, Self::Error>;
 }
+```
 
 
 它使用了 trait object 作为返回值。这样，不管 fetch() 的实现，返回什么样的 Future 类型，都可以被 trait object 统一起来，调用者只需要按照正常 Future 的接口使用即可。
 
 我们再看一个 snow 下的 CryptoResolver 的例子：
 
+```html
 /// An object that resolves the providers of Noise crypto choices
 pub trait CryptoResolver {
     /// Provide an implementation of the Random trait or None if none available.
     fn resolve_rng(&self) -> Option<Box<dyn Random>>;
+```
 
+```html
     /// Provide an implementation of the Dh trait for the given DHChoice or None if unavailable.
     fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh>>;
+```
 
+```html
     /// Provide an implementation of the Hash trait for the given HashChoice or None if unavailable.
     fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash>>;
+```
 
+```html
     /// Provide an implementation of the Cipher trait for the given CipherChoice or None if unavailable.
     fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher>>;
+```
 
+```html
     /// Provide an implementation of the Kem trait for the given KemChoice or None if unavailable
     #[cfg(feature = "hfs")]
     fn resolve_kem(&self, _choice: &KemChoice) -> Option<Box<dyn Kem>> {
         None
     }
 }
+```
 
 
 这是一个处理 Noise Protocol 使用何种加密算法的一个 trait。这个 trait 的每个方法，都返回一个 trait object，每个 trait object 都提供加密算法中所需要的不同的能力，比如随机数生成算法（Random）、DH 算法（Dh）、哈希算法（Hash）、对称加密算法（Cipher）和密钥封装算法（Kem）。
 
 所有这些，都有一系列的具体的算法实现，通过 CryptoResolver trait，可以得到当前使用的某个具体算法的 trait object，这样，在处理业务逻辑时，我们不用关心当前究竟使用了什么算法，就能根据这些 trait object 构筑相应的实现，比如下面的 generate_keypair：
 
+```java
 pub fn generate_keypair(&self) -> Result<Keypair, Error> {
     // 拿到当前的随机数生成算法
     let mut rng = self.resolver.resolve_rng().ok_or(InitStage::GetRngImpl)?;
@@ -192,12 +235,17 @@ pub fn generate_keypair(&self) -> Result<Keypair, Error> {
     let mut public = vec![0u8; dh.pub_len()];
     // 使用随机数生成器 和 DH 生成密钥对
     dh.generate(&mut *rng);
+```
 
+```java
     private.copy_from_slice(dh.privkey());
     public.copy_from_slice(dh.pubkey());
+```
 
+```java
     Ok(Keypair { private, public })
 }
+```
 
 
 说句题外话，如果你想更好地学习 trait 和 trait object 的使用，snow 是一个很好的学习资料。你可以顺着 CryptoResolver 梳理它用到的这几个主要的加密算法相关的 trait，看看别人是怎么定义 trait、如何把各个 trait 关联起来，以及最终如何把 trait 和核心数据结构联系起来的（小提示：Builder 以及 HandshakeState）。
@@ -208,6 +256,7 @@ pub fn generate_keypair(&self) -> Result<Keypair, Error> {
 
 继续以 snow 的代码为例，看 HandshakeState这个用于处理 Noise Protocol 握手协议的数据结构，用到了哪些 trait object（代码）：
 
+```html
 pub struct HandshakeState {
     pub(crate) rng:              Box<dyn Random>,
     pub(crate) symmetricstate:   SymmetricState,
@@ -228,6 +277,7 @@ pub struct HandshakeState {
     pub(crate) message_patterns: MessagePatterns,
     pub(crate) pattern_position: usize,
 }
+```
 
 
 你不需要了解 Noise protocol，也能够大概可以明白这里 Random、Dh 以及 Kem 三个 trait object 的作用：它们为握手期间使用的加密协议提供最大的灵活性。
@@ -236,6 +286,7 @@ pub struct HandshakeState {
 
 可以用泛型参数，也就是说：
 
+```css
 pub struct HandshakeState<R, D, K>
 where
     R: Random,
@@ -244,6 +295,7 @@ where
 {
   ...
 }
+```
 
 
 这是我们大部分时候处理这样的数据结构的选择。但是，过多的泛型参数会带来两个问题：首先，代码实现过程中，所有涉及的接口都变得非常臃肿，你在使用 HandshakeState 的任何地方，都必须带着这几个泛型参数以及它们的约束。其次，这些参数所有被使用到的情况，组合起来，会生成大量的代码。
@@ -257,15 +309,18 @@ where
 比如用于做 RBAC 的库 oso 里的 AttributeGetter，它包含了一个 Fn：
 
 #[derive(Clone)]
+```html
 pub struct AttributeGetter(
     Arc<dyn Fn(&Instance, &mut Host) -> crate::Result<PolarValue> + Send + Sync>,
 );
+```
 
 
 如果你对在 Rust 中如何实现 Python 的 getattr 感兴趣，可以看看 oso 的代码。
 
 再比如做交互式 CLI 的 dialoguer 的 Input，它的 validator 就是一个 FnMut：
 
+```html
 pub struct Input<'a, T> {
     prompt: String,
     default: Option<T>,
@@ -277,6 +332,7 @@ pub struct Input<'a, T> {
     #[cfg(feature = "history")]
     history: Option<&'a mut dyn History<T>>,
 }
+```
 
 
 用 trait object 处理 KV server 的 Service 结构
@@ -289,11 +345,14 @@ pub struct Input<'a, T> {
 
 use std::{error::Error, sync::Arc};
 
+```html
 // 定义类型，让 KV server 里的 trait 可以被编译通过
 pub type KvError = Box<dyn Error + Send + Sync>;
 pub struct Value(i32);
 pub struct Kvpair(i32, i32);
+```
 
+```html
 /// 对存储的抽象，我们不关心数据存在哪儿，但需要定义外界如何和存储打交道
 pub trait Storage: Send + Sync + 'static {
     fn get(&self, table: &str, key: &str) -> Result<Option<Value>, KvError>;
@@ -303,12 +362,16 @@ pub trait Storage: Send + Sync + 'static {
     fn get_all(&self, table: &str) -> Result<Vec<Kvpair>, KvError>;
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError>;
 }
+```
 
+```html
 // 使用 trait object，不需要泛型参数，也不需要 ServiceInner 了
 pub struct Service {
     pub store: Arc<dyn Storage>,
 }
+```
 
+```cpp
 // impl 的代码略微简单一些
 impl Service {
     pub fn new<S: Storage>(store: S) -> Self {
@@ -317,7 +380,9 @@ impl Service {
         }
     }
 }
+```
 
+```cpp
 // 实现 trait 时也不需要带着泛型参数
 impl Clone for Service {
     fn clone(&self) -> Self {
@@ -326,6 +391,7 @@ impl Clone for Service {
         }
     }
 }
+```
 
 
 从这段代码中可以看到，通过牺牲一点性能，我们让代码整体撰写和使用起来方便了不少。
@@ -342,8 +408,10 @@ impl Clone for Service {
 
 期中测试中我给出的 rgrep 的代码，如果把 StrategyFn 的接口改成使用 trait object：
 
+```text
 /// 定义类型，这样，在使用时可以简化复杂类型的书写
 pub type StrategyFn = fn(&Path, &mut dyn BufRead, &Regex, &mut dyn Write) -> Result<(), GrepError>;
+```
 
 
 你能把实现部分修改，使测试通过么？对比修改前后的代码，你觉得对 rgrep，哪种实现更好？为什么？
@@ -356,11 +424,14 @@ pub type StrategyFn = fn(&Path, &mut dyn BufRead, &Regex, &mut dyn Write) -> Res
 
 我用 criterion 做了一个简单的测试，测试的 trait 使用的就是我们这一讲使用的 Executor trait。测试代码如下（你可以访问 GitHub repo 中这一讲的代码）：
 
+```text
 use advanced_trait_objects::{
     execute_boxed_trait_object, execute_generics, execute_trait_object, Shell,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+```
 
+```javascript
 pub fn generics_benchmark(c: &mut Criterion) {
     c.bench_function("generics", |b| {
         b.iter(|| {
@@ -369,7 +440,9 @@ pub fn generics_benchmark(c: &mut Criterion) {
         })
     });
 }
+```
 
+```javascript
 pub fn trait_object_benchmark(c: &mut Criterion) {
     c.bench_function("trait object", |b| {
         b.iter(|| {
@@ -378,7 +451,9 @@ pub fn trait_object_benchmark(c: &mut Criterion) {
         })
     });
 }
+```
 
+```javascript
 pub fn boxed_object_benchmark(c: &mut Criterion) {
     c.bench_function("boxed object", |b| {
         b.iter(|| {
@@ -387,7 +462,9 @@ pub fn boxed_object_benchmark(c: &mut Criterion) {
         })
     });
 }
+```
 
+```text
 criterion_group!(
     benches,
     generics_benchmark,
@@ -395,10 +472,12 @@ criterion_group!(
     boxed_object_benchmark
 );
 criterion_main!(benches);
+```
 
 
 为了不让实现本身干扰接口调用的速度，我们在 trait 的方法中什么也不做，直接返回：
 
+```javascript
 impl<'a, 'b> Executor for Shell<'a, 'b> {
     fn run(&self) -> Result<Option<i32>, BoxedError> {
         // let output = Command::new(self.cmd).args(self.args).output()?;
@@ -406,28 +485,35 @@ impl<'a, 'b> Executor for Shell<'a, 'b> {
         Ok(Some(0))
     }
 }
+```
 
 
 测试结果如下：
 
+```text
 generics                time:   [3.0995 ns 3.1549 ns 3.2172 ns]                      
                         change: [-96.890% -96.810% -96.732%] (p = 0.00 < 0.05)
                         Performance has improved.
 Found 5 outliers among 100 measurements (5.00%)
   4 (4.00%) high mild
   1 (1.00%) high severe
+```
 
+```text
 trait object            time:   [4.0348 ns 4.0934 ns 4.1552 ns]                          
                         change: [-96.024% -95.893% -95.753%] (p = 0.00 < 0.05)
                         Performance has improved.
 Found 8 outliers among 100 measurements (8.00%)
   3 (3.00%) high mild
   5 (5.00%) high severe
+```
 
+```text
 boxed object            time:   [65.240 ns 66.473 ns 67.777 ns]                         
                         change: [-67.403% -66.462% -65.530%] (p = 0.00 < 0.05)
                         Performance has improved.
 Found 2 outliers among 100 measurements (2.00%)
+```
 
 
 可以看到，使用泛型做静态分发最快，平均 3.15ns；使用 &dyn Executor 平均速度 4.09ns，要慢 30%；而使用 Box 平均速度 66.47ns，慢了足足 20 倍。可见，额外的内存访问并不是 trait object 的效率杀手，有些场景下为了使用 trait object 不得不做的额外的堆内存分配，才是主要的效率杀手。
@@ -436,38 +522,46 @@ Found 2 outliers among 100 measurements (2.00%)
 
 在回答这个问题之前，我们把 run() 方法改回来：
 
+```javascript
 impl<'a, 'b> Executor for Shell<'a, 'b> {
     fn run(&self) -> Result<Option<i32>, BoxedError> {
         let output = Command::new(self.cmd).args(self.args).output()?;
         Ok(output.status.code())
     }
 }
+```
 
 
 我们知道 Command 的执行速度比较慢，但是想再看看，对于执行效率低的方法，这个性能差异是否重要。
 
 新的测试结果不出所料：
 
+```text
 generics                time:   [4.6901 ms 4.7267 ms 4.7678 ms]                      
                         change: [+145694872% +148496855% +151187366%] (p = 0.00 < 0.05)
                         Performance has regressed.
 Found 7 outliers among 100 measurements (7.00%)
   3 (3.00%) high mild
   4 (4.00%) high severe
+```
 
+```text
 trait object            time:   [4.7452 ms 4.7912 ms 4.8438 ms]                          
                         change: [+109643581% +113478268% +116908330%] (p = 0.00 < 0.05)
                         Performance has regressed.
 Found 7 outliers among 100 measurements (7.00%)
   4 (4.00%) high mild
   3 (3.00%) high severe
+```
 
+```text
 boxed object            time:   [4.7867 ms 4.8336 ms 4.8874 ms]                          
                         change: [+6935303% +7085465% +7238819%] (p = 0.00 < 0.05)
                         Performance has regressed.
 Found 8 outliers among 100 measurements (8.00%)
   4 (4.00%) high mild
   4 (4.00%) high severe
+```
 
 
 因为执行一个 Shell 命令的效率实在太低，到毫秒的量级，虽然 generics 依然最快，但使用 &dyn Executor 和 Box 也不过只比它慢了 1% 和 2%。

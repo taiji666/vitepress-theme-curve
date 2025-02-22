@@ -1,10 +1,12 @@
 ---
 title: 08LuaJIT分支和标准Lua有什么不同？
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             08 LuaJIT分支和标准Lua有什么不同？
                             你好，我是温铭。
+```
 
 这节课，我们来学习下 OpenResty 的另一块基石：LuaJIT。今天主要的篇幅，我会留给 Lua 和 LuaJIT 中重要和鲜为人知的一些知识点。而更多 Lua 语言的基础知识，你可以通过搜索引擎或者 Lua 的书籍自己来学习，这里我推荐 Lua 作者编写的《Lua 程序设计》这本书。
 
@@ -65,8 +67,10 @@ $ resty -e 't={100}; ngx.say(t[0])'
 
 你自然期望打印出 100，或者报错说下标 0 不存在。但结果出乎意料，什么都没有打印出来，也没有报错。既然如此，让我们加上 type 命令，来看下输出到底是什么：
 
+```bash
 $ resty -e 't={100};ngx.say(type(t[0]))'
 nil
+```
 
 
 原来是空值。事实上，在 OpenResty 中，对于空值的判断和处理也是一个容易让人迷惑的点，后面我们讲到 OpenResty 的时候再细聊。
@@ -75,8 +79,10 @@ nil
 
 这一点，上节课我也提到过。和大部分语言使用 + 不同，Lua 中使用两个点号来拼接字符串：
 
+```bash
 $ resty -e "ngx.say('hello' .. ', world')"
 hello, world
+```
 
 
 在实际的项目开发中，我们一般都会使用多种开发语言，而Lua 这种不走寻常路的设计，总是会让开发者的思维，在字符串拼接的时候卡顿一下，也是让人哭笑不得。
@@ -85,37 +91,49 @@ hello, world
 
 不同于 Python 这种内置数据结构丰富的语言，Lua 中只有一种数据结构，那就是 table，它里面可以包括数组和哈希表：
 
+```python
 local color = {first = "red", "blue", third = "green", "yellow"}
 print(color["first"])                 --> output: red
 print(color[1])                         --> output: blue
 print(color["third"])                --> output: green
 print(color[2])                         --> output: yellow
 print(color[3])                         --> output: nil
+```
 
 
 如果不显式地用_键值对_的方式赋值，table 就会默认用数字作为下标，从 1 开始。所以 color[1] 就是 blue。
 
 另外，想在 table 中获取到正确长度，也是一件不容易的事情，我们来看下面这些例子：
 
+```python
 local t1 = { 1, 2, 3 }
 print("Test1 " .. table.getn(t1))
+```
 
+```python
 local t2 = { 1, a = 2, 3 }
 print("Test2 " .. table.getn(t2))
+```
 
+```python
 local t3 = { 1, nil }
 print("Test3 " .. table.getn(t3))
+```
 
+```python
 local t4 = { 1, nil, 2 }
 print("Test4 " .. table.getn(t4))
+```
 
 
 使用 resty 运行的结果如下：
 
+```text
 Test1 3
 Test2 2
 Test3 1
 Test4 1
+```
 
 
 你可以看到，除了第一个返回长度为 3 的测试案例外，后面的测试都是我们预期之外的结果。事实上，想要在Lua 中获取 table 长度，必须注意到，只有在 table 是 _序列_ 的时候，才能返回正确的值。
@@ -139,11 +157,15 @@ local s = 'hello'
 
 所以，在 OpenResty 编程中，我强烈建议你总是使用 local 来声明变量，即使在 require module 的时候也是一样：
 
+```text
 -- Recommended 
 local xxx = require('xxx')
+```
 
+```text
 -- Avoid
 require('xxx')
+```
 
 
 LuaJIT
@@ -152,11 +174,13 @@ LuaJIT
 
 下面是一个最简单的例子：
 
+```text
 local ffi = require("ffi")
 ffi.cdef[[
 int printf(const char *fmt, ...);
 ]]
 ffi.C.printf("Hello %s!", "world")
+```
 
 
 短短这几行代码，就可以直接在 Lua 中调用 C 的 printf 函数，打印出 Hello world!。你可以使用 resty 命令来运行它，看下是否成功。

@@ -1,10 +1,12 @@
 ---
 title: 28连接太慢该怎么办：HTTPS的优化
-date: 1739706057.3374302
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             28  连接太慢该怎么办：HTTPS的优化
                             你可能或多或少听别人说过，“HTTPS 的连接很慢”。那么“慢”的原因是什么呢？
+```
 
 通过前两讲的学习，你可以看到，HTTPS 连接大致上可以划分为两个部分，第一个是建立连接时的非对称加密握手，第二个是握手后的对称加密报文传输。
 
@@ -13,9 +15,11 @@ categories: [透视HTTP协议]
 在 TCP 建连之后，正式数据传输之前，HTTPS 比 HTTP 增加了一个 TLS 握手的步骤，这个步骤最长可以花费两个消息往返，也就是 2-RTT。而且在握手消息的网络耗时之外，还会有其他的一些“隐形”消耗，比如：
 
 
+```text
 产生用于密钥交换的临时公私钥对（ECDHE）；
 验证证书时访问 CA 获取 CRL 或者 OCSP；
 非对称加密解密处理“Pre-Master”。
+```
 
 
 在最差的情况下，也就是不做任何的优化措施，HTTPS 建立连接可能会比 HTTP 慢上几百毫秒甚至几秒，这其中既有网络耗时，也有计算耗时，就会让人产生“打开一个 HTTPS 网站好慢啊”的感觉。
@@ -72,8 +76,10 @@ HTTPS 连接是计算密集型，而不是 I/O 密集型。所以，如果你花
 
 在 Nginx 里可以用“ssl_ciphers”“ssl_ecdh_curve”等指令配置服务器使用的密码套件和椭圆曲线，把优先使用的放在前面，例如：
 
+```text
 ssl_ciphers   TLS13-AES-256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256:EECDH+CHACHA20；
 ssl_ecdh_curve              X25519:P-256;
+```
 
 
 证书优化
@@ -106,19 +112,25 @@ CRL（Certificate revocation list，证书吊销列表）由 CA 定期发布，�
 
 会话复用分两种，第一种叫“Session ID”，就是客户端和服务器首次连接后各自保存一个会话的 ID 号，内存里存储主密钥和其他相关的信息。当客户端再次连接时发一个 ID 过来，服务器就在内存里找，找到就直接用主密钥恢复会话状态，跳过证书验证和密钥交换，只用一个消息往返就可以建立安全通信。
 
+```text
 实验环境的端口 441 实现了“Session ID”的会话复用，你可以访问 URI
 “https://www.chrono.com:441⁄28-1”，刷新几次，用 Wireshark 抓包看看实际的效果。
+```
 
+```text
 Handshake Protocol: Client Hello
     Version: TLS 1.2 (0x0303)
     Session ID: 13564734eeec0a658830cd…
     Cipher Suites Length: 34
+```
  
  
+```text
 Handshake Protocol: Server Hello
     Version: TLS 1.2 (0x0303)
     Session ID: 13564734eeec0a658830cd…
     Cipher Suite: TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 (0xc030)
+```
 
 
 通过抓包可以看到，服务器在“ServerHello”消息后直接发送了“Change Cipher Spec”和“Finished”消息，复用会话完成了握手。
@@ -152,17 +164,21 @@ Handshake Protocol: Server Hello
 小结
 
 
+```text
 可以有多种硬件和软件手段减少网络耗时和计算耗时，让 HTTPS 变得和 HTTP 一样快，最可行的是软件优化；
 应当尽量使用 ECDHE 椭圆曲线密码套件，节约带宽和计算量，还能实现“False Start”；
 服务器端应当开启“OCSP Stapling”功能，避免客户端访问 CA 去验证证书；
 会话复用的效果类似 Cache，前提是客户端必须之前成功建立连接，后面就可以用“Session ID”“Session Ticket”等凭据跳过密钥交换、证书验证等步骤，直接开始加密通信。
+```
 
 
 课下作业
 
 
+```text
 你能比较一下“Session ID”“Session Ticket”“PSK”这三种会话复用手段的异同吗？
 你觉得哪些优化手段是你在实际工作中能用到的？应该怎样去用？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

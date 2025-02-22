@@ -1,10 +1,12 @@
 ---
 title: 加餐这个专栏你可以怎么学，以及Rust是否值得学？
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             加餐 这个专栏你可以怎么学，以及Rust是否值得学？
                             你好，我是陈天。
+```
 
 离课程上线到现在，确实没有想到有这么多的同学想要学习 Rust，首先谢谢你的支持、鼓励和反馈。
 
@@ -79,9 +81,11 @@ Rust 通过所有权规则和类型系统，主要是两个 trait：Send/Sync �
 再往下的三类缺陷是语言和编译器无法帮助解决的。
 
 
+```text
 对于逻辑缺陷，我们需要有不错的单元测试覆盖率；
 对于功能缺陷，需要通过足够好的集成测试，把用户主要使用的功能测试一遍；
 对于用户体验缺陷，需要端到端的测试，甚至手工测试，才能发现。
+```
 
 
 从上述介绍中你可以看到，Rust 帮我们把尽可能多的缺陷扼杀在摇篮中。Rust 在编译时解决掉的很多缺陷，如资源释放安全、并发安全和错误处理方面的缺陷，在其他大多数语言中并没有完整的解决方案。
@@ -164,9 +168,11 @@ Rust 社区里就有大量的学习资料供我们使用。
 Rust does deref coercion when it finds types and trait implementations in three cases:
 
 
+```text
 From &T to &U when T: Deref
 From &mut T to &mut U when T: DerefMut
 From &mut T to &U when T: Deref
+```
 
 
 

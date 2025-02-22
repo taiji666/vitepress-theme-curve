@@ -1,10 +1,12 @@
 ---
 title: 38bytes包与字节串操作（上）
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             38 bytes包与字节串操作（上）
                             我相信，经过上一次的学习，你已经对strings.Builder和strings.Reader这两个类型足够熟悉了。
+```
 
 我上次还建议你去自行查阅strings代码包中的其他程序实体。如果你认真去看了，那么肯定会对我们今天要讨论的bytes代码包，有种似曾相识的感觉。
 
@@ -28,19 +30,23 @@ strings包和bytes包可以说是一对孪生兄弟，它们在API方面非常�
 
 我们先来看下面的代码：
 
+```text
 var buffer1 bytes.Buffer
 contents := "Simple byte buffer for marshaling data."
 fmt.Printf("Writing contents %q ...\n", contents)
 buffer1.WriteString(contents)
 fmt.Printf("The length of buffer: %d\n", buffer1.Len())
 fmt.Printf("The capacity of buffer: %d\n", buffer1.Cap())
+```
 
 
 我先声明了一个bytes.Buffer类型的变量buffer1，并写入了一个字符串。然后，我想打印出这个bytes.Buffer类型的值（以下简称Buffer值）的长度和容量。在运行这段代码之后，我们将会看到如下的输出：
 
+```text
 Writing contents "Simple byte buffer for marshaling data." ...
 The length of buffer: 39
 The capacity of buffer: 64
+```
 
 
 乍一看这没什么问题。长度39和容量64的含义看起来与我们已知的概念是一致的。我向缓冲区中写入了一个长度为39的字符串，所以buffer1的长度就是39。
@@ -49,11 +55,13 @@ The capacity of buffer: 64
 
 可实际上，与strings.Reader类型的Len方法一样，buffer1的Len方法返回的也是内容容器中未被读取部分的长度，而不是其中已存内容的总长度（以下简称内容长度）。示例如下：
 
+```text
 p1 := make([]byte, 7)
 n, _ := buffer1.Read(p1)
 fmt.Printf("%d bytes were read. (call Read)\n", n)
 fmt.Printf("The length of buffer: %d\n", buffer1.Len())
 fmt.Printf("The capacity of buffer: %d\n", buffer1.Cap())
+```
 
 
 当我从buffer1中读取一部分内容，并用它们填满长度为7的字节切片p1之后，buffer1的Len方法返回的结果值也会随即发生变化。如果运行这段代码，我们会发现，这个缓冲区的长度已经变为了32。
@@ -85,6 +93,7 @@ fmt.Printf("The capacity of buffer: %d\n", buffer1.Cap())
 bytes.Buffer中的已读计数的大致功用如下所示。
 
 
+```text
 读取内容时，相应方法会依据已读计数找到未读部分，并在读取后更新计数。
 写入内容时，如需扩容，相应方法会根据已读计数实现扩容策略。
 截断内容时，相应方法截掉的是已读计数代表索引之后的未读部分。
@@ -92,6 +101,7 @@ bytes.Buffer中的已读计数的大致功用如下所示。
 重置内容时，相应方法会把已读计数置为0。
 导出内容时，相应方法只会导出已读计数代表的索引之后的未读部分。
 获取长度时，相应方法会依据已读计数和内容容器的长度，计算未读部分的长度并返回。
+```
 
 
 问题解析

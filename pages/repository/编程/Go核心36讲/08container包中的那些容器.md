@@ -1,10 +1,12 @@
 ---
 title: 08container包中的那些容器
-date: 1739706057.6527565
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             08 container包中的那些容器
                             我们在上次讨论了数组和切片，当我们提到数组的时候，往往会想起链表。那么Go语言的链表是什么样的呢？
+```
 
 Go语言的链表实现在标准库的container/list代码包中。这个代码包中有两个公开的程序实体——List和Element，List实现了一个双向链表（以下简称链表），而Element则代表了链表中元素的结构。
 
@@ -18,11 +20,15 @@ MoveToFront方法和MoveToBack方法，分别用于把给定的元素移动到�
 
 在这些方法中，“给定的元素”都是*Element类型的，*Element类型是Element类型的指针类型，*Element的值就是元素的指针。
 
+```text
 func (l *List) MoveBefore(e, mark *Element)
 func (l *List) MoveAfter(e, mark *Element)
+```
 
+```text
 func (l *List) MoveToFront(e *Element)
 func (l *List) MoveToBack(e *Element)
+```
 
 
 具体问题是，如果我们自己生成这样的值，然后把它作为“给定的元素”传给链表的方法，那么会发生什么？链表会接受它吗？
@@ -37,17 +43,25 @@ func (l *List) MoveToBack(e *Element)
 
 List的方法还有下面这几种：
 
+```text
 Front和Back方法分别用于获取链表中最前端和最后端的元素，-
 InsertBefore和InsertAfter方法分别用于在指定的元素之前和之后插入新元素，PushFront和PushBack方法则分别用于在链表的最前端和最后端插入新元素。
+```
 
+```text
 func (l *List) Front() *Element
 func (l *List) Back() *Element
+```
 
+```css
 func (l *List) InsertBefore(v interface{}, mark *Element) *Element
 func (l *List) InsertAfter(v interface{}, mark *Element) *Element
+```
 
+```css
 func (l *List) PushFront(v interface{}) *Element
 func (l *List) PushBack(v interface{}) *Element
+```
 
 
 这些方法都会把一个Element值的指针作为结果返回，它们就是链表留给我们的安全“接口”。拿到这些内部元素的指针，我们就可以去调用前面提到的用于移动元素的方法了。
@@ -103,11 +117,13 @@ container/ring包中的Ring类型实现的是一个循环链表，也就是我�
 最主要的不同有下面几种。
 
 
+```text
 Ring类型的数据结构仅由它自身即可代表，而List类型则需要由它以及Element类型联合表示。这是表示方式上的不同，也是结构复杂度上的不同。
 一个Ring类型的值严格来讲，只代表了其所属的循环链表中的一个元素，而一个List类型的值则代表了一个完整的链表。这是表示维度上的不同。
 在创建并初始化一个Ring值的时候，我们可以指定它包含的元素的数量，但是对于一个List值来说却不能这样做（也没有必要这样做）。循环链表一旦被创建，其长度是不可变的。这是两个代码包中的New函数在功能上的不同，也是两个类型在初始化值方面的第一个不同。
 仅通过var r ring.Ring语句声明的r将会是一个长度为1的循环链表，而List类型的零值则是一个长度为0的链表。别忘了List中的根元素不会持有实际元素值，因此计算长度时不会包含它。这是两个类型在初始化值方面的第二个不同。
 Ring值的Len方法的算法复杂度是O(N)的，而List值的Len方法的算法复杂度则是O(1)的。这是两者在性能方面最显而易见的差别。
+```
 
 
 其他的不同基本上都是方法方面的了。比如，循环链表也有用于插入、移动或删除元素的方法，不过用起来都显得更抽象一些，等等。
@@ -119,8 +135,10 @@ Ring值的Len方法的算法复杂度是O(N)的，而List值的Len方法的算�
 思考题
 
 
+```text
 container/ring包中的循环链表的适用场景都有哪些？
 你使用过container/heap包中的堆吗？它的适用场景又有哪些呢？
+```
 
 
 在这里，我们先不求对它们的实现了如指掌，能用对、用好才是我们进阶之前的第一步。好了，感谢你的收听，我们下次再见。

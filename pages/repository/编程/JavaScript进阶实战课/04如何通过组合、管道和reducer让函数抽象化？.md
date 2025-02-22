@@ -1,10 +1,12 @@
 ---
 title: 04如何通过组合、管道和reducer让函数抽象化？
-date: 1739706057.5926027
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             04 如何通过组合、管道和reducer让函数抽象化？
                             你好，我是石川。
+```
 
 上节课我们讲到，通过部分应用和柯里化，我们做到了从抽象到具象化。那么，今天我们要讲的组合和管道，就是反过来帮助我们把函数从具象化变到抽象化的过程。它相当于是系统化地把不同的组件函数，封装在了只有一个入口和出口的函数当中。
 
@@ -42,6 +44,7 @@ var isOdd = (x) => equalsToOne(remainderOfTwo(x));
 
 这两个函数其实就是我们用到的组件函数。你可以发现，这两个组件的特点都是努力专注做好一件小事。
 
+```javascript
 var dividedBy = (y) => {
     return function forX(x) {
         return x % y;
@@ -52,12 +55,15 @@ var equalsTo = (y) => {
         return x === y;
     }
 }
+```
 
 
 然后，在dividedBy和equalsToOne的基础上，我们就可以创建两个Point-Free的函数，remainderOfTwo和equalsToOne。
 
+```javascript
 var remainderOfTwo = dividedBy(2);
 var equalsToOne = equalsTo(1);
+```
 
 
 最后，我们只需要传入参数 x，就可以计算相应的isOdd的结果了。
@@ -73,6 +79,7 @@ var isOdd = (x) => equalsToOne(remainderOfTwo(x));
 
 其实从上面的例子里，我们已经看到了组合的影子。那么更进一步地，我们就可以把组合抽象成一个独立的函数，如下所示：
 
+```javascript
 function compose(...fns) {
     return fns.reverse().reduce( function reducer(fn1,fn2){
         return function composed(...args){
@@ -80,6 +87,7 @@ function compose(...fns) {
         };
     } );
 }
+```
 
 
 也就是说，基于这里抽象出来的compose功能，我们可以把之前的组件函数组合起来。
@@ -104,8 +112,10 @@ Unix/Linux中的管道
 其实管道的概念最早是源于Unix/Linux，这个概念的创始人道格拉斯·麦克罗伊（Douglas McIlroy）在贝尔实验室的文章中，曾经提到过两个很重要的点：
 
 
+```text
 一是让每个程序只专注做好一件事。如果有其它新的任务，那么应该重新构建，而不是通过添加新功能使旧程序复杂化。
 二是让每个程序的输出，可以成为另一个程序的输入。
+```
 
 
 感兴趣的话你也可以读一下这篇杂志文章，虽然这是1978年的文章，但是它的设计思想到现在都不算过时。
@@ -127,11 +137,13 @@ JavaScript中的管道
 
 你可能会想到我们在上节课讲unary的时候，是把函数的输入参数减少到1，而这里是把参数做倒序处理，生成一个新的函数。在函数式编程中，这算是一个比较经典的高阶函数的例子。
 
+```javascript
 function reverseArgs(fn) {
     return function argsReversed(...args){
         return fn( ...args.reverse() );
     };
 }
+```
 
 var pipe = reverseArgs( compose );
 
@@ -142,8 +154,10 @@ var pipe = reverseArgs( compose );
 
 const isOdd = pipe(remainderOfTwo, equalsToOne);
 
+```text
 isOdd(1); // 返回 true
 isOdd(2); // 返回 false
+```
 
 
 Transduction
@@ -166,12 +180,14 @@ Transduction
 
 可能我这么讲，你还是不太好理解，这里我们先来举一个不用tansducer或reducer例子吧。
 
+```javascript
 var oldArray = [36, 29, 18, 7, 46, 53];
 var newArray = oldArray
   .filter(isEven)
   .map(double)
   .filter(passSixty)
   .map(addFive);
+```
   
 console.log (newArray); // 返回：[77,97]
 
@@ -194,12 +210,14 @@ console.log (newArray); // 返回：[77,97]
 
 var oldArray = [36, 29, 18, 7, 46, 53];
 
+```javascript
 var newArray = composeReducer(oldArray, [
   filterTR(isEven),
   mapTR(double),
   filterTR(passSixty),
   mapTR(addFive),
 ]); 
+```
 
 console.log (newArray); // 返回：[77,97]
 

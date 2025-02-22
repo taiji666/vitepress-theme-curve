@@ -1,6 +1,6 @@
 ---
 title: 14 深入函数组合(Composition)思想：composepipe 是如何实现的
-date: 1739708222.3816018
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 $\color{LightPink}{保姆式教学の}\color{Pink}{温情提示：}$    

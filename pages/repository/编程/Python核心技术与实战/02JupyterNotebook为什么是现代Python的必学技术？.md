@@ -1,10 +1,12 @@
 ---
 title: 02JupyterNotebook为什么是现代Python的必学技术？
-date: 1739706057.5293307
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             02 Jupyter Notebook为什么是现代Python的必学技术？
                             你好，我是景霄。
+```
 
 Stack Overflow 曾在2017年底，发布了在该站上各种语言的提问流量。其中，Python已经超过了JavaScript成为了流量最高的语言，预测在2020年前会远远甩开JavaScript。
 

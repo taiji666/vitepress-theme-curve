@@ -1,10 +1,12 @@
 ---
 title: 28网络开发（上）：如何使用Rust处理网络请求？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             28 网络开发（上）：如何使用Rust处理网络请求？
                             你好，我是陈天。今天我们学习如何使用 Rust 做网络开发。
+```
 
 在互联网时代，谈到网络开发，我们想到的首先是 Web 开发以及涉及的部分 HTTP 协议和 WebSocket 协议。
 
@@ -31,9 +33,11 @@ std::net
 std::net 下提供了处理 TCP/UDP 的数据结构，以及一些辅助结构：
 
 
+```text
 TCP：TcpListener/TcpStream，处理服务器的监听以及客户端的连接
 UDP：UdpSocket，处理 UDP socket
 其它：IpAddr 是 IPv4 和 IPv6 地址的封装；SocketAddr，表示 IP 地址 + 端口的数据结构
+```
 
 
 这里就主要介绍一下 TCP 的处理，顺带会使用到 IpAddr/SocketAddr。
@@ -42,12 +46,15 @@ TcpListener/TcpStream
 
 如果要创建一个 TCP server，我们可以使用 TcpListener 绑定某个端口，然后用 loop 循环处理接收到的客户端请求。接收到请求后，会得到一个 TcpStream，它实现了 Read/Write trait，可以像读写文件一样，进行 socket 的读写：
 
+```cpp
 use std::{
     io::{Read, Write},
     net::TcpListener,
     thread,
 };
+```
 
+```javascript
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:9527").unwrap();
     loop {
@@ -62,24 +69,31 @@ fn main() {
         });
     }
 }
+```
 
 
 对于客户端，我们可以用 TcpStream::connect() 得到一个 TcpStream。一旦客户端的请求被服务器接受，就可以发送或者接收数据：
 
+```cpp
 use std::{
     io::{Read, Write},
     net::TcpStream,
 };
+```
 
+```cpp
 fn main() {
     let mut stream = TcpStream::connect("127.0.0.1:9527").unwrap();
     // 一共写了 12 个字节
     stream.write_all(b"hello world!").unwrap();
+```
 
+```cpp
     let mut buf = [0u8; 17];
     stream.read_exact(&mut buf).unwrap();
     println!("data: {:?}", String::from_utf8_lossy(&buf));
 }
+```
 
 
 在这个例子中，客户端在连接成功后，会发送 12 个字节的 “hello world!“给服务器，服务器读取并回复后，客户端会尝试接收完整的、来自服务器的 17个字节的 “glad to meet you!”。
@@ -96,6 +110,7 @@ fn main() {
 
 我们在之前的 listener 代码中也看到了，在网络处理的主循环中，会不断 accept() 一个新的连接：
 
+```cpp
 fn main() {
     ...
     loop {
@@ -106,6 +121,7 @@ fn main() {
         });
     }
 }
+```
 
 
 但是，处理连接的过程，需要放在另一个线程或者另一个异步任务中进行，而不要在主循环中直接处理，因为这样会阻塞主循环，使其在处理完当前的连接前，无法 accept() 新的连接。
@@ -158,24 +174,32 @@ rocket = { version = "0.5.0-rc.1", features = ["json"] }
 #[macro_use]
 extern crate rocket;
 
+```cpp
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
+```
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
+```css
 struct Hello {
     name: String,
 }
+```
 
 #[get("/", format = "json")]
+```html
 fn hello() -> Json<Hello> {
     Json(Hello { name: "Tyr".into() })
 }
+```
 
 #[launch]
+```cpp
 fn rocket() -> _ {
     rocket::build().mount("/", routes![hello])
 }
+```
 
 
 Rocket 是 Rust 的一个全功能的 Web 框架，类似于 Python 的 Django。可以看到，使用 rocket，10 多行代码，我们就可以运行起一个 Web Server。
@@ -211,13 +235,16 @@ gRPC 使用了五个字节的 Length-Prefixed-Message，其中包含一个字节
 
 服务器的代码：
 
+```cpp
 use anyhow::Result;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:9527").await?;
     loop {
@@ -225,7 +252,9 @@ async fn main() -> Result<()> {
         println!("accepted: {:?}", addr);
         // LengthDelimitedCodec 默认 4 字节长度
         let mut stream = Framed::new(stream, LengthDelimitedCodec::new());
+```
 
+```cpp
         tokio::spawn(async move {
             // 接收到的消息会只包含消息主体（不包含长度）
             while let Some(Ok(data)) = stream.next().await {
@@ -237,41 +266,52 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 以及客户端代码：
 
+```cpp
 use anyhow::Result;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let stream = TcpStream::connect("127.0.0.1:9527").await?;
     let mut stream = Framed::new(stream, LengthDelimitedCodec::new());
     stream.send(Bytes::from("hello world")).await?;
+```
 
+```cpp
     // 接收从服务器返回的数据
     if let Some(Ok(data)) = stream.next().await {
         println!("Got: {:?}", String::from_utf8_lossy(&data));
     }
+```
 
+```text
     Ok(())
 }
+```
 
 
 和刚才的TcpListener/TcpStream代码相比，双方都不需要知道对方发送的数据的长度，就可以通过 StreamExt trait 的 next() 接口得到下一个消息；在发送时，只需要调用 SinkExt trait 的 send() 接口发送，相应的长度就会被自动计算并添加到要发送的消息帧的开头。
 
 当然啦，如果你想自己运行这两段代码，记得在 Cargo.toml 里添加：
 
+```text
 [dependencies]
 anyhow = "1"
 bytes = "1"
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.6", features = ["codec"] }
+```
 
 
 完整的代码可以在这门课程 GitHub repo 这一讲的目录中找到。
@@ -290,14 +330,17 @@ tokio-util = { version = "0.6", features = ["codec"] }
 
 在之前做的 kv server 的 examples 里，我们使用 async_prost。根据今天我们所学的内容，你能不能尝试使用使用 tokio_util 下的 LengthDelimitedCodec 来改写这个 example 呢？
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
 use kv1::{CommandRequest, CommandResponse, Service, ServiceInner, SledDb};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let service: Service<SledDb> = ServiceInner::new(SledDb::new("/tmp/kvserver"))
@@ -325,6 +368,7 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 感谢你的阅读，下一讲我们继续学习网络开发的通讯模型，我们下一讲见～

@@ -1,10 +1,12 @@
 ---
 title: 36阶段实操（4）：构建一个简单的KVserver-网络处理
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             36 阶段实操（4）：构建一个简单的KV server-网络处理
                             你好，我是陈天。
+```
 
 经历了基础篇和进阶篇中两讲的构建和优化，到现在，我们的KV server 核心功能已经比较完善了。不知道你有没有注意，之前一直在使用一个神秘的 async-prost 库，我们神奇地完成了TCP frame 的封包和解包。是怎么完成的呢？
 
@@ -31,14 +33,17 @@ tokio 有个 tokio-util 库，已经帮我们处理了和 frame 相关的封包�
 
 首先在 Cargo.toml 里添加依赖：
 
+```text
 [dev-dependencies]
 ...
 tokio-util = { version = "0.6", features = ["codec"]}
 ...
+```
 
 
 然后创建 examples/server_with_codec.rs 文件，添入如下代码：
 
+```cpp
 use anyhow::Result;
 use futures::prelude::*;
 use kv2::{CommandRequest, MemTable, Service, ServiceInner};
@@ -46,8 +51,10 @@ use prost::Message;
 use tokio::net::TcpListener;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let service: Service = ServiceInner::new(MemTable::new()).into();
@@ -72,12 +79,15 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 你可以对比一下它和之前的 examples/server.rs 的差别，主要改动了这一行：
 
+```cpp
 // let mut stream = AsyncProstStream::<_, CommandRequest, CommandResponse, _>::from(stream).for_async();
 let mut stream = Framed::new(stream, LengthDelimitedCodec::new());
+```
 
 
 完成之后，我们打开一个命令行窗口，运行：RUST_LOG=info cargo run --example server_with_codec --quiet。然后在另一个命令行窗口，运行：RUST_LOG=info cargo run --example client --quiet。此时，服务器和客户端都收到了彼此的请求和响应，并且处理正常。
@@ -95,6 +105,7 @@ LengthDelimitedCodec 非常好用，它的代码也并不复杂，非常建议�
 
 按照惯例，还是先来定义处理这个逻辑的 trait：
 
+```text
 pub trait FrameCoder
 where
     Self: Message + Sized + Default,
@@ -104,50 +115,62 @@ where
     /// 把一个完整的 frame decode 成一个 Message
     fn decode_frame(buf: &mut BytesMut) -> Result<Self, KvError>;
 }
+```
 
 
 定义了两个方法：
 
 
+```text
 encode_frame() 可以把诸如 CommandRequest 这样的消息封装成一个 frame，写入传进来的 BytesMut；
 decode_frame() 可以把收到的一个完整的、放在 BytesMut 中的数据，解封装成诸如 CommandRequest 这样的消息。
+```
 
 
 如果要实现这个 trait，Self 需要实现了 prost::Message，大小是固定的，并且实现了 Default（prost 的需求）。
 
 好，我们再写实现代码。首先创建 src/network 目录，并在其下添加两个文件mod.rs 和 frame.rs。然后在 src/network/mod.rs 里引入 src/network/frame.rs：
 
+```cpp
 mod frame;
 pub use frame::FrameCoder;
+```
 
 
 同时在 lib.rs 里引入 network：
 
+```text
 mod network;
 pub use network::*;
+```
 
 
 因为要处理 gzip 压缩，还需要在 Cargo.toml 中引入 flate2，同时，因为今天这一讲引入了网络相关的操作和数据结构，我们需要把 tokio 从 dev-dependencies 移到 dependencies 里，为简单起见，就用 full features：
 
+```text
 [dependencies]
 ...
 flate2 = "1" # gzip 压缩
 ...
 tokio = { version = "1", features = ["full"] } # 异步网络库
 ...
+```
 
 
 然后，在 src/network/frame.rs 里添加 trait 和实现 trait 的代码：
 
 use std::io::{Read, Write};
 
+```cpp
 use crate::{CommandRequest, CommandResponse, KvError};
 use bytes::{Buf, BufMut, BytesMut};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use prost::Message;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::debug;
+```
 
+```text
 /// 长度整个占用 4 个字节
 pub const LEN_LEN: usize = 4;
 /// 长度占 31 bit，所以最大的 frame 是 2G
@@ -156,7 +179,9 @@ const MAX_FRAME: usize = 2 * 1024 * 1024 * 1024;
 const COMPRESSION_LIMIT: usize = 1436;
 /// 代表压缩的 bit（整个长度 4 字节的最高位）
 const COMPRESSION_BIT: usize = 1 << 31;
+```
 
+```javascript
 /// 处理 Frame 的 encode/decode
 pub trait FrameCoder
 where
@@ -165,58 +190,82 @@ where
     /// 把一个 Message encode 成一个 frame
     fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), KvError> {
         let size = self.encoded_len();
+```
 
+```cpp
         if size >= MAX_FRAME {
             return Err(KvError::FrameError);
         }
+```
 
+```text
         // 我们先写入长度，如果需要压缩，再重写压缩后的长度
         buf.put_u32(size as _);
+```
 
+```cpp
         if size > COMPRESSION_LIMIT {
             let mut buf1 = Vec::with_capacity(size);
             self.encode(&mut buf1)?;
+```
 
+```javascript
             // BytesMut 支持逻辑上的 split（之后还能 unsplit）
             // 所以我们先把长度这 4 字节拿走，清除
             let payload = buf.split_off(LEN_LEN);
             buf.clear();
+```
 
+```cpp
             // 处理 gzip 压缩，具体可以参考 flate2 文档
             let mut encoder = GzEncoder::new(payload.writer(), Compression::default());
             encoder.write_all(&buf1[..])?;
+```
 
+```javascript
             // 压缩完成后，从 gzip encoder 中把 BytesMut 再拿回来
             let payload = encoder.finish()?.into_inner();
             debug!("Encode a frame: size {}({})", size, payload.len());
+```
 
+```text
             // 写入压缩后的长度
             buf.put_u32((payload.len() | COMPRESSION_BIT) as _);
+```
 
+```text
             // 把 BytesMut 再合并回来
             buf.unsplit(payload);
+```
 
+```css
             Ok(())
         } else {
             self.encode(buf)?;
             Ok(())
         }
     }
+```
 
+```javascript
     /// 把一个完整的 frame decode 成一个 Message
     fn decode_frame(buf: &mut BytesMut) -> Result<Self, KvError> {
         // 先取 4 字节，从中拿出长度和 compression bit
         let header = buf.get_u32() as usize;
         let (len, compressed) = decode_header(header);
         debug!("Got a frame: msg len {}, compressed {}", len, compressed);
+```
 
+```cpp
         if compressed {
             // 解压缩
             let mut decoder = GzDecoder::new(&buf[..len]);
             let mut buf1 = Vec::with_capacity(len * 2);
             decoder.read_to_end(&mut buf1)?;
             buf.advance(len);
+```
 
+```javascript
             // decode 成相应的消息
             Ok(Self::decode(&buf1[..buf1.len()])?)
         } else {
@@ -226,15 +275,20 @@ where
         }
     }
 }
+```
 
+```css
 impl FrameCoder for CommandRequest {}
 impl FrameCoder for CommandResponse {}
+```
 
+```javascript
 fn decode_header(header: usize) -> (usize, bool) {
     let len = header & !COMPRESSION_BIT;
     let compressed = header & COMPRESSION_BIT == COMPRESSION_BIT;
     (len, compressed)
 }
+```
 
 
 这段代码本身并不难理解。我们直接为 FrameCoder 提供了缺省实现，然后 CommandRequest/CommandResponse 做了空实现。其中使用了之前介绍过的 bytes 库里的 BytesMut，以及新引入的 GzEncoder/GzDecoder。你可以按照 [20 讲]介绍的阅读源码的方式，了解这几个数据类型的用法。最后还写了个辅助函数 decode_header()，让 decode_frame() 的代码更直观一些。
@@ -246,55 +300,82 @@ fn decode_header(header: usize) -> (usize, bool) {
 现在，CommandRequest/CommandResponse 就可以做 frame 级别的处理了，我们写一些测试验证是否工作。还是在 src/network/frame.rs 里，添加测试代码：
 
 #[cfg(test)]
+```cpp
 mod tests {
     use super::*;
     use crate::Value;
     use bytes::Bytes;
+```
 
+```cpp
     #[test]
     fn command_request_encode_decode_should_work() {
         let mut buf = BytesMut::new();
+```
 
+```javascript
         let cmd = CommandRequest::new_hdel("t1", "k1");
         cmd.encode_frame(&mut buf).unwrap();
+```
 
+```text
         // 最高位没设置
         assert_eq!(is_compressed(&buf), false);
+```
 
+```javascript
         let cmd1 = CommandRequest::decode_frame(&mut buf).unwrap();
         assert_eq!(cmd, cmd1);
     }
+```
 
+```cpp
     #[test]
     fn command_response_encode_decode_should_work() {
         let mut buf = BytesMut::new();
+```
 
+```html
         let values: Vec<Value> = vec![1.into(), "hello".into(), b"data".into()];
         let res: CommandResponse = values.into();
         res.encode_frame(&mut buf).unwrap();
+```
 
+```text
         // 最高位没设置
         assert_eq!(is_compressed(&buf), false);
+```
 
+```javascript
         let res1 = CommandResponse::decode_frame(&mut buf).unwrap();
         assert_eq!(res, res1);
     }
+```
 
+```cpp
     #[test]
     fn command_response_compressed_encode_decode_should_work() {
         let mut buf = BytesMut::new();
+```
 
+```cpp
         let value: Value = Bytes::from(vec![0u8; COMPRESSION_LIMIT + 1]).into();
         let res: CommandResponse = value.into();
         res.encode_frame(&mut buf).unwrap();
+```
 
+```text
         // 最高位设置了
         assert_eq!(is_compressed(&buf), true);
+```
 
+```javascript
         let res1 = CommandResponse::decode_frame(&mut buf).unwrap();
         assert_eq!(res, res1);
     }
+```
 
+```css
     fn is_compressed(data: &[u8]) -> bool {
         if let &[v] = &data[..1] {
             v >> 7 == 1
@@ -303,16 +384,20 @@ mod tests {
         }
     }
 }
+```
 
 
 这个测试代码里面有从 [u8; N] 到 Value（b"data".into()） 以及从 Bytes 到 Value 的转换，所以我们需要在 src/pb/mod.rs 里添加 From trait 的相应实现：
 
+```cpp
 impl<const N: usize> From<&[u8; N]> for Value {
     fn from(buf: &[u8; N]) -> Self {
         Bytes::copy_from_slice(&buf[..]).into()
     }
 }
+```
 
+```cpp
 impl From<Bytes> for Value {
     fn from(buf: Bytes) -> Self {
         Self {
@@ -320,6 +405,7 @@ impl From<Bytes> for Value {
         }
     }
 }
+```
 
 
 运行 cargo test ，所有测试都可以通过。
@@ -328,6 +414,7 @@ impl From<Bytes> for Value {
 
 在进一步写网络相关的代码前，还有一个问题需要解决：decode_frame() 函数使用的 BytesMut，是如何从 socket 里拿出来的？显然，先读 4 个字节，取出长度 N，然后再读 N 个字节。这个细节和 frame 关系很大，所以还需要在 src/network/frame.rs 里写个辅助函数 read_frame()：
 
+```javascript
 /// 从 stream 中读取一个完整的 frame
 pub async fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<(), KvError>
 where
@@ -345,12 +432,14 @@ where
     stream.read_exact(&mut buf[LEN_LEN..]).await?;
     Ok(())
 }
+```
 
 
 在写 read_frame() 时，我们不希望它只能被用于 TcpStream，这样太不灵活，所以用了泛型参数 S，要求传入的 S 必须满足 AsyncRead + Unpin + Send。我们来看看这3个约束。
 
 AsyncRead 是 tokio 下的一个 trait，用于做异步读取，它有一个方法 poll_read()：
 
+```css
 pub trait AsyncRead {
     fn poll_read(
         self: Pin<&mut Self>, 
@@ -358,6 +447,7 @@ pub trait AsyncRead {
         buf: &mut ReadBuf<'_>
     ) -> Poll<Result<()>>;
 }
+```
 
 
 一旦某个数据结构实现了 AsyncRead，它就可以使用 AsyncReadExt 提供的多达 29 个辅助方法。这是因为任何实现了 AsyncRead 的数据结构，都自动实现了 AsyncReadExt：
@@ -380,11 +470,14 @@ impl<R: AsyncRead + ?Sized> AsyncReadExt for R {}
 在 src/network/frame.rs 里的 mod tests 下加入：
 
 #[cfg(test)]
+```css
 mod tests {
 		struct DummyStream {
         buf: BytesMut,
     }
+```
 
+```cpp
     impl AsyncRead for DummyStream {
         fn poll_read(
             self: std::pin::Pin<&mut Self>,
@@ -393,35 +486,48 @@ mod tests {
         ) -> std::task::Poll<std::io::Result<()>> {
 						// 看看 ReadBuf 需要多大的数据
             let len = buf.capacity();
+```
 
+```javascript
             // split 出这么大的数据
             let data = self.get_mut().buf.split_to(len);
+```
 
+```text
             // 拷贝给 ReadBuf
             buf.put_slice(&data);
+```
 
+```cpp
             // 直接完工
             std::task::Poll::Ready(Ok(()))
         }
     }
 }
+```
 
 
 因为只需要保证 AsyncRead 接口的正确性，所以不需要太复杂的逻辑，我们就放一个 buffer，poll_read() 需要读多大的数据，我们就给多大的数据。有了这个 DummyStream，就可以测试 read_frame() 了：
 
 #[tokio::test]
+```javascript
 async fn read_frame_should_work() {
     let mut buf = BytesMut::new();
     let cmd = CommandRequest::new_hdel("t1", "k1");
     cmd.encode_frame(&mut buf).unwrap();
     let mut stream = DummyStream { buf };
+```
 
+```cpp
     let mut data = BytesMut::new();
     read_frame(&mut stream, &mut data).await.unwrap();
+```
 
+```javascript
     let cmd1 = CommandRequest::decode_frame(&mut data).unwrap();
     assert_eq!(cmd, cmd1);
 }
+```
 
 
 运行 “cargo test”，测试通过。如果你的代码无法编译，可以看看编译错误，是不是缺了一些 use 语句来把某些数据结构和 trait 引入。你也可以对照 GitHub 上的代码修改。
@@ -433,6 +539,7 @@ async fn read_frame_should_work() {
 对于服务器，我们期望可以对 accept 下来的 TcpStream 提供一个 process() 方法，处理协议的细节：
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let addr = "127.0.0.1:9527";
@@ -446,88 +553,114 @@ async fn main() -> Result<()> {
         tokio::spawn(async move { stream.process().await });
     }
 }
+```
 
 
 这个 process() 方法，实际上就是对 examples/server.rs 中 tokio::spawn 里的 while loop 的封装：
 
+```javascript
 while let Some(Ok(cmd)) = stream.next().await {
     info!("Got a new command: {:?}", cmd);
     let res = svc.execute(cmd);
     stream.send(res).await.unwrap();
 }
+```
 
 
 对客户端，我们也希望可以直接 execute() 一个命令，就能得到结果：
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     let addr = "127.0.0.1:9527";
     // 连接服务器
     let stream = TcpStream::connect(addr).await?;
+```
 
     let mut client = ProstClientStream::new(stream);
 
+```javascript
     // 生成一个 HSET 命令
     let cmd = CommandRequest::new_hset("table1", "hello", "world".to_string().into());
+```
 
+```javascript
     // 发送 HSET 命令
     let data = client.execute(cmd).await?;
     info!("Got response {:?}", data);
+```
 
+```text
     Ok(())
 }
+```
 
 
 这个 execute()，实际上就是对 examples/client.rs 中发送和接收代码的封装：
 
+```css
 client.send(cmd).await?;
 if let Some(Ok(data)) = client.next().await {
     info!("Got response {:?}", data);
 }
+```
 
 
 这样的代码，看起来很简洁，维护起来也很方便。
 
 好，先看服务器处理一个 TcpStream 的数据结构，它需要包含 TcpStream，还有我们之前创建的用于处理客户端命令的 Service。所以，让服务器处理 TcpStream 的结构包含这两部分：
 
+```html
 pub struct ProstServerStream<S> {
     inner: S,
     service: Service,
 }
+```
 
 
 而客户端处理 TcpStream 的结构就只需要包含 TcpStream：
 
+```html
 pub struct ProstClientStream<S> {
     inner: S,
 }
+```
 
 
 这里，依旧使用了泛型参数 S。未来，如果要支持 WebSocket，或者在 TCP 之上支持 TLS，它都可以让我们无需改变这一层的代码。
 
 接下来就是具体的实现。有了 frame 的封装，服务器的 process() 方法和客户端的 execute() 方法都很容易实现。我们直接在 src/network/mod.rs 里添加完整代码：
 
+```cpp
 mod frame;
 use bytes::BytesMut;
 pub use frame::{read_frame, FrameCoder};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tracing::info;
+```
 
 use crate::{CommandRequest, CommandResponse, KvError, Service};
 
+```html
 /// 处理服务器端的某个 accept 下来的 socket 的读写
 pub struct ProstServerStream<S> {
     inner: S,
     service: Service,
 }
+```
 
+```html
 /// 处理客户端 socket 的读写
 pub struct ProstClientStream<S> {
     inner: S,
 }
+```
 
+```html
 impl<S> ProstServerStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send,
@@ -538,7 +671,9 @@ where
             service,
         }
     }
+```
 
+```javascript
     pub async fn process(mut self) -> Result<(), KvError> {
         while let Ok(cmd) = self.recv().await {
             info!("Got a new command: {:?}", cmd);
@@ -548,7 +683,9 @@ where
         // info!("Client {:?} disconnected", self.addr);
         Ok(())
     }
+```
 
+```javascript
     async fn send(&mut self, msg: CommandResponse) -> Result<(), KvError> {
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
@@ -556,7 +693,9 @@ where
         self.inner.write_all(&encoded[..]).await?;
         Ok(())
     }
+```
 
+```javascript
     async fn recv(&mut self) -> Result<CommandRequest, KvError> {
         let mut buf = BytesMut::new();
         let stream = &mut self.inner;
@@ -564,7 +703,9 @@ where
         CommandRequest::decode_frame(&mut buf)
     }
 }
+```
 
+```html
 impl<S> ProstClientStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send,
@@ -572,12 +713,16 @@ where
     pub fn new(stream: S) -> Self {
         Self { inner: stream }
     }
+```
 
+```text
     pub async fn execute(&mut self, cmd: CommandRequest) -> Result<CommandResponse, KvError> {
         self.send(cmd).await?;
         Ok(self.recv().await?)
     }
+```
 
+```javascript
     async fn send(&mut self, msg: CommandRequest) -> Result<(), KvError> {
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
@@ -585,7 +730,9 @@ where
         self.inner.write_all(&encoded[..]).await?;
         Ok(())
     }
+```
 
+```javascript
     async fn recv(&mut self) -> Result<CommandResponse, KvError> {
         let mut buf = BytesMut::new();
         let stream = &mut self.inner;
@@ -593,6 +740,7 @@ where
         CommandResponse::decode_frame(&mut buf)
     }
 }
+```
 
 
 这段代码不难阅读，基本上和 frame 的测试代码大同小异。
@@ -600,66 +748,95 @@ where
 当然了，我们还是需要写段代码来测试客户端和服务器交互的整个流程：
 
 #[cfg(test)]
+```cpp
 mod tests {
     use anyhow::Result;
     use bytes::Bytes;
     use std::net::SocketAddr;
     use tokio::net::{TcpListener, TcpStream};
+```
 
     use crate::{assert_res_ok, MemTable, ServiceInner, Value};
 
     use super::*;
 
+```javascript
     #[tokio::test]
     async fn client_server_basic_communication_should_work() -> anyhow::Result<()> {
         let addr = start_server().await?;
+```
 
+```javascript
         let stream = TcpStream::connect(addr).await?;
         let mut client = ProstClientStream::new(stream);
+```
 
         // 发送 HSET，等待回应
 
+```javascript
         let cmd = CommandRequest::new_hset("t1", "k1", "v1".into());
         let res = client.execute(cmd).await.unwrap();
+```
 
+```cpp
         // 第一次 HSET 服务器应该返回 None
         assert_res_ok(res, &[Value::default()], &[]);
+```
 
+```javascript
         // 再发一个 HSET
         let cmd = CommandRequest::new_hget("t1", "k1");
         let res = client.execute(cmd).await?;
+```
 
+```text
         // 服务器应该返回上一次的结果
         assert_res_ok(res, &["v1".into()], &[]);
+```
 
+```text
         Ok(())
     }
+```
 
+```javascript
     #[tokio::test]
     async fn client_server_compression_should_work() -> anyhow::Result<()> {
         let addr = start_server().await?;
+```
 
+```javascript
         let stream = TcpStream::connect(addr).await?;
         let mut client = ProstClientStream::new(stream);
+```
 
+```javascript
         let v: Value = Bytes::from(vec![0u8; 16384]).into();
         let cmd = CommandRequest::new_hset("t2", "k2", v.clone().into());
         let res = client.execute(cmd).await?;
+```
 
         assert_res_ok(res, &[Value::default()], &[]);
 
+```javascript
         let cmd = CommandRequest::new_hget("t2", "k2");
         let res = client.execute(cmd).await?;
+```
 
         assert_res_ok(res, &[v.into()], &[]);
 
+```text
         Ok(())
     }
+```
 
+```javascript
     async fn start_server() -> Result<SocketAddr> {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
+```
 
+```javascript
         tokio::spawn(async move {
             loop {
                 let (stream, _) = listener.accept().await.unwrap();
@@ -668,10 +845,13 @@ mod tests {
                 tokio::spawn(server.process());
             }
         });
+```
 
+```text
         Ok(addr)
     }
 }
+```
 
 
 测试代码基本上是之前 examples 下的 server.rs/client.rs 中的内容。我们测试了不做压缩和做压缩的两种情况。运行 cargo test ，应该所有测试都通过了。
@@ -682,19 +862,26 @@ mod tests {
 
 首先在 Cargo.toml 中，加入两个可执行文件：kvs（kv-server）和 kvc（kv-client）。还需要把一些依赖移动到 dependencies 下。修改之后，Cargo.toml 长这个样子：
 
+```text
 [package]
 name = "kv2"
 version = "0.1.0"
 edition = "2018"
+```
 
+```text
 [[bin]]
 name = "kvs"
 path = "src/server.rs"
+```
 
+```text
 [[bin]]
 name = "kvc"
 path = "src/client.rs"
+```
 
+```text
 [dependencies]
 anyhow = "1" # 错误处理
 bytes = "1" # 高效处理网络 buffer 的库
@@ -707,53 +894,73 @@ thiserror = "1" # 错误定义和处理
 tokio = { version = "1", features = ["full" ] } # 异步网络库
 tracing = "0.1" # 日志处理
 tracing-subscriber = "0.2" # 日志处理
+```
 
+```text
 [dev-dependencies]
 async-prost = "0.2.1" # 支持把 protobuf 封装成 TCP frame
 futures = "0.3" # 提供 Stream trait
 tempfile = "3" # 处理临时目录和临时文件
 tokio-util = { version = "0.6", features = ["codec"]}
+```
 
+```text
 [build-dependencies]
 prost-build = "0.8" # 编译 protobuf
+```
 
 
 然后，创建 src/client.rs 和 src/server.rs，分别写入下面的代码。src/client.rs：
 
+```cpp
 use anyhow::Result;
 use kv2::{CommandRequest, ProstClientStream};
 use tokio::net::TcpStream;
 use tracing::info;
+```
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     let addr = "127.0.0.1:9527";
     // 连接服务器
     let stream = TcpStream::connect(addr).await?;
+```
 
     let mut client = ProstClientStream::new(stream);
 
+```javascript
     // 生成一个 HSET 命令
     let cmd = CommandRequest::new_hset("table1", "hello", "world".to_string().into());
+```
 
+```javascript
     // 发送 HSET 命令
     let data = client.execute(cmd).await?;
     info!("Got response {:?}", data);
+```
 
+```text
     Ok(())
 }
+```
 
 
 src/server.rs：
 
+```cpp
 use anyhow::Result;
 use kv2::{MemTable, ProstServerStream, Service, ServiceInner};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let addr = "127.0.0.1:9527";
@@ -767,6 +974,7 @@ async fn main() -> Result<()> {
         tokio::spawn(async move { stream.process().await });
     }
 }
+```
 
 
 这和之前的 client/server 的代码几乎一致，不同的是，我们使用了自己撰写的 frame 处理方法。
@@ -802,9 +1010,11 @@ INFO cargo_tarpaulin::report: Coverage Results:
 思考题
 
 
+```text
 在设计 frame 的时候，如果我们的压缩方法不止 gzip 一种，而是服务器或客户端都会根据各自的情况，在需要的时候做某种算法的压缩。假设服务器和客户端都支持 gzip、lz4 和 zstd 这三种压缩算法。那么 frame 该如何设计呢？需要用几个 bit 来存放压缩算法的信息？
 目前我们的 client 只适合测试，你可以将其修改成一个完整的命令行程序么？小提示，可以使用 clap 或 structopt，用户可以输入不同的命令；或者做一个交互式的命令行，使用 shellfish 或 rustyline，就像 redis-cli 那样。
 试着使用 LengthDelimitedCodec 来重写 frame 这一层。
+```
 
 
 欢迎在留言区分享你的思考，感谢你的收听。你已经完成Rust学习的第36次打卡啦。

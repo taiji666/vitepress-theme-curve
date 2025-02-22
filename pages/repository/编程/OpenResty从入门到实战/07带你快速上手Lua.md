@@ -1,10 +1,12 @@
 ---
 title: 07带你快速上手Lua
-date: 1739706057.145951
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             07 带你快速上手 Lua
                             你好，我是温铭。
+```
 
 在大概了解 NGINX 的基础知识后，接下来，我们就要来进一步学习 Lua了。它是 OpenResty 中使用的编程语言，掌握它的基本语法还是很有必要的。
 
@@ -22,35 +24,47 @@ Lua 是一个小巧精妙的脚本语言，诞生于巴西的大学实验室，�
 
 在 OpenResty 的安装目录下，你可以找到 LuaJIT 的目录和可执行文件。我这里是 Mac 环境，使用 brew 安装 OpenResty，所以你本地的路径很可能和下面的不同：
 
+```bash
 $ ll /usr/local/Cellar/openresty/1.13.6.2/luajit/bin/luajit
  lrwxr-xr-x  1 ming  admin    18B  4  2 14:54 /usr/local/Cellar/openresty/1.13.6.2/luajit/bin/luajit -> luajit-2.1.0-beta3
+```
 
 
 你也可以在系统的可执行文件目录中找到它：
 
+```bash
 $ which luajit
  /usr/local/bin/luajit
+```
 
 
 并查看 LuaJIT 的版本号：
 
+```bash
 $ luajit -v
  LuaJIT 2.1.0-beta2 -- Copyright (C) 2005-2017 Mike Pall. http://luajit.org/
+```
 
 
 查清楚这些信息后，你可以新建一个 1.lua 文件，并用 luajit 来运行其中的 hello world 代码：
 
+```bash
 $ cat 1.lua
 print("hello world")
+```
 
+```bash
 $ luajit 1.lua
  hello world
+```
 
 
 当然，你还可以使用 resty 来直接运行，要知道，它最终也是用 LuaJIT 来执行的：
 
+```bash
 $ resty -e 'print("hello world")'
  hello world
+```
 
 
 上述两种运行 hello world 的方式都是可行的。不顾对我来说，我更喜欢 resty 这种方式，因为后面很多 OpenResty 的代码，也都是通过 resty 来运行的。
@@ -59,6 +73,7 @@ $ resty -e 'print("hello world")'
 
 Lua 中的数据类型不多，你可以通过 type 函数来返回一个值的类型，比如下面这样的操作：
 
+```bash
 $ resty -e 'print(type("hello world")) 
  print(type(print)) 
  print(type(true)) 
@@ -66,16 +81,19 @@ $ resty -e 'print(type("hello world"))
  print(type({}))
  print(type(nil))
  '
+```
 
 
 会打印出如下内容：
 
+```text
  string
  function
  boolean
  number
  table
  nil
+```
 
 
 这几种就是 Lua 中的基本数据类型了。下面我们来简单介绍一下它们。
@@ -86,11 +104,13 @@ $ resty -e 'print(type("hello world"))
 
 我们举一个例子，来说明这个弊端。下面这段代码，是把 1 到 10 这些数字当作字符串拼接起来。对了，在 Lua 中，我们使用两个点号来表示字符串的相加：
 
+```bash
 $ resty -e 'local s  = ""
  for i = 1, 10 do
      s = s .. tostring(i)
  end
  print(s)'
+```
 
 
 这里我们循环了 10 次，但只有最后一次是我们想要的，而中间新建的 9 个字符串都是无用的。它们不仅占用了额外的空间，也消耗了不必要的 CPU 运算。
@@ -101,22 +121,27 @@ $ resty -e 'local s  = ""
 
 我们看一个具体的示例：
 
+```bash
 $ resty -e 'print([[string has \n and \r]])'
  string has \n and \r
+```
 
 
 你可以看到，长括号中的字符串不会做任何的转义处理。
 
 你也许会问另外一个问题：如果上面那段字符串中包括了长括号本身，又该怎么处理呢？答案很简单，就是在长括号中间增加一个或者多个 = 符号：
 
+```bash
 $ resty -e 'print([=[ string has a [[]]. ]=])'
   string has a [[]].
+```
 
 
 布尔值
 
 这个很简单，true 和 false。但在 Lua 中，只有 nil 和 false 为假，其他都为真，包括 0 和空字符串也为真。我们可以用下面的代码印证一下：
 
+```bash
 $ resty -e 'local a = 0
  if a then
    print("true")
@@ -125,15 +150,18 @@ $ resty -e 'local a = 0
  if a then
    print("true")
  end'
+```
 
 
 这种判断方式和很多常见的开发语言并不一致，所以，为了避免在这种问题上出错，你可以显式地写明比较的对象，比如下面这样：
 
+```bash
 $ resty -e 'local a = 0
  if a == false then
    print("true")
  end
  '
+```
 
 
 数字
@@ -142,8 +170,10 @@ Lua 的 number 类型，是用双精度浮点数来实现的。值得一提的�
 
 此外，LuaJIT 还支持长长整型的大整数，比如下面的例子：
 
+```bash
 $ resty -e 'print(9223372036854775807LL - 1)'
 9223372036854775806LL
+```
 
 
 函数
@@ -152,32 +182,40 @@ $ resty -e 'print(9223372036854775807LL - 1)'
 
 比如，下面两个函数的声明是完全等价的：
 
+```javascript
 function foo()
  end
+```
 
 
 和
 
+```text
 foo = function ()
  end
+```
 
 
 table
 
 table 是 Lua 中唯一的数据结构，自然非常重要，所以后面我会用专门的章节来介绍它。我们可以先来看一个简单的示例代码：
 
+```bash
 $ resty -e 'local color = {first = "red"}
 print(color["first"])'
  red
+```
 
 
 空值
 
 在 Lua 中，空值就是 nil。如果你定义了一个变量，但没有赋值，它的默认值就是 nil：
 
+```bash
 $ resty -e 'local a
  print(type(a))'
  nil
+```
 
 
 当你真正进入 OpenResty 体系中后，会发现很多种空值，比如 ngx.null 等等，我们后面再细聊。
@@ -202,17 +240,21 @@ string 库
 
 下面我们来看一段示例代码：
 
+```bash
 $ resty -e 'print(string.byte("abc", 1, 3))
  print(string.byte("abc", 3)) -- 缺少第三个参数，第三个参数默认与第二个相同，此时为 3
  print(string.byte("abc"))    -- 缺少第二个和第三个参数，此时这两个参数都默认为 1
  '
+```
 
 
 它的输出为：
 
+```text
  979899
  99
  97
+```
 
 
 table 库
@@ -221,8 +263,10 @@ table 库
 
 这里我简单提一下table.concat 。table.concat一般用在字符串拼接的场景下，比如下面这个例子。它可以避免生成很多无用的字符串。
 
+```bash
 $ resty -e 'local a = {"A", "b", "C"}
  print(table.concat(a))'
+```
 
 
 math 库
@@ -231,9 +275,11 @@ Lua math 库由一组标准的数学函数构成。数学库的引入，既丰�
 
 在 OpenResty 的实际项目中，我们很少用 Lua 去做数学方面的运算，不过其中和随机数相关的 math.random() 和 math.randomseed() 两个函数，倒是比较常用，比如下面的这段代码，它可以在指定的范围内，随机地生成两个数字。
 
+```bash
 $ resty -e 'math.randomseed (os.time()) 
 print(math.random())
  print(math.random(100))'
+```
 
 
 虚变量
@@ -250,26 +296,32 @@ print(math.random())
 
 如果我们只需要获取开始的下标，那么很简单，只声明一个变量来接收 string.find 的返回值即可：
 
+```bash
 $ resty -e 'local start = string.find("hello", "he")
  print(start)'
  1
+```
 
 
 但如果你只想获取结束的下标，那就必须使用虚变量了：
 
+```bash
 $ resty -e 'local  _, end_pos = string.find("hello", "he")
  print(end_pos)'
  2
+```
 
 
 除了在返回值里使用，虚变量还经常用于循环中，比如下面这个例子：
 
+```bash
 $ resty -e 'for _, v in ipairs({4,5,6}) do
      print(v)
  end'
  4
  5
  6
+```
 
 
 而当有多个返回值需要忽略时，你可以重复使用同一个虚变量。这里我就不举例子了，你可以试着自己写一个这样的示例代码吗？欢迎你把代码贴在留言区里和我分享、交流。
@@ -282,9 +334,11 @@ $ resty -e 'for _, v in ipairs({4,5,6}) do
 
 还记得这节课讲math库时，学过的这段代码吗？它可以在指定范围内，随机生成两个数字。
 
+```bash
 $ resty -e 'math.randomseed (os.time()) 
 print(math.random())
  print(math.random(100))'
+```
 
 
 不过，你可能注意到了，这段代码是用当前时间戳作为种子的，那么这种方法是否有问题呢？又该如何生成好的种子呢？要知道，很多时候我们生成的随机数其实并不随机，并且有很大的安全隐患。

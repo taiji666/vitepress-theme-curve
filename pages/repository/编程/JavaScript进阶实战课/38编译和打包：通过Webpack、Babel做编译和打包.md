@@ -1,10 +1,12 @@
 ---
 title: 38编译和打包：通过Webpack、Babel做编译和打包
-date: 1739706057.6210232
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             38 编译和打包：通过Webpack、Babel做编译和打包
                             你好，我是石川。
+```
 
 在 JavaScript 从 ES5 升级到 ES6 的时候，在大多浏览器还尚未支持新版的JavaScript的时候，很多开发者就想要预先体验相关的功能，但是却愁于没有相关的环境支持。当时，为了解决这个问题，一些面向 JavaScript 开发者的编译器如 Babel.js 就诞生了，它允许开发者按照 ES6 版的 JavaScript 语法来编写程序，然后再将代码编译转化成与 ES5 兼容的版本。
 
@@ -26,40 +28,54 @@ JavaScript的编译
 
 Babel 可以通过 npm install --save-dev @babel/core 来安装，然后直接在代码中导入使用，但是这样的使用会把编译的工作加到终端用户侧，更合理的方式应该是将 Babel 的使用放在开发流程中。
 
+```javascript
 const babel = require("@babel/core");
 babel.transformSync("code", optionsObject);
+```
 
 
 在开发的流程中加入 Babel 的方式如下：
 
+```text
 npm install --save-dev @babel/core @babel/cli
 ./node_modules/.bin/babel src --out-dir lib
+```
 
 
 之后，我们可以加入预设（preset）。预设的加入有两种方式，一种是将所用的编译插件都一次性安装；另外一种则是只针对特定的插件，比如箭头函数做安装。
 
+```text
 npm install --save-dev @babel/preset-env 
 ./node_modules/.bin/babel src --out-dir lib --presets=@babel/env
+```
 
+```text
 npm install --save-dev @babel/plugin-transform-arrow-functions
 ./node_modules/.bin/babel src --out-dir lib --plugins=@babel/plugin-transform-arrow-functions
+```
 
 
 假如我们安装了上述的箭头函数插件，那么在代码中，如果我们使用相关的箭头，Babel 在编译的过程中就会将代码转化成 ES5 版本的样式。在 Babel 内部，通过读取一个 .babelrc 配置文件，来判断如何转换 JavaScript 代码。所以，你可以按需创建想要编译的功能，来进行这些预设，也可以全量使用所有插件，来对所有的功能进行相关的转译。比如在下面这个例子中，就是将一个箭头函数转化为和ES5版本兼容的代码。
 
+```javascript
 // Babel输入: ES6箭头函数
 [1, 2, 3].map(n => n + 1);
+```
 
+```text
 // Babel输出: ES5匿名函数
 [1, 2, 3].map(function(n) {
   return n + 1;
 });
+```
 
 
 尽管现在很多时候，我们已经不太需要转换 JavaScript 的核心语言了，但 Babel 仍然常用于支持 JavaScript 语言的非标准扩展，其中一个就是我们在前面一讲提到的 Flow。Babel 在编译的过程中，可以帮助我们去掉 Flow 的类型注释。除了 Flow 外，Babel 也支持去掉 TypeScript 语言的类型注释。
 
+```text
 npm install --save-dev @babel/preset-flow
 npm install --save-dev @babel/preset-typescript
+```
 
 
 通过把 Babel 和一个代码打包工具结合起来使用，我们可以在 JavaScript 文件上自动运行 Babel。这样做可以简化生成可执行代码的过程。例如，Webpack 支持一个 “babel 加载器”模块，你可以安装并配置该模块，以便在打包的每个 JavaScript 模块上运行 babel。那么说到这里，下面我们再来看看 JavaScript 中的打包工具。

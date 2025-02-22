@@ -1,10 +1,12 @@
 ---
 title: 23你真的懂PythonGIL（全局解释器锁）吗？
-date: 1739706057.5437288
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             23 你真的懂Python GIL（全局解释器锁）吗？
                             你好，我是景霄。
+```
 
 前面几节课，我们学习了Python的并发编程特性，也了解了多线程编程。事实上，Python多线程另一个很重要的话题——GIL（Global Interpreter Lock，即全局解释器锁）却鲜有人知，甚至连很多Python“老司机”都觉得GIL就是一个谜。今天我就来为你解谜，带你一起来看GIL。
 
@@ -14,9 +16,11 @@ categories: [Python核心技术与实战]
 
 比如下面这段很简单的cpu-bound代码：
 
+```python
 def CountDown(n):
     while n > 0:
         n -= 1
+```
 
 
 现在，假设一个很大的数字n = 100000000，我们先来试试单线程的情况下执行CountDown(n)。在我手上这台号称8核的MacBook上执行后，我发现它的耗时为5.4s。
@@ -27,12 +31,14 @@ from threading import Thread
 
 n = 100000000
 
+```text
 t1 = Thread(target=CountDown, args=[n // 2])
 t2 = Thread(target=CountDown, args=[n // 2])
 t1.start()
 t2.start()
 t1.join()
 t2.join()
+```
 
 
 我又在同一台机器上跑了一下，结果发现，这不仅没有得到速度的提升，反而让运行变慢，总共花了9.6s。
@@ -81,8 +87,10 @@ CPython使用引用计数来管理内存，所有Python脚本中创建的实例�
 所以说，CPython 引进 GIL 其实主要就是这么两个原因：
 
 
+```text
 一是设计者为了规避类似于内存管理这样的复杂的竞争风险问题（race condition）；
 二是因为CPython大量使用C语言库，但大部分C语言库都不是原生线程安全的（线程安全会降低性能和增加复杂度）。
+```
 
 
 GIL是如何工作的？
@@ -101,23 +109,31 @@ GIL是如何工作的？
 
 整体来说，每一个Python线程都是类似这样循环的封装，我们来看下面这段代码：
 
+```text
 for (;;) {
     if (--ticker < 0) {
         ticker = check_interval;
+```
     
+```text
         /* Give another thread a chance */
         PyThread_release_lock(interpreter_lock);
+```
     
         /* Other threads may run now */
     
+```text
         PyThread_acquire_lock(interpreter_lock, 1);
     }
+```
 
+```text
     bytecode = *next_instr++;
     switch (bytecode) {
         /* execute the next instruction ... */ 
     }
 }
+```
 
 
 从这段代码中，我们可以看到，每个Python线程都会先检查ticker计数。只有在ticker大于0的情况下，线程才会去执行自己的bytecode。
@@ -130,20 +146,28 @@ import threading
 
 n = 0
 
+```python
 def foo():
     global n
     n += 1
+```
 
+```text
 threads = []
 for i in range(100):
     t = threading.Thread(target=foo)
     threads.append(t)
+```
 
+```text
 for t in threads:
     t.start()
+```
 
+```text
 for t in threads:
     t.join()
+```
 
 print(n)
 
@@ -154,23 +178,29 @@ print(n)
 
 >>> import dis
 >>> dis.dis(foo)
+```text
 LOAD_GLOBAL              0 (n)
 LOAD_CONST               1 (1)
 INPLACE_ADD
 STORE_GLOBAL             0 (n)
+```
 
 
 而这四行bytecode中间都是有可能被打断的！
 
 所以，千万别想着，有了GIL你的程序就可以高枕无忧了，我们仍然需要去注意线程安全。正如我开头所说，GIL的设计，主要是为了方便CPython解释器层面的编写者，而不是Python应用层面的程序员。作为Python的使用者，我们还是需要lock等工具，来确保线程安全。比如我下面的这个例子：
 
+```text
 n = 0
 lock = threading.Lock()
+```
 
+```python
 def foo():
     global n
     with lock:
         n += 1
+```
 
 
 如何绕过GIL？
@@ -188,8 +218,10 @@ def foo():
 总的来说，你只需要重点记住，绕过GIL的大致思路有这么两种就够了：
 
 
+```text
 绕过CPython，使用JPython（Java实现的Python解释器）等别的实现；
 把关键性能代码，放到别的语言（一般是C++）中实现。
+```
 
 
 总结

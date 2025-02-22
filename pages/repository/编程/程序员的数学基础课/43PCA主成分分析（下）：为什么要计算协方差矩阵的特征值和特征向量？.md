@@ -1,10 +1,12 @@
 ---
 title: 43PCA主成分分析（下）：为什么要计算协方差矩阵的特征值和特征向量？
-date: 1739706057.495119
+date: 2025-02-22
 categories: [程序员的数学基础课]
 ---
+```text
                             43 PCA主成分分析（下）：为什么要计算协方差矩阵的特征值和特征向量？
                             你好，我是黄申，今天我们继续来聊PCA主成分分析的下半部分。
+```
 
 上一节，我们讲解了一种特征降维的方法：PCA主成分分析。这个方法主要是利用不同维度特征之间的协方差，构造一个协方差矩阵，然后获取这个矩阵的特征值和特征向量。根据特征值的大小，我们可以选取那些更为重要的特征向量，或者说主成分。最终，根据这些主成分，我们就可以对原始的数据矩阵进行降维。
 
@@ -28,16 +30,20 @@ PCA方法的操作步骤有些繁琐，并且背后的理论支持也不是很�
 
 当然，全部手动计算工作量不小，这时可以让计算机做它擅长的事情：重复性计算。下面的Python代码展示了如何对样本矩阵的数据进行标准化。
 
+```python
 from numpy import *
 from numpy import linalg as LA
 from sklearn.preprocessing import scale
+```
 
 # 原始数据，包含了3个样本和3个特征，每一行表示一个样本，每一列表示一维特征
 x = mat([[1,3,-7],[2,5,-14],[-3,-7,2]])
 
 # 矩阵按列进行标准化
+```python
 x_s = scale(x, with_mean=True, with_std=True, axis=0)
 print("标准化后的矩阵：", x_s)
+```
 
 
 其中，scale函数使用了axis=0，表示对列进行标准化，因为目前的矩阵排列中，每一列代表一个特征维度，这点需要注意。如果矩阵排列中每一行代表一个特征维度，那么可以使用axis=1对行进行标准化。
@@ -72,17 +78,21 @@ print("协方差矩阵：\n", x_cov, "\n")
 
 最后化简为：
 
+```text
 \(-λ^3+4.5λ^2=0.343λ=0\)-
 \(λ(0.0777-λ)(λ-4.4223)=0\)
+```
 
 所以\(λ\)有3个近似解，分别是0、0.0777和4.4223。
 
 特征向量的求解过程如果手动推算比较繁琐，我们还是利用Python语言直接求出特征值和对应的特征向量。
 
 # 求协方差矩阵的特征值和特征向量
+```python
 eigVals,eigVects = LA.eig(x_cov)
 print("协方差矩阵的特征值：", eigVals)
 print("协方差的特征向量（主成分）：\n", eigVects, "\n")
+```
 
 
 我们可以得到三个特征值及它们对应的特征向量。
@@ -94,19 +104,25 @@ print("协方差的特征向量（主成分）：\n", eigVects, "\n")
 我使用下面的这段代码，找出特征值最大的特征向量，也就是最重要的主成分，然后利用这个主成分，对原始的样本矩阵进行变换。
 
 # 找到最大的特征值，及其对应的特征向量
+```text
 max_eigVal = -1
 max_eigVal_index = -1
+```
 
+```text
 for i in range(0, eigVals.size):
     if (eigVals[i] > max_eigVal):
         max_eigVal = eigVals[i]
         max_eigVal_index = i
+```
 
     eigVect_with_max_eigVal = eigVects[:,max_eigVal_index]
 
 # 输出最大的特征值及其对应的特征向量，也就是第一个主成分
+```python
 print("最大的特征值：", max_eigVal)
 print("最大特征值所对应的特征向量：", eigVect_with_max_eigVal)
+```
 
 # 输出变换后的数据矩阵。注意，这里的三个值是表示三个样本，而特征从3维变为1维了。
 print("变换后的数据矩阵：", x_s.dot(eigVect_with_max_eigVal), "\n")
@@ -114,8 +130,10 @@ print("变换后的数据矩阵：", x_s.dot(eigVect_with_max_eigVal), "\n")
 
 很明显，最大的特征值是4.422311507725755，对应的特征向量是[-0.58077228 -0.57896098 0.57228292]。变换后的样本矩阵是：
 
+```markdown
 -
 它从原来的3个特征维度降为1个特征维度了。
+```
 
 Python的sklearn库也实现了PCA，我们可以通过下面的代码来尝试一下。
 
@@ -128,10 +146,12 @@ pca = PCA(n_components=2)
 pca.fit(x_s)
 
 # 输出变换后的数据矩阵。注意，这里的三个值是表示三个样本，而特征从3维变为1维了。
+```python
 print("方差（特征值）: ", pca.explained_variance_)
 print("主成分（特征向量）", pca.components_)
 print("变换后的样本矩阵：", pca.transform(x_s))
 print("信息量: ", pca.explained_variance_ratio_)
+```
 
 
 这段代码中，我把输出的主成分设置为2，也就是说挑出前2个最重要的主成分。相应的，变化后的样本矩阵有2个特征维度。

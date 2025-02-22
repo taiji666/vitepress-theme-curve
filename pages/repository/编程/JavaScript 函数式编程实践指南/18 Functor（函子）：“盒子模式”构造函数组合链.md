@@ -1,6 +1,6 @@
 ---
 title: 18 Functor（函子）：“盒子模式”构造函数组合链
-date: 1739708222.3816018
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 ## JS Functor 中的“顶流”——Array
@@ -192,8 +192,10 @@ Maybe 就仿佛是交警叔叔那无形的手，它能够控制乘客们把垃�
 
 一个合法的 Functor 需要满足以下条件：
 
+```markdown
 1.  恒等性（Identity）
 1.  可组合性（Composition）
+```
 
   
 

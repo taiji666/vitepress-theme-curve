@@ -1,10 +1,12 @@
 ---
 title: 37阶段实操（5）：构建一个简单的KVserver-网络安全
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             37 阶段实操（5）：构建一个简单的KV server-网络安全
                             你好，我是陈天。
+```
 
 上一讲我们完成了KV server整个网络部分的构建。而安全是和网络密不可分的组成部分，在构建应用程序的时候，一定要把网络安全也考虑进去。当然，如果不考虑极致的性能，我们可以使用诸如 gRPC 这样的系统，在提供良好性能的基础上，它还通过 TLS 保证了安全性。
 
@@ -16,25 +18,32 @@ categories: [陈天·Rust编程第一课]
 
 为了测试方便，我们要有能力生成自己的 CA 证书、服务端证书，甚至客户端证书。证书生成的细节今天就不详细介绍了，我之前做了一个叫 certify 的库，可以用来生成各种证书。我们可以在 Cargo.toml 里加入这个库：
 
+```text
 [dev-dependencies]
 ...
 certify = "0.3"
 ...
+```
 
 
 然后在根目录下创建 fixtures 目录存放证书，再创建 examples/gen_cert.rs 文件，添入如下代码：
 
+```cpp
 use anyhow::Result;
 use certify::{generate_ca, generate_cert, load_ca, CertType, CA};
 use tokio::fs;
+```
 
+```css
 struct CertPem {
     cert_type: CertType,
     cert: String,
     key: String,
 }
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let pem = create_ca()?;
     gen_files(&pem).await?;
@@ -45,7 +54,9 @@ async fn main() -> Result<()> {
     gen_files(&pem).await?;
     Ok(())
 }
+```
 
+```cpp
 fn create_ca() -> Result<CertPem> {
     let (cert, key) = generate_ca(
         &["acme.inc"],
@@ -61,7 +72,9 @@ fn create_ca() -> Result<CertPem> {
         key,
     })
 }
+```
 
+```cpp
 fn create_cert(ca: &CA, domains: &[&str], cn: &str, is_client: bool) -> Result<CertPem> {
     let (days, cert_type) = if is_client {
         (Some(365), CertType::Client)
@@ -69,14 +82,18 @@ fn create_cert(ca: &CA, domains: &[&str], cn: &str, is_client: bool) -> Result<C
         (Some(5 * 365), CertType::Server)
     };
     let (cert, key) = generate_cert(ca, domains, "CN", "Acme Inc.", cn, None, is_client, days)?;
+```
 
+```css
     Ok(CertPem {
         cert_type,
         cert,
         key,
     })
 }
+```
 
+```javascript
 async fn gen_files(pem: &CertPem) -> Result<()> {
     let name = match pem.cert_type {
         CertType::Client => "client",
@@ -87,6 +104,7 @@ async fn gen_files(pem: &CertPem) -> Result<()> {
     fs::write(format!("fixtures/{}.key", name), pem.key.as_bytes()).await?;
     Ok(())
 }
+```
 
 
 这个代码很简单，它先生成了一个 CA 证书，然后再生成服务器和客户端证书，全部存入刚创建的 fixtures 目录下。你需要 cargo run --examples gen_cert 运行一下这个命令，待会我们会在测试中用到这些证书和密钥。
@@ -113,17 +131,22 @@ TLS 是目前最主要的应用层安全协议，被广泛用于保护架构在 
 
 先在 Cargo.toml 中添加 tokio-rustls：
 
+```text
 [dependencies]
 ...
 tokio-rustls = "0.22"
 ...
+```
 
 
 然后创建 src/network/tls.rs，撰写如下代码（记得在 src/network/mod.rs 中引入这个文件哦）：
 
+```cpp
 use std::io::Cursor;
 use std::sync::Arc;
+```
 
+```java
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::rustls::{internal::pemfile, Certificate, ClientConfig, ServerConfig};
 use tokio_rustls::rustls::{AllowAnyAuthenticatedClient, NoClientAuth, PrivateKey, RootCertStore};
@@ -132,25 +155,33 @@ use tokio_rustls::TlsConnector;
 use tokio_rustls::{
     client::TlsStream as ClientTlsStream, server::TlsStream as ServerTlsStream, TlsAcceptor,
 };
+```
 
 use crate::KvError;
 
+```text
 /// KV Server 自己的 ALPN (Application-Layer Protocol Negotiation)
 const ALPN_KV: &str = "kv";
+```
 
 /// 存放 TLS ServerConfig 并提供方法 accept 把底层的协议转换成 TLS
 #[derive(Clone)]
+```html
 pub struct TlsServerAcceptor {
     inner: Arc<ServerConfig>,
 }
+```
 
 /// 存放 TLS Client 并提供方法 connect 把底层的协议转换成 TLS
 #[derive(Clone)]
+```html
 pub struct TlsClientConnector {
     pub config: Arc<ClientConfig>,
     pub domain: Arc<String>,
 }
+```
 
+```cpp
 impl TlsClientConnector {
     /// 加载 client cert/CA cert，生成 ClientConfig
     pub fn new(
@@ -159,33 +190,43 @@ impl TlsClientConnector {
         server_ca: Option<&str>,
     ) -> Result<Self, KvError> {
         let mut config = ClientConfig::new();
+```
 
+```javascript
         // 如果有客户端证书，加载之
         if let Some((cert, key)) = identity {
             let certs = load_certs(cert)?;
             let key = load_key(key)?;
             config.set_single_client_cert(certs, key)?;
         }
+```
 
+```javascript
         // 加载本地信任的根证书链
         config.root_store = match rustls_native_certs::load_native_certs() {
             Ok(store) | Err((Some(store), _)) => store,
             Err((None, error)) => return Err(error.into()),
         };
+```
 
+```cpp
         // 如果有签署服务器的 CA 证书，则加载它，这样服务器证书不在根证书链
         // 但是这个 CA 证书能验证它，也可以
         if let Some(cert) = server_ca {
             let mut buf = Cursor::new(cert);
             config.root_store.add_pem_file(&mut buf).unwrap();
         }
+```
 
+```cpp
         Ok(Self {
             config: Arc::new(config),
             domain: Arc::new(domain.into()),
         })
     }
+```
 
+```javascript
     /// 触发 TLS 协议，把底层的 stream 转换成 TLS stream
     pub async fn connect<S>(&self, stream: S) -> Result<ClientTlsStream<S>, KvError>
     where
@@ -193,21 +234,29 @@ impl TlsClientConnector {
     {
         let dns = DNSNameRef::try_from_ascii_str(self.domain.as_str())
             .map_err(|_| KvError::Internal("Invalid DNS name".into()))?;
+```
 
+```javascript
         let stream = TlsConnector::from(self.config.clone())
             .connect(dns, stream)
             .await?;
+```
 
+```text
         Ok(stream)
     }
 }
+```
 
+```javascript
 impl TlsServerAcceptor {
     /// 加载 server cert/CA cert，生成 ServerConfig
     pub fn new(cert: &str, key: &str, client_ca: Option<&str>) -> Result<Self, KvError> {
         let certs = load_certs(cert)?;
         let key = load_key(key)?;
+```
 
+```javascript
         let mut config = match client_ca {
             None => ServerConfig::new(NoClientAuth::new()),
             Some(cert) => {
@@ -217,23 +266,31 @@ impl TlsServerAcceptor {
                 client_root_cert_store
                     .add_pem_file(&mut cert)
                     .map_err(|_| KvError::CertifcateParseError("CA", "cert"))?;
+```
 
+```javascript
                 let client_auth = AllowAnyAuthenticatedClient::new(client_root_cert_store);
                 ServerConfig::new(client_auth)
             }
         };
+```
 
+```cpp
         // 加载服务器证书
         config
             .set_single_cert(certs, key)
             .map_err(|_| KvError::CertifcateParseError("server", "cert"))?;
         config.set_protocols(&[Vec::from(&ALPN_KV[..])]);
+```
 
+```cpp
         Ok(Self {
             inner: Arc::new(config),
         })
     }
+```
 
+```javascript
     /// 触发 TLS 协议，把底层的 stream 转换成 TLS stream
     pub async fn accept<S>(&self, stream: S) -> Result<ServerTlsStream<S>, KvError>
     where
@@ -243,22 +300,30 @@ impl TlsServerAcceptor {
         Ok(acceptor.accept(stream).await?)
     }
 }
+```
 
+```cpp
 fn load_certs(cert: &str) -> Result<Vec<Certificate>, KvError> {
     let mut cert = Cursor::new(cert);
     pemfile::certs(&mut cert).map_err(|_| KvError::CertifcateParseError("server", "cert"))
 }
+```
 
+```java
 fn load_key(key: &str) -> Result<PrivateKey, KvError> {
     let mut cursor = Cursor::new(key);
+```
 
+```java
     // 先尝试用 PKCS8 加载私钥
     if let Ok(mut keys) = pemfile::pkcs8_private_keys(&mut cursor) {
         if !keys.is_empty() {
             return Ok(keys.remove(0));
         }
     }
+```
 
+```java
     // 再尝试加载 RSA key
     cursor.set_position(0);
     if let Ok(mut keys) = pemfile::rsa_private_keys(&mut cursor) {
@@ -266,10 +331,13 @@ fn load_key(key: &str) -> Result<PrivateKey, KvError> {
             return Ok(keys.remove(0));
         }
     }
+```
 
+```java
     // 不支持的私钥类型
     Err(KvError::CertifcateParseError("private", "key"))
 }
+```
 
 
 这个代码创建了两个数据结构 TlsServerAcceptor/TlsClientConnector。虽然它有 100 多行，但主要的工作其实就是根据提供的证书，来生成 tokio-tls 需要的 ServerConfig/ClientConfig。
@@ -278,6 +346,7 @@ fn load_key(key: &str) -> Result<PrivateKey, KvError> {
 
 处理完 config 后，这段代码的核心逻辑其实就是客户端的 connect() 方法和服务器的 accept() 方法，它们都接受一个满足 AsyncRead + AsyncWrite + Unpin + Send 的 stream。类似上一讲，我们不希望 TLS 代码只能接受 TcpStream，所以这里提供了一个泛型参数 S：
 
+```javascript
 /// 触发 TLS 协议，把底层的 stream 转换成 TLS stream
 pub async fn connect<S>(&self, stream: S) -> Result<ClientTlsStream<S>, KvError>
 where
@@ -285,14 +354,20 @@ where
 {
     let dns = DNSNameRef::try_from_ascii_str(self.domain.as_str())
         .map_err(|_| KvError::Internal("Invalid DNS name".into()))?;
+```
 
+```javascript
     let stream = TlsConnector::from(self.config.clone())
         .connect(dns, stream)
         .await?;
+```
 
+```text
     Ok(stream)
 }
+```
 
+```javascript
 /// 触发 TLS 协议，把底层的 stream 转换成 TLS stream
 pub async fn accept<S>(&self, stream: S) -> Result<ServerTlsStream<S>, KvError>
 where
@@ -301,6 +376,7 @@ where
     let acceptor = TlsAcceptor::from(self.inner.clone());
     Ok(acceptor.accept(stream).await?)
 }
+```
 
 
 在使用 TlsConnector 或者 TlsAcceptor 处理完 connect/accept 后，我们得到了一个 TlsStream，它也满足 AsyncRead + AsyncWrite + Unpin + Send，后续的操作就可以在其上完成了。百来行代码就搞定了 TLS，是不是很轻松？
@@ -312,25 +388,32 @@ mod tests {
 
     use std::net::SocketAddr;
 
+```cpp
     use super::*;
     use anyhow::Result;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
     };
+```
 
+```text
     const CA_CERT: &str = include_str!("../../fixtures/ca.cert");
     const CLIENT_CERT: &str = include_str!("../../fixtures/client.cert");
     const CLIENT_KEY: &str = include_str!("../../fixtures/client.key");
     const SERVER_CERT: &str = include_str!("../../fixtures/server.cert");
     const SERVER_KEY: &str = include_str!("../../fixtures/server.key");
+```
 
+```javascript
     #[tokio::test]
     async fn tls_should_work() -> Result<()> {
         let ca = Some(CA_CERT);
+```
 
         let addr = start_server(None).await?;
 
+```javascript
         let connector = TlsClientConnector::new("kvserver.acme.inc", None, ca)?;
         let stream = TcpStream::connect(addr).await?;
         let mut stream = connector.connect(stream).await?;
@@ -338,17 +421,23 @@ mod tests {
         let mut buf = [0; 12];
         stream.read_exact(&mut buf).await?;
         assert_eq!(&buf, b"hello world!");
+```
 
+```text
         Ok(())
     }
+```
 
+```javascript
     #[tokio::test]
     async fn tls_with_client_cert_should_work() -> Result<()> {
         let client_identity = Some((CLIENT_CERT, CLIENT_KEY));
         let ca = Some(CA_CERT);
+```
 
         let addr = start_server(ca.clone()).await?;
 
+```javascript
         let connector = TlsClientConnector::new("kvserver.acme.inc", client_identity, ca)?;
         let stream = TcpStream::connect(addr).await?;
         let mut stream = connector.connect(stream).await?;
@@ -356,29 +445,43 @@ mod tests {
         let mut buf = [0; 12];
         stream.read_exact(&mut buf).await?;
         assert_eq!(&buf, b"hello world!");
+```
 
+```text
         Ok(())
     }
+```
 
+```javascript
     #[tokio::test]
     async fn tls_with_bad_domain_should_not_work() -> Result<()> {
         let addr = start_server(None).await?;
+```
 
+```javascript
         let connector = TlsClientConnector::new("kvserver1.acme.inc", None, Some(CA_CERT))?;
         let stream = TcpStream::connect(addr).await?;
         let result = connector.connect(stream).await;
+```
 
         assert!(result.is_err());
 
+```text
         Ok(())
     }
+```
 
+```javascript
     async fn start_server(ca: Option<&str>) -> Result<SocketAddr> {
         let acceptor = TlsServerAcceptor::new(SERVER_CERT, SERVER_KEY, ca)?;
+```
 
+```javascript
         let echo = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = echo.local_addr().unwrap();
+```
 
+```cpp
         tokio::spawn(async move {
             let (stream, _) = echo.accept().await.unwrap();
             let mut stream = acceptor.accept(stream).await.unwrap();
@@ -386,10 +489,13 @@ mod tests {
             stream.read_exact(&mut buf).await.unwrap();
             stream.write_all(&buf).await.unwrap();
         });
+```
 
+```text
         Ok(addr)
     }
 }
+```
 
 
 这段测试代码使用了 include_str! 宏，在编译期把文件加载成字符串放在 RODATA 段。我们测试了三种情况：标准的 TLS 连接、带有客户端证书的 TLS 连接，以及客户端提供了错的域名的情况。运行 cargo test ，所有测试都能通过。
@@ -400,13 +506,17 @@ mod tests {
 
 由于我们一路以来良好的接口设计，尤其是 ProstClientStream/ProstServerStream 都接受泛型参数，使得 TLS 的代码可以无缝嵌入。比如客户端：
 
+```javascript
 // 新加的代码
 let connector = TlsClientConnector::new("kvserver.acme.inc", None, Some(ca_cert))?;
+```
 
 let stream = TcpStream::connect(addr).await?;
 
+```javascript
 // 新加的代码
 let stream = connector.connect(stream).await?;
+```
 
 let mut client = ProstClientStream::new(stream);
 
@@ -415,20 +525,27 @@ let mut client = ProstClientStream::new(stream);
 
 我们看完整的代码，src/server.rs：
 
+```cpp
 use anyhow::Result;
 use kv3::{MemTable, ProstServerStream, Service, ServiceInner, TlsServerAcceptor};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let addr = "127.0.0.1:9527";
+```
 
+```javascript
     // 以后从配置文件取
     let server_cert = include_str!("../fixtures/server.cert");
     let server_key = include_str!("../fixtures/server.key");
+```
 
+```javascript
     let acceptor = TlsServerAcceptor::new(server_cert, server_key, None)?;
     let service: Service = ServiceInner::new(MemTable::new()).into();
     let listener = TcpListener::bind(addr).await?;
@@ -442,39 +559,54 @@ async fn main() -> Result<()> {
         tokio::spawn(async move { stream.process().await });
     }
 }
+```
 
 
 src/client.rs：
 
+```cpp
 use anyhow::Result;
 use kv3::{CommandRequest, ProstClientStream, TlsClientConnector};
 use tokio::net::TcpStream;
 use tracing::info;
+```
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     // 以后用配置替换
     let ca_cert = include_str!("../fixtures/ca.cert");
+```
 
+```javascript
     let addr = "127.0.0.1:9527";
     // 连接服务器
     let connector = TlsClientConnector::new("kvserver.acme.inc", None, Some(ca_cert))?;
     let stream = TcpStream::connect(addr).await?;
     let stream = connector.connect(stream).await?;
+```
 
     let mut client = ProstClientStream::new(stream);
 
+```javascript
     // 生成一个 HSET 命令
     let cmd = CommandRequest::new_hset("table1", "hello", "world".to_string().into());
+```
 
+```javascript
     // 发送 HSET 命令
     let data = client.execute(cmd).await?;
     info!("Got response {:?}", data);
+```
 
+```text
     Ok(())
 }
+```
 
 
 和上一讲的代码项目相比，更新后的客户端和服务器代码，各自仅仅多了一行，就把 TcpStream 封装成了 TlsStream。这就是使用 trait 做面向接口编程的巨大威力，系统的各个组件可以来自不同的 crates，但只要其接口一致（或者我们创建 adapter 使其接口一致），就可以无缝插入。
@@ -494,8 +626,10 @@ TLS 很好地解决了安全性的问题，可以保证整个传输过程中数�
 思考题
 
 
+```text
 目前我们的 kvc/kvs 只做了单向的验证，如果服务器要验证客户端的证书，该怎么做？如果你没有头绪，可以再仔细看看测试 TLS 的代码，然后改动 kvc/kvs 使得双向验证也能通过吧。
 除了 TLS，另外一个被广泛使用的处理应用层安全的协议是 noise protocol。你可以阅读我的这篇文章了解 noise protocol。Rust 下有 snow 这个很优秀的库处理 noise protocol。对于有余力的同学，你们可以看看它的文档，尝试着写段类似 tls.rs 的代码，让我们的 kvs/kvc 可以使用 noise protocol。
+```
 
 
 欢迎在留言区分享你的思考，感谢你的收听，如果你觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论。

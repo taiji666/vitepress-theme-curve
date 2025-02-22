@@ -1,10 +1,12 @@
 ---
 title: 36盘点OpenResty的各种调试手段
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             36 盘点OpenResty的各种调试手段
                             你好，我是温铭。
+```
 
 在 OpenResty 的交流群里面，经常会有开发者提出这样的疑问：OpenResty 里面怎么调试呢？据我所知，OpenResty 中有一些支持断点调试的工具，包括 VSCode 中的插件，但至今使用并不广泛。包括作者 agentzh 以及我认识的几个贡献者在内，大家都是使用最简单的 ngx.log 和 ngx.say 来做调试。
 
@@ -58,11 +60,13 @@ sudo apt install systemtap
 我们再来看下，用 Systemtap 写的 hello world 程序是什么样子的：
 
 # cat hello-world.stp
+```python
 probe begin
 {
   print("hello world!")
   exit()
 }
+```
 
 
 是不是很简单？不过，你需要使用 sudo 权限才可以运行：
@@ -76,15 +80,19 @@ sudo stap hello-world.stp
 
 比如，刚刚这个示例代码中的 probe 就是一个探针。begin 会在探测的最开始运行，与之对应的是 end，所以上面的 hello world 程序也可以写成下面的这种方式：
 
+```python
 probe begin
 {
   print("hello ")
   exit()
 }
+```
 
+```python
 probe end
 {
 print("world!") 
+```
 
 
 这里，我只对 Systemtap 进行了非常粗浅的介绍。其实，Systemtap 的作者 Frank Ch. Eigler 写了一本电子书《Systemtap tutorial》，详细地介绍了Systemtap。如果你想进一步地学习和深入了解 Systemtap，那么我建议，从这本书开始入手，就是最好的学习路径。

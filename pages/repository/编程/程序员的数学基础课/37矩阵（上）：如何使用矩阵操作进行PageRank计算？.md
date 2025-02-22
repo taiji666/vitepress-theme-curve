@@ -1,10 +1,12 @@
 ---
 title: 37矩阵（上）：如何使用矩阵操作进行PageRank计算？
-date: 1739706057.495119
+date: 2025-02-22
 categories: [程序员的数学基础课]
 ---
+```text
                             37 矩阵（上）：如何使用矩阵操作进行PageRank计算？
                             你好，我是黄申。今天我来说说矩阵。
+```
 
 前面我说过，矩阵由多个长度相等的向量组成，其中的每列或者每行就是一个向量。从数据结构的角度来看，我们可以把向量看作一维数组，把矩阵看作二维数组。
 
@@ -89,8 +91,10 @@ PageRank的计算是采用迭代法实现的：一开始所有网页结点的初
 import numpy as np
 
 # 设置确定随机跳转概率的alpha、网页结点数
+```text
 alpha = 0.9
 N = 5
+```
 
 # 初始化随机跳转概率的矩阵
 jump = np.full([2,1], [[alpha], [1-alpha]], dtype=float)
@@ -99,9 +103,11 @@ jump = np.full([2,1], [[alpha], [1-alpha]], dtype=float)
 adj = np.full([N,N], [[0,0,1,0,0],[1,0,1,0,0],[1,0,0,0,0],[0,0,0,0,0],[0,1,0,0,0]], dtype=float)
 
 # 对邻接矩阵进行归一化
+```text
 row_sums = adj.sum(axis=1)      # 对每一行求和
 row_sums[row_sums == 0] = 0.1   # 防止由于分母出现0而导致的Nan
 adj = adj / row_sums[:, np.newaxis] # 除以每行之和的归一化
+```
 
 # 初始的PageRank值，通常是设置所有值为1.0
 pr = np.full([1,N], 1, dtype=float)
@@ -112,19 +118,27 @@ pr = np.full([1,N], 1, dtype=float)
 # PageRank算法本身是采用迭代方式进行的，当最终的取值趋于稳定后结束。
 for i in range(0, 20):
 
+```markdown
     # 进行点乘，计算Σ(PR(pj)/L(pj))
     pr = np.dot(pr, adj)
+```
 
+```markdown
     # 转置保存Σ(PR(pj)/L(pj))结果的矩阵，并增加长度为N的列向量，其中每个元素的值为1/N，便于下一步的点乘。
     pr_jump = np.full([N, 2], [[0, 1/N]])
     pr_jump[:,:-1] = pr.transpose()
+```
 
+```markdown
     # 进行点乘，计算α(Σ(PR(pj)/L(pj))) + (1-α)/N)
     pr = np.dot(pr_jump, jump)
+```
 
+```markdown
     # 归一化PageRank得分
     pr = pr.transpose()
     pr = pr / pr.sum()
+```
 
     print("round", i + 1, pr)
 

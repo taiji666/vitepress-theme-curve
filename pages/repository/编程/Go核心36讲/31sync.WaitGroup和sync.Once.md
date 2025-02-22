@@ -1,10 +1,12 @@
 ---
 title: 31sync.WaitGroup和sync.Once
-date: 1739706057.6688364
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             31 sync.WaitGroup和sync.Once
                             我们在前几次讲的互斥锁、条件变量和原子操作都是最基本重要的同步工具。在Go语言中，除了通道之外，它们也算是最为常用的并发安全工具了。
+```
 
 说到通道，不知道你想过没有，之前在一些场合下里，我们使用通道的方式看起来都似乎有些蹩脚。
 
@@ -14,6 +16,7 @@ categories: [Go核心36讲]
 
 这就是下面的coordinateWithChan函数展示的多goroutine协作流程。
 
+```css
 func coordinateWithChan() {
  sign := make(chan struct{}, 2)
  num := int32(0)
@@ -28,6 +31,7 @@ func coordinateWithChan() {
  <-sign
  <-sign
 }
+```
 
 
 其中的addNum函数的声明在demo65.go文件中。addNum函数会把它接受的最后一个参数值作为其中的defer函数。
@@ -50,6 +54,7 @@ WaitGroup类型拥有三个指针方法：Add、Done和Wait。你可以想象该
 
 你可能已经看出来了，WaitGroup类型的值（以下简称WaitGroup值）完全可以被用来替换coordinateWithChan函数中的通道sign。下面的coordinateWithWaitGroup函数就是它的改造版本。
 
+```text
 func coordinateWithWaitGroup() {
  var wg sync.WaitGroup
  wg.Add(2)
@@ -60,6 +65,7 @@ func coordinateWithWaitGroup() {
  go addNum(&num, 4, max, wg.Done)
  wg.Wait()
 }
+```
 
 
 很明显，整体代码少了好几行，而且看起来也更加简洁了。这里我先声明了一个WaitGroup类型的变量wg。然后，我调用了它的Add方法并传入了2，因为我会在后面启用两个需要等待的goroutine。
@@ -90,8 +96,10 @@ func coordinateWithWaitGroup() {
 
 也就是说，只要计数器的值始于0又归为0，就可以被视为一个计数周期。在一个此类值的生命周期中，它可以经历任意多个计数周期。但是，只有在它走完当前的计数周期之后，才能够开始下一个计数周期。
 
+```text
 -
 （sync.WaitGroup的计数周期）
+```
 
 因此，也可以说，如果一个此类值的Wait方法在它的某个计数周期中被调用，那么就会立即阻塞当前的goroutine，直至这个计数周期完成。在这种情况下，该值的下一个计数周期，必须要等到这个Wait方法执行结束之后，才能够开始。
 

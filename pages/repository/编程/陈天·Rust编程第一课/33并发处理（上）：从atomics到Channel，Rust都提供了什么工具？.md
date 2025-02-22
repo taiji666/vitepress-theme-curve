@@ -1,10 +1,12 @@
 ---
 title: 33并发处理（上）：从atomics到Channel，Rust都提供了什么工具？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             33 并发处理（上）：从atomics到Channel，Rust都提供了什么工具？
                             你好，我是陈天。
+```
 
 不知不觉我们已经并肩作战三十多讲了，希望你通过这段时间的学习，有一种“我成为更好的程序员啦！”这样的感觉。这是我想通过介绍 Rust 的思想、处理问题的思路、设计接口的理念等等传递给你的。如今，我们终于来到了备受期待的并发和异步的篇章。
 
@@ -41,11 +43,14 @@ Atomic 是所有并发原语的基础，它为并发任务的同步奠定了坚�
 
 use std::{cell::RefCell, fmt, sync::Arc, thread};
 
+```html
 struct Lock<T> {
     locked: RefCell<bool>,
     data: RefCell<T>,
 }
+```
 
+```cpp
 impl<T> fmt::Debug for Lock<T>
 where
     T: fmt::Debug,
@@ -54,10 +59,14 @@ where
         write!(f, "Lock<{:?}>", self.data.borrow())
     }
 }
+```
 
+```html
 // SAFETY: 我们确信 Lock<T> 很安全，可以在多个线程中共享
 unsafe impl<T> Sync for Lock<T> {}
+```
 
+```cpp
 impl<T> Lock<T> {
     pub fn new(data: T) -> Self {
         Self {
@@ -65,39 +74,56 @@ impl<T> Lock<T> {
             locked: RefCell::new(false),
         }
     }
+```
 
+```css
     pub fn lock(&self, op: impl FnOnce(&mut T)) {
         // 如果没拿到锁，就一直 spin
         while *self.locked.borrow() != false {} // **1
+```
 
+```text
         // 拿到，赶紧加锁
         *self.locked.borrow_mut() = true; // **2
+```
 
+```text
         // 开始干活
         op(&mut self.data.borrow_mut()); // **3
+```
 
+```text
         // 解锁
         *self.locked.borrow_mut() = false; // **4
     }
 }
+```
 
+```javascript
 fn main() {
     let data = Arc::new(Lock::new(0));
+```
 
+```javascript
     let data1 = data.clone();
     let t1 = thread::spawn(move || {
         data1.lock(|v| *v += 10);
     });
+```
 
+```javascript
     let data2 = data.clone();
     let t2 = thread::spawn(move || {
         data2.lock(|v| *v *= 10);
     });
     t1.join().unwrap();
     t2.join().unwrap();
+```
 
+```text
     println!("data: {:?}", data);
 }
+```
 
 
 这段代码模拟了 Mutex 的实现，它的核心部分是 lock() 方法。
@@ -107,10 +133,12 @@ fn main() {
 这样的实现看上去似乎问题不大，但是你细想，它有好几个问题：
 
 
+```text
 在多核情况下，**1 和 **2 之间，有可能其它线程也碰巧 spin 结束，把 locked 修改为 true。这样，存在多个线程拿到这把锁，破坏了任何线程都有独占访问的保证。
 即便在单核情况下，**1 和 **2 之间，也可能因为操作系统的可抢占式调度，导致问题1发生。
 如今的编译器会最大程度优化生成的指令，如果操作之间没有依赖关系，可能会生成乱序的机器码，比如**3 被优化放在 **1 之前，从而破坏了这个 lock 的保证。
 即便编译器不做乱序处理，CPU 也会最大程度做指令的乱序执行，让流水线的效率最高。同样会发生 3 的问题。
+```
 
 
 所以，我们实现这个锁的行为是未定义的。可能大部分时间如我们所愿，但会随机出现奇奇怪怪的行为。一旦这样的事情发生，bug 可能会以各种不同的面貌出现在系统的各个角落。而且，这样的 bug 几乎是无解的，因为它很难稳定复现，表现行为很不一致，甚至，只在某个 CPU 下出现。
@@ -123,10 +151,12 @@ fn main() {
 
 所以，刚才的代码，我们可以把一开始的循环改成：
 
+```cpp
 while self
 	.locked
 	.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
 	.is_err() {}
+```
 
 
 这句的意思是：如果 locked 当前的值是 false，就将其改成 true。这整个操作在一条指令里完成，不会被其它线程打断或者修改；如果 locked 的当前值不是 false，那么就会返回错误，我们会在此不停 spin，直到前置条件得到满足。这里，compare_exchange 是 Rust 提供的 CAS 操作，它会被编译成 CPU 的对应 CAS 指令。
@@ -140,6 +170,7 @@ self.locked.store(false, Ordering::Release);
 
 当然，为了配合这样的改动，我们还需要把 locked 从 bool 改成 AtomicBool。在 Rust里，std::sync::atomic 有大量的 atomic 数据结构，对应各种基础结构。我们看使用了 AtomicBool 的新实现（代码）：
 
+```cpp
 use std::{
     cell::RefCell,
     fmt,
@@ -149,12 +180,16 @@ use std::{
     },
     thread,
 };
+```
 
+```html
 struct Lock<T> {
     locked: AtomicBool,
     data: RefCell<T>,
 }
+```
 
+```cpp
 impl<T> fmt::Debug for Lock<T>
 where
     T: fmt::Debug,
@@ -163,10 +198,14 @@ where
         write!(f, "Lock<{:?}>", self.data.borrow())
     }
 }
+```
 
+```html
 // SAFETY: 我们确信 Lock<T> 很安全，可以在多个线程中共享
 unsafe impl<T> Sync for Lock<T> {}
+```
 
+```cpp
 impl<T> Lock<T> {
     pub fn new(data: T) -> Self {
         Self {
@@ -174,7 +213,9 @@ impl<T> Lock<T> {
             locked: AtomicBool::new(false),
         }
     }
+```
 
+```cpp
     pub fn lock(&self, op: impl FnOnce(&mut T)) {
         // 如果没拿到锁，就一直 spin
         while self
@@ -182,38 +223,52 @@ impl<T> Lock<T> {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {} // **1
+```
 
+```text
         // 已经拿到并加锁，开始干活
         op(&mut self.data.borrow_mut()); // **3
+```
 
+```cpp
         // 解锁
         self.locked.store(false, Ordering::Release);
     }
 }
+```
 
+```javascript
 fn main() {
     let data = Arc::new(Lock::new(0));
+```
 
+```javascript
     let data1 = data.clone();
     let t1 = thread::spawn(move || {
         data1.lock(|v| *v += 10);
     });
+```
 
+```javascript
     let data2 = data.clone();
     let t2 = thread::spawn(move || {
         data2.lock(|v| *v *= 10);
     });
     t1.join().unwrap();
     t2.join().unwrap();
+```
 
+```text
     println!("data: {:?}", data);
 }
+```
 
 
 可以看到，通过使用 compare_exchange ，规避了 1 和 2 面临的问题，但对于和编译器/CPU自动优化相关的 3 和 4，我们还需要一些额外处理。这就是这个函数里额外的两个和 Ordering 有关的奇怪参数。
 
 如果你查看 atomic 的文档，可以看到 Ordering 是一个 enum：
 
+```css
 pub enum Ordering {
     Relaxed,
     Release,
@@ -221,6 +276,7 @@ pub enum Ordering {
     AcqRel,
     SeqCst,
 }
+```
 
 
 文档里解释了几种 Ordering 的用途，我来稍稍扩展一下。
@@ -230,15 +286,19 @@ pub enum Ordering {
 Release，当我们写入数据（比如上面代码里的 store）的时候，如果用了 Release order，那么：
 
 
+```text
 对于当前线程，任何读取或写入操作都不能被乱序排在这个 store 之后。也就是说，在上面的例子里，CPU 或者编译器不能把 **3 挪到 **4 之后执行。
 对于其它线程，如果使用了 Acquire 来读取这个 atomic 的数据， 那么它们看到的是修改后的结果。上面代码我们在 compare_exchange 里使用了 Acquire 来读取，所以能保证读到最新的值。
+```
 
 
 而Acquire是当我们读取数据的时候，如果用了 Acquire order，那么：
 
 
+```text
 对于当前线程，任何读取或者写入操作都不能被乱序排在这个读取之前。在上面的例子里，CPU 或者编译器不能把 **3 挪到 **1 之前执行。
 对于其它线程，如果使用了 Release 来修改数据，那么，修改的值对当前线程可见。
+```
 
 
 第四个AcqRel是Acquire 和 Release 的结合，同时拥有 Acquire 和 Release 的保证。这个一般用在 fetch_xxx 上，比如你要对一个 atomic 自增 1，你希望这个操作之前和之后的读取或写入操作不会被乱序，并且操作的结果对其它线程可见。
@@ -249,6 +309,7 @@ Release，当我们写入数据（比如上面代码里的 store）的时候，�
 
 其实上面获取锁的 spin 过程性能不够好，更好的方式是这样处理一下：
 
+```cpp
 while self
     .locked
     .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
@@ -258,6 +319,7 @@ while self
     // 先不停检测 locked 的状态，直到其 unlocked 后，再尝试拿锁
     while self.locked.load(Ordering::Relaxed) == true {}
 }
+```
 
 
 注意，我们在 while loop 里，又嵌入了一个 loop。这是因为 CAS 是个代价比较高的操作，它需要获得对应内存的独占访问（exclusive access），我们希望失败的时候只是简单读取 atomic 的状态，只有符合条件的时候再去做独占访问，进行 CAS。所以，看上去多做了一层循环，实际代码的效率更高。
@@ -273,14 +335,19 @@ while self
 
 另外，atomic 还可以用于记录系统的各种 metrics。比如一个简单的 in-memory Metrics 模块：
 
+```cpp
 use std::{
     collections::HashMap,
     sync::atomic::{AtomicUsize, Ordering},
 };
+```
 
+```text
 // server statistics
 pub struct Metrics(HashMap<&'static str, AtomicUsize>);
+```
 
+```cpp
 impl Metrics {
     pub fn new(names: &[&'static str]) -> Self {
         let mut metrics: HashMap<&'static str, AtomicUsize> = HashMap::new();
@@ -289,25 +356,33 @@ impl Metrics {
         }
         Self(metrics)
     }
+```
 
+```cpp
     pub fn inc(&self, name: &'static str) {
         if let Some(m) = self.0.get(name) {
             m.fetch_add(1, Ordering::Relaxed);
         }
     }
+```
 
+```cpp
     pub fn add(&self, name: &'static str, val: usize) {
         if let Some(m) = self.0.get(name) {
             m.fetch_add(val, Ordering::Relaxed);
         }
     }
+```
 
+```cpp
     pub fn dec(&self, name: &'static str) {
         if let Some(m) = self.0.get(name) {
             m.fetch_sub(1, Ordering::Relaxed);
         }
     }
+```
 
+```cpp
     pub fn snapshot(&self) -> Vec<(&'static str, usize)> {
         self.0
             .iter()
@@ -315,10 +390,12 @@ impl Metrics {
             .collect()
     }
 }
+```
 
 
 它允许你初始化一个全局的 metrics 表，然后在程序的任何地方，无锁地操作相应的 metrics：
 
+```cpp
 lazy_static! {
     pub(crate) static ref METRICS: Metrics = Metrics::new(&[
         "topics",
@@ -330,13 +407,18 @@ lazy_static! {
         "subscribers"
     ]);
 }
+```
 
+```text
 fn main() {
     METRICS.inc("topics");
     METRICS.inc("subscribers");
+```
 
+```text
     println!("{:?}", METRICS.snapshot());
 }
+```
 
 
 完整代码见 GitHub repo 或者 playground。
@@ -383,9 +465,11 @@ SpinLock和 Mutex 最大的不同是，使用 SpinLock，线程在忙等（busy 
 参考资料
 
 
+```text
 Robe Pike的演讲 concurrency is not parallelism，如果你没有看过，建议去看看。
 通过今天的例子，相信你对 atomic 以及其背后的 CAS 有个初步的了解，如果你还想更深入学习 Rust 下如何使用 atomic，可以看 Jon Gjengset 的视频：Crust of Rust: Atomics and Memory Ordering。
 Rust 的 spin-rs crate 提供了 Spinlock 的实现，感兴趣的可以看看它的实现。
+```
 
 
                         

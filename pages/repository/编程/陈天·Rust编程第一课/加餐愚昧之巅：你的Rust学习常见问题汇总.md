@@ -1,10 +1,12 @@
 ---
 title: 加餐愚昧之巅：你的Rust学习常见问题汇总
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             加餐 愚昧之巅：你的Rust学习常见问题汇总
                             你好，我是陈天。
+```
 
 到目前为止，我们已经学了很多 Rust 的知识，比如基本语法、内存管理、所有权、生命周期等，也展示了三个非常有代表性的示例项目，让你了解接近真实应用环境的 Rust 代码是什么样的。
 
@@ -31,8 +33,10 @@ Q：编译器总告诉我：“use of moved value” 错误，该怎么破？
 对于这样的错误，首先你要判断，这个变量真的需要被移动到另一个作用域下么？如果不需要，可不可以使用借用？（[第8讲]）如果的确需要移动给另一个作用域的话：
 
 
+```text
 如果需要多个所有者共享同一份数据，可以使用 Rc/Arc，辅以 Cell/RefCell/Mutex/RwLock。（[第9讲]）
 如果不需要多个所有者共享，那可以考虑实现 Clone 甚至 Copy。（[第7讲]）
+```
 
 
 生命周期问题
@@ -43,10 +47,12 @@ Q：为什么我的函数返回一个引用的时候，编译器总是跟我过�
 
 比如 HashMap 的 get() 方法：
 
+```html
 pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
         Q: Hash + Eq
+```
 
 
 我们并不用实现它或者知道它如何实现，就可以确定返回值 Option<&V> 到底跟谁有关系。因为这里只有两个选择：&self 或者 k: &Q。显然是 &self，因为 HashMap 持有数据，而 k 只是用来在 HashMap 里查询的 key。
@@ -71,18 +77,22 @@ Q：为什么 Rust 字符串这么混乱，有 String、&String、&str 这么多
 
 用过 Python 的人都知道：
 
+```python
 s = "hello world"
 let slice1 = s[:5] # 可以对字符串切片
 let slice2 = slice1[1:3] # 可以对切片再切片
 print(slice1, slice2) # 打印 hello, el
+```
 
 
 这和 Rust 的 String 切片何其相似：
 
+```javascript
 let s = "hello world".to_string();
 let slice1 = &s[..5]; // 可以对字符串切片
 let slice2 = &slice1[1..3]; // 可以对切片再切片
 println!("{} {}", slice1, slice2); // 打印 hello el
+```
 
 
 所以 &str 是 String 的切片，也可以是 &str 的切片。它和 &[T] 一样，没有什么特别的，就是一个带着长度的胖指针，指向了一片连续的内存区域。
@@ -97,13 +107,17 @@ Q：在课程的示例代码中，用了很多 unwrap()，这样可以么？
 
 那什么情况下我们可以确定 unwrap() 不会 panic 呢？如果在做 unwrap() 之前，Option 或者 Result 中已经有合适的值（Some(T) 或者 Ok(T)），你就可以做 unwrap()。比如这样的代码：
 
+```html
 // 假设 v 是一个 Vec<T>
 if v.is_empty() {
     return None;
 }
+```
 
+```javascript
 // 我们现在确定至少有一个数据，所以 unwrap 是安全的
 let first = v.pop().unwrap();
+```
 
 
 Q：为什么标准库的数据结构比如 Rc/Vec 用那么多 unsafe，但别人总是告诉我，unsafe 不好？
@@ -122,17 +136,22 @@ Q：在 Rust 里，我如何声明全局变量呢？
 
 static mut COUNTER: u64 = 0; 
 
+```text
 fn main() {
     COUNTER += 1; // 编译不过，编译器告诉你需要使用 unsafe
 }
+```
 
 
 如果你的确想用可写的全局变量，可以用 Mutex，然而，初始化它很麻烦，这时，你可以用一个库 lazy_static。比如（代码）：
 
+```cpp
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+```
 
+```cpp
 lazy_static! {
     static ref HASHMAP: Arc<Mutex<HashMap<u32, &'static str>>> = {
         let mut m = HashMap::new();
@@ -142,13 +161,18 @@ lazy_static! {
         Arc::new(Mutex::new(m))
     };
 }
+```
 
+```text
 fn main() {
     let mut map = HASHMAP.lock().unwrap();
     map.insert(3, "waz");
+```
 
+```text
     println!("map: {:?}", map);
 }
+```
 
 
 调试工具
@@ -176,24 +200,33 @@ Q：这门课使用什么样的 Rust 版本？会随着 2021 edition 更新么�
 会的。Rust 是一门不断在发展的语言，每六周就会有一个新的版本诞生，伴随着很多新的功能。比如 const generics（代码）：
 
 #[derive(Debug)]
+```html
 struct Packet<const N: usize> {
     data: [u8; N],
 }
+```
 
+```javascript
 fn main() {
     let ip = Packet { data: [0u8; 20] };
     let udp = Packet { data: [0u8; 8] };
+```
 
+```text
     println!("ip: {:?}, udp: {:?}", ip, udp);
 }
+```
 
 
 再比如最近刚发的 1.55 支持了 open range pattern（代码）：
 
+```text
 fn main() {
     println!("{}", match_range(10001));
 }
+```
 
+```javascript
 fn match_range(v: usize) -> &'static str {
     match v {
         0..=99 => "good",
@@ -202,6 +235,7 @@ fn match_range(v: usize) -> &'static str {
         _ => unreachable!(),
     }
 }
+```
 
 
 再过一个多月，Rust 就要发布 2021 edition 了。由于 Rust 良好的向后兼容能力，我建议保持使用最新的 Rust 版本。等 2021 edition 发布后，我会更新代码库到 2021 edition，文稿中的相应代码也会随之更新。
@@ -212,21 +246,27 @@ fn match_range(v: usize) -> &'static str {
 
 use std::str::Chars;
 
+```javascript
 // 错误，为什么？
 fn lifetime1() -> &str {
     let name = "Tyr".to_string();
     &name[1..]
 }
+```
 
+```css
 // 错误，为什么？
 fn lifetime2(name: String) -> &str {
     &name[1..]
 }
+```
 
+```css
 // 正确，为什么？
 fn lifetime3(name: &str) -> Chars {
     name.chars()
 }
+```
 
 
 欢迎在留言区抢答，也非常欢迎你分享这段时间的学习感受，一起交流进步。我们下节课回归正文讲Rust的类型系统，下节课见！

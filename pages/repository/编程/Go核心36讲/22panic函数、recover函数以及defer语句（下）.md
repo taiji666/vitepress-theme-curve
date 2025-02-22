@@ -1,10 +1,12 @@
 ---
 title: 22panic函数、recover函数以及defer语句（下）
-date: 1739706057.6688364
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             22 panic函数、recover函数以及defer语句（下）
                             你好，我是郝林，今天我们继续来聊聊panic函数、recover函数以及defer语句的内容。
+```
 
 我在前一篇文章提到过这样一个说法，panic之中可以包含一个值，用于简要解释引发此panic的原因。
 
@@ -46,11 +48,14 @@ Go语言的内建函数recover专用于恢复panic，或者说平息运行时恐
 
 package main
 
+```python
 import (
  "fmt"
  "errors"
 )
+```
 
+```text
 func main() {
  fmt.Println("Enter function main.")
  // 引发panic。
@@ -59,6 +64,7 @@ func main() {
  fmt.Printf("panic: %s\n", p)
  fmt.Println("Exit function main.")
 }
+```
 
 
 在上面这个main函数中，我先通过调用panic函数引发了一个panic，紧接着想通过调用recover函数恢复这个panic。可结果呢？你一试便知，程序依然会崩溃，这个recover函数调用并不会起到任何作用，甚至都没有机会执行。
@@ -85,11 +91,14 @@ func main() {
 
 package main
 
+```python
 import (
  "fmt"
  "errors"
 )
+```
 
+```css
 func main() {
  fmt.Println("Enter function main.")
  defer func(){
@@ -103,6 +112,7 @@ func main() {
  panic(errors.New("something wrong"))
  fmt.Println("Exit function main.")
 }
+```
 
 
 在这个main函数中，我先编写了一条defer语句，并在defer函数中调用了recover函数。仅当调用的结果值不为nil时，也就是说只有panic确实已发生时，我才会打印一行以“panic:”为前缀的内容。

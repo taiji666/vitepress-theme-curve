@@ -1,10 +1,12 @@
 ---
 title: 27条件变量sync.Cond（上）
-date: 1739706057.6688364
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             27 条件变量sync.Cond （上）
                             在上篇文章中，我们主要说的是互斥锁，今天我和你来聊一聊条件变量（conditional variable）。
+```
 
 前导内容：条件变量与互斥锁
 
@@ -44,10 +46,12 @@ categories: [Go核心36讲]
 
 首先，我们先来创建如下几个变量。
 
+```text
 var mailbox uint8
 var lock sync.RWMutex
 sendCond := sync.NewCond(&lock)
 recvCond := sync.NewCond(lock.RLocker())
+```
 
 
 变量mailbox代表信箱，是uint8类型的。 若它的值为0则表示信箱中没有情报，而当它的值为1时则说明信箱中有情报。lock是一个类型为sync.RWMutex的变量，是一个读写锁，也可以被视为信箱上的那把锁。
@@ -82,6 +86,7 @@ sync.Locker其实是一个接口，在它的声明中只包含了两个方法定
 
 我，现在是一个goroutine（携带的go函数），想要适时地向信箱里放置情报并通知你，应该怎么做呢？
 
+```css
 lock.Lock()
 for mailbox == 1 {
  sendCond.Wait()
@@ -89,6 +94,7 @@ for mailbox == 1 {
 mailbox = 1
 lock.Unlock()
 recvCond.Signal()
+```
 
 
 我肯定需要先调用lock变量的Lock方法。注意，这个Lock方法在这里意味的是：持有信箱上的锁，并且有打开信箱的权利，而不是锁上这个锁。
@@ -103,6 +109,7 @@ recvCond.Signal()
 
 另一方面，你现在是另一个goroutine，想要适时地从信箱中获取情报，然后通知我。
 
+```css
 lock.RLock()
 for mailbox == 0 {
  recvCond.Wait()
@@ -110,6 +117,7 @@ for mailbox == 0 {
 mailbox = 0
 lock.RUnlock()
 sendCond.Signal()
+```
 
 
 你跟我做的事情在流程上其实基本一致，只不过每一步操作的对象是不同的。你需要调用的是lock变量的RLock方法。因为你要进行的是读操作，并且会使用recvCond变量作为辅助。recvCond与lock变量的读锁是对应的。

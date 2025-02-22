@@ -1,10 +1,12 @@
 ---
 title: 12高手秘诀：识别Lua的独有概念和坑
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             12 高手秘诀：识别Lua的独有概念和坑
                             你好，我是温铭。
+```
 
 上一节中，我们一起了解了 LuaJIT 中 table 相关的库函数。除了这些常用的函数外，今天我再为你介绍一些Lua 独有的或不太常用的概念，以及 OpenResty 中常见的 Lua 的坑。
 
@@ -15,37 +17,49 @@ categories: [OpenResty从入门到实战]
 但简单的引用计数还不太够用，有时候我们需要一种更灵活的机制。举个例子，我们把一个 Lua 的对象 Foo（table 或者函数）插入到 table tb 中，这就会产生对这个对象 Foo 的引用。即使没有其他地方引用 Foo，tb 对它的引用也还一直存在，那么 GC 就没有办法回收 Foo 所占用的内存。这时候，我们就只有两种选择：
 
 
+```text
 一是手工释放 Foo；
 二是让它常驻内存。
+```
 
 
 比如下面这段代码：
 
+```bash
 $ resty -e 'local tb = {}
 tb[1] = {red}
 tb[2] = function() print("func") end
 print(#tb) -- 2
+```
 
+```python
 collectgarbage()
 print(#tb) -- 2
+```
 
+```python
 table.remove(tb, 1)
 print(#tb) -- 1
+```
 
 
 不过，你肯定不希望，内存一直被用不到的对象占用着吧，特别是 LuaJIT 中还有 2G 内存的上限。而手工释放的时机并不好把握，也会增加代码的复杂度。
 
 那么这时候，就轮到弱表来大显身手了。看它的名字，弱表，首先它是一个表，然后这个表里面的所有元素都是弱引用。概念总是抽象的，让我们先来看一段稍加修改后的代码：
 
+```bash
 $ resty -e 'local tb = {}
 tb[1] = {red}
 tb[2] = function() print("func") end
 setmetatable(tb, {__mode = "v"})
 print(#tb)  -- 2
+```
 
+```python
 collectgarbage()
 print(#tb) -- 0
 '
+```
 
 
 可以看到，没有被使用的对象都被 GC 了。这其中，最重要的就是下面这一行代码：
@@ -56,45 +70,57 @@ setmetatable(tb, {__mode = "v"})
 是不是似曾相识？这不就是元表的操作吗！没错，当一个 table 的元表中存在 __mode 字段时，这个 table 就是弱表（weak table）了。
 
 
+```text
 如果 __mode 的值是 k，那就意味着这个 table 的 键 是弱引用。
 如果 __mode 的值是 v，那就意味着这个 table 的 值 是弱引用。
 当然，你也可以设置为 kv，表明这个表的键和值都是弱引用。
+```
 
 
 这三者中的任意一种弱表，只要它的 键 或者 值 被回收了，那么对应的整个键值 对象都会被回收。
 
 在上面的代码示例中，__mode 的值 v，而tb 是一个数组，数组的 value 则是 table 和函数对象，所以可以被自动回收。不过，如果你把__mode 的值改为 k，就不会 GC 了，比如看下面这段代码：
 
+```bash
 $ resty -e 'local tb = {}
 tb[1] = {red}
 tb[2] = function() print("func") end
 setmetatable(tb, {__mode = "k"})
 print(#tb)  -- 2
+```
 
+```python
 collectgarbage()
 print(#tb) -- 2
 '
+```
 
 
 请注意，这里我们只演示了 value 为弱引用的弱表，也就是数组类型的弱表。自然，你同样可以把对象作为 key，来构建哈希表类型的弱表，比如下面这样写：
 
+```python
 $ resty -e 'local tb = {}
 tb[{color = red}] = "red"
 local fc = function() print("func") end
 tb[fc] = "func"
 fc = nil
+```
 
+```python
 setmetatable(tb, {__mode = "k"})
 for k,v in pairs(tb) do
      print(v)
 end
+```
 
+```python
 collectgarbage()
 print("----------")
 for k,v in pairs(tb) do
      print(v)
 end
 '
+```
 
 
 在手动调用 collectgarbage() 进行强制 GC 后，tb 整个 table 里面的元素，就已经全部被回收了。当然，在实际的代码中，我们大可不必手动调用 collectgarbage()，它会在后台自动运行，无须我们担心。
@@ -114,12 +140,15 @@ tb[2] = function() print("func") end
 
 在 Lua 中，下面这段代码中动两个函数的定义是完全等价的。不过注意，后者是把函数赋值给一个变量，这也是我们经常会用到的一种方式：
 
+```python
 local function foo() print("foo") end
 local foo = fuction() print("foo") end
+```
 
 
 另外，Lua 支持把一个函数写在另外一个函数里面，即嵌套函数，比如下面的示例代码：
 
+```bash
 $ resty -e '
 local function foo()
      local i = 1
@@ -129,10 +158,13 @@ local function foo()
      end
      return bar
 end
+```
 
+```python
 local fn = foo()
 print(fn()) -- 2
 '
+```
 
 
 你可以看到， bar 这个函数可以读取函数 foo 里面的局部变量 i，并修改它的值，即使这个变量并不在 bar 里面定义。这个特性叫做词法作用域（lexical scoping）。
@@ -141,15 +173,18 @@ print(fn()) -- 2
 
 如果按照闭包的定义来看，Lua 的所有函数实际上都是闭包，即使你没有嵌套。这是因为 Lua 编译器会把 Lua 脚本外面，再包装一层主函数。比如下面这几行简单的代码段：
 
+```javascript
 local foo, bar
 local function fn()
      foo = 1
      bar = 2
 end
+```
 
 
 在编译后，就会变为下面的样子：
 
+```javascript
 function main(...)
      local foo, bar
      local function fn()
@@ -157,6 +192,7 @@ function main(...)
          bar = 2
      end
 end
+```
 
 
 而函数 fn 捕获了主函数的两个局部变量，因此也是闭包。
@@ -165,11 +201,13 @@ end
 
 upvalue 就是 Lua 中独有的概念了。从字面意思来看，可以翻译成 上面的值。实际上，upvalue 就是闭包中捕获的自己词法作用域外的那个变量。还是继续看上面那段代码：
 
+```javascript
 local foo, bar
 local function fn()
      foo = 1
      bar = 2
 end
+```
 
 
 你可以看到，函数 fn 捕获了两个不在自己词法作用域的局部变量 foo 和 bar，而这两个变量，实际上就是函数 fn 的 upvalue。
@@ -212,19 +250,23 @@ json 编码时无法区分 array 和 dict
 
 第三个坑，json 编码时无法区分 array 和 dict。由于 Lua 中只有 table 这一个数据结构，所以在 json 对空 table 编码的时候，自然就无法确定编码为数组还是字典：
 
+```python
 resty -e 'local cjson = require "cjson"
 local t = {}
 print(cjson.encode(t))
 '
+```
 
 
 比如上面这段代码，它的输出是 {}，由此可见， OpenResty 的 cjson 库，默认把空 table 当做字典来编码。当然，我们可以通过 encode_empty_table_as_object 这个函数，来修改这个全局的默认值：
 
+```python
 resty -e 'local cjson = require "cjson"
 cjson.encode_empty_table_as_object(false)
 local t = {}
 print(cjson.encode(t))
 '
+```
 
 
 这次，空 table 就被编码为了数组：[]。
@@ -233,16 +275,19 @@ print(cjson.encode(t))
 
 第一种方法，把 cjson.empty_array 这个 userdata 赋值给指定 table。这样，在 json 编码的时候，它就会被当做空数组来处理：
 
+```bash
 $ resty -e 'local cjson = require "cjson"
 local t = cjson.empty_array
 print(cjson.encode(t))
 '
+```
 
 
 不过，有时候我们并不确定，这个指定的 table 是否一直为空。我们希望当它为空的时候编码为数组，那么就要用到 cjson.empty_array_mt 这个函数，也就是我们的第二个方法。
 
 它会标记好指定的 table，当 table 为空时编码为数组。从cjson.empty_array_mt 这个命名你也可以看出，它是通过 metatable 的方式进行设置的，比如下面这段代码操作：
 
+```bash
 $ resty -e 'local cjson = require "cjson"
 local t = {}
 setmetatable(t, cjson.empty_array_mt)
@@ -250,6 +295,7 @@ print(cjson.encode(t))
 t = {123}
 print(cjson.encode(t))
 '
+```
 
 
 你可以在本地执行一下这段代码，看看输出和你预期的是否一致。
@@ -258,17 +304,21 @@ print(cjson.encode(t))
 
 再来看第四个坑，变量的个数限制问题。 Lua 中，一个函数的局部变量的个数，和 upvalue 的个数都是有上限的，你可以从 Lua 的源码中得到印证：
 
+```text
 /*
 @@ LUAI_MAXVARS is the maximum number of local variables per function
 @* (must be smaller than 250).
 */
+```
 #define LUAI_MAXVARS            200
 
 
+```text
 /*
 @@ LUAI_MAXUPVALUES is the maximum number of upvalues per function
 @* (must be smaller than 250).
 */
+```
 #define LUAI_MAXUPVALUES        60
 
 
@@ -278,20 +328,24 @@ print(cjson.encode(t))
 
 比如我们来看下面这段伪码：
 
+```javascript
 local re_find = ngx.re.find
   function foo() ... end
 function bar() ... end
 function fn() ... end
+```
 
 
 如果只有函数 foo 使用到了 re_find， 那么我们可以这样改造下：
 
+```javascript
 do
      local re_find = ngx.re.find
      function foo() ... end
 end
 function bar() ... end
 function fn() ... end
+```
 
 
 这样一来，在 main 函数的层面上，就少了 re_find 这个局部变量。这在单个的大的 Lua 文件中，算是一个优化技巧。

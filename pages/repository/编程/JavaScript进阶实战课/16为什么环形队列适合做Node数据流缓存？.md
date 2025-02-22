@@ -1,10 +1,12 @@
 ---
 title: 16为什么环形队列适合做Node数据流缓存？
-date: 1739706057.6064274
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             16 为什么环形队列适合做Node数据流缓存？
                             你好，我是石川。
+```
 
 前面几讲讲完了栈这种数据结构，我们再来看看队列（queue）。队列对于你来说，可能不算是一种陌生的数据结构，和栈相反，列队通常遵循的是先进先出（FIFO，First In, First Out）的原则。你可以把它想象成在咖啡厅买咖啡时要排的队，基本是先到先得，最后来的最后买到，不能插队。如果你强行插队的话，那每个人的排队时长都会打乱。
 
@@ -24,6 +26,7 @@ categories: [JavaScript进阶实战课]
 
 在JavaScript里面，我们可以通过下面的方式来实现一个队列。
 
+```javascript
 class Queue {
   constructor () {
     this.queue = [];
@@ -44,6 +47,7 @@ class Queue {
     return console.log(this.queue[0]);
   }
 }
+```
 
 
 通过队列看浏览器任务管理

@@ -1,10 +1,12 @@
 ---
 title: 13搭建积木：Python模块化
-date: 1739706057.5397522
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             13 搭建积木：Python 模块化
                             你好，我是景霄。
+```
 
 这是基础版块的最后一节。到目前为止，你已经掌握了 Python 这一门当代武功的基本招式和套路，走出了新手村，看到了更远的世界，有了和这个世界过过招的冲动。
 
@@ -18,39 +20,53 @@ categories: [Python核心技术与实战]
 
 # utils.py
 
+```python
 def get_sum(a, b):
     return a + b
+```
 
 
 # class_utils.py
 
+```python
 class Encoder(object):
     def encode(self, s):
         return s[::-1]
+```
 
+```python
 class Decoder(object):
     def decode(self, s):
         return ''.join(reversed(list(s)))
+```
 
 
 # main.py
 
+```python
 from utils import get_sum
 from class_utils import *
+```
 
 print(get_sum(1, 2))
 
+```text
 encoder = Encoder()
 decoder = Decoder()
+```
 
+```python
 print(encoder.encode('abcde'))
 print(decoder.decode('edcba'))
+```
 
 ########## 输出 ##########
 
+```text
 3
 edcba
 abcde
+```
 
 
 我们来看这种方式的代码：get_sum() 函数定义在 utils.py，Encoder 和 Decoder 类则在 class_utils.py，我们在 main 函数直接调用 from import ，就可以将我们需要的东西 import 过来。
@@ -63,42 +79,57 @@ abcde
 
 # utils/utils.py
 
+```python
 def get_sum(a, b):
     return a + b
+```
 
 
 # utils/class_utils.py
 
+```python
 class Encoder(object):
     def encode(self, s):
         return s[::-1]
+```
 
+```python
 class Decoder(object):
     def decode(self, s):
         return ''.join(reversed(list(s)))
+```
 
 
 # src/sub_main.py
 
+```python
 import sys
 sys.path.append("..")
+```
 
 from utils.class_utils import *
 
+```text
 encoder = Encoder()
 decoder = Decoder()
+```
 
+```python
 print(encoder.encode('abcde'))
 print(decoder.decode('edcba'))
+```
 
 ########## 输出 ##########
 
+```text
 edcba
 abcde
+```
 
 
 而这一次，我们的文件结构是下面这样的：
 
+```text
 .
 ├── utils
 │   ├── utils.py
@@ -106,6 +137,7 @@ abcde
 ├── src
 │   └── sub_main.py
 └── main.py
+```
 
 
 很容易看出，main.py 调用子目录的模块时，只需要使用 . 代替 / 来表示子目录，utils.utils 表示 utils 子文件夹下的 utils.py 模块就行。
@@ -139,8 +171,10 @@ abcde
 事实上，在 Facebook 和 Google，整个公司都只有一个代码仓库，全公司的代码都放在这个库里。我刚加入 Facebook 时对此感到很困惑，也很新奇，难免会有些担心：
 
 
+```text
 这样做似乎会增大项目管理的复杂度吧？
 是不是也会有不同组代码隐私泄露的风险呢？
+```
 
 
 后来，随着工作的深入，我才发现了这种代码仓库独有的几个优点。
@@ -159,6 +193,7 @@ abcde
 
 明白了这一点后，这次我们使用 PyCharm 来创建一个项目。这个项目结构如下所示：
 
+```text
 .
 ├── proto
 │   ├── mat.py
@@ -166,21 +201,25 @@ abcde
 │   └── mat_mul.py
 └── src
     └── main.py
+```
 
 
 # proto/mat.py
 
+```python
 class Matrix(object):
     def __init__(self, data):
         self.data = data
         self.n = len(data)
         self.m = len(data[0])
+```
 
 
 # utils/mat_mul.py
 
 from proto.mat import Matrix
 
+```python
 def mat_mul(matrix_1: Matrix, matrix_2: Matrix):
     assert matrix_1.m == matrix_2.n
     n, m, s = matrix_1.n, matrix_1.m, matrix_2.m
@@ -189,18 +228,23 @@ def mat_mul(matrix_1: Matrix, matrix_2: Matrix):
         for j in range(s):
             for k in range(m):
                 result[i][k] += matrix_1.data[i][j] * matrix_2.data[j][k]
+```
 
     return Matrix(result)
 
 
 # src/main.py
 
+```python
 from proto.mat import Matrix
 from utils.mat_mul import mat_mul
+```
 
 
+```text
 a = Matrix([[1, 2], [3, 4]])
 b = Matrix([[5, 6], [7, 8]])
+```
 
 print(mat_mul(a, b).data)
 
@@ -260,30 +304,40 @@ Python 是脚本语言，和 C++、Java 最大的不同在于，不需要显式�
 
 项目结构如下：
 
+```text
 .
 ├── utils.py
 ├── utils_with_main.py
 ├── main.py
 └── main_2.py
+```
 
 
 # utils.py
 
+```python
 def get_sum(a, b):
     return a + b
+```
 
+```python
 print('testing')
 print('{} + {} = {}'.format(1, 2, get_sum(1, 2)))
+```
 
 
 # utils_with_main.py
 
+```python
 def get_sum(a, b):
     return a + b
+```
 
+```python
 if __name__ == '__main__':
     print('testing')
     print('{} + {} = {}'.format(1, 2, get_sum(1, 2)))
+```
 
 
 # main.py
@@ -294,9 +348,11 @@ print('get_sum: ', get_sum(1, 2))
 
 ########## 输出 ##########
 
+```text
 testing
 1 + 2 = 3
 get_sum: 3
+```
 
 
 # main_2.py
@@ -321,9 +377,11 @@ import 在导入文件的时候，会自动把所有暴露在外面的代码全�
 今天这节课，我为你讲述了如何使用 Python 来构建模块化和大型工程。这里需要强调几点：
 
 
+```python
 通过绝对路径和相对路径，我们可以 import 模块；
 在大型工程中模块化非常重要，模块的索引要通过绝对路径来做，而绝对路径从程序的根目录开始；
 记着巧用if __name__ == '__main__'来避开 import 时执行。
+```
 
 
 思考题

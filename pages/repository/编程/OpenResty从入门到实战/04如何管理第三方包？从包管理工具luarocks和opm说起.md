@@ -1,10 +1,12 @@
 ---
 title: 04如何管理第三方包？从包管理工具luarocks和opm说起
-date: 1739706057.145951
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             04 如何管理第三方包？从包管理工具luarocks和opm说起
                             你好，我是温铭。
+```
 
 在上一节中，我们大概了解了下 OpenResty 官方的一些项目。不过，如果我们把 OpenResty 用于生产环境，显然，OpenResty 安装包自带的这些库是远远不够的，比如没有 lua-resty 库来发起HTTP请求，也没有办法和 Kafka 交互。
 
@@ -33,10 +35,12 @@ openresty/lua-resty-upload    			Streaming reader and parser for HTTP file uploa
 
 不过，不管怎么说，这个返回并不友好。让我们修改下关键字，重新搜索下：
 
+```bash
 $ opm search lua-resty-http
 ledgetech/lua-resty-http                          Lua HTTP client cosocket driver for OpenResty/ngx_lua
 pintsized/lua-resty-http                          Lua HTTP client cosocket driver for OpenResty/ngx_lua
 agentzh/lua-resty-http                            Lua HTTP client cosocket driver for OpenResty/ngx_lua
+```
 
 
 其实，在 OpenResty 世界中，如果你使用 cosocket 实现了一个包，那么就要使用 lua-resty- 这个前缀，算是一个不成文的规定。
@@ -73,6 +77,7 @@ $ luarocks search lua-resty-http
 
 目前 Kong 的最新版本是 1.1.1， 你可以在 https://github.com/Kong/kong 的项目下找到最新的 .rockspec 后缀的文件。
 
+```text
 package = "kong"
 version = "1.1.1-0"
 supported_platforms = {"linux", "macosx"}
@@ -112,6 +117,7 @@ dependencies = {
   "lua-resty-cookie == 0.1.0",
   "lua-resty-mlcache == 2.3.0",
 ......
+```
 
 
 通过文件你可以看到，依赖项里面掺杂了 lua-resty 库和纯 Lua 世界的库，使用 OPM 只能部分安装这些依赖项。写好配置后，使用 luarocks 的 upload 命令把这个配置上传，用户就可以用 LuaRocks 来下载并安装 Kong 了。
@@ -128,6 +134,7 @@ AWESOME-RESTY
 
 还是以HTTP库为例， 在awesome-resty 中，它自然是属于 networking 分类：
 
+```text
 lua-resty-http by @pintsized — Lua HTTP client cosocket driver for OpenResty / ngx_lua
 lua-resty-http by @liseen — Lua http client driver for the ngx_lua based on the cosocket API
 lua-resty-http by @DorianGray — Lua HTTP client driver for ngx_lua based on the cosocket API
@@ -136,6 +143,7 @@ lua-resty-httpipe — Lua HTTP client cosocket driver for OpenResty / ngx_lua
 lua-resty-httpclient — Nonblocking Lua HTTP Client library for aLiLua & ngx_lua
 lua-httpcli-resty — Lua HTTP client module for OpenResty
 lua-resty-requests — Yet Another HTTP Library for OpenResty
+```
 
 
 我们看到，这里有 8 个 lua-resty-http 的第三方库。对比一下前面的结果，我们使用 OPM 只找到 2 个，而LuaRocks 里面更是只有 1 个。不过，如果你是选择困难症，请直接使用第一个，它和 LuaRocks 中的是同一个。

@@ -1,10 +1,12 @@
 ---
 title: 46软件架构：如何用Rust架构复杂系统？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             46 软件架构：如何用Rust架构复杂系统？
                             你好，我是陈天。
+```
 
 对一个软件系统来说，不同部门关心的侧重点不同。产品、运营和销售部门关心产品的功能，测试部门关心产品的缺陷，工程部门除了开发功能、解决缺陷外，还要不断地维护和优化系统的架构，减少之前遗留的技术债。
 
@@ -41,10 +43,12 @@ categories: [陈天·Rust编程第一课]
 架构设计是一个非常广泛的概念，很难一言以蔽之。在《Fundamentals of Software Architecture》一书中，作者从四个维度来探讨架构，分别是：
 
 
+```text
 Structure：架构的风格和结构，比如 MVVM、微服务
 Characteristics：架构的主要指标，比如可伸缩性、容错性和性能
 Decisions：架构的硬性规则，比如服务调用只能通过接口完成
 Design Principles：架构的设计原则，比如优先使用消息通讯
+```
 
 
 可以对照下面这张图理解，我们一个个说（来源：Fundamentals of Software Architecture）：
@@ -87,6 +91,7 @@ Decisions架构的硬性规则
 
 
 
+```text
 All teams will henceforth expose their data and functionality through service interfaces.
 Teams must communicate with each other through these interfaces.
 There will be no other form of interprocess communication allowed: no direct linking, no direct reads of another team’s data store, no shared-memory model, no back-doors whatsoever. The only communication allowed is via service interface calls over the network.
@@ -94,6 +99,7 @@ It doesn’t matter what technology they use. HTTP, Corba, Pubsub, custom protoc
 All service interfaces, without exception, must be designed from the ground up to be externalizable. That is to say, the team must plan and design to be able to expose the interface to developers in the outside world. No exceptions.
 Anyone who doesn’t do this will be fired.
 Thank you; have a nice day!
+```
 
 
 
@@ -110,10 +116,12 @@ Design Principles架构的设计原则
 再复习一下刚才聊的架构设计的四个方面：
 
 
+```text
 Structure架构的风格和结构
 Characteristics架构的主要指标
 Decisions架构的硬性规则
 Design Principles架构的设计原则
+```
 
 
 其中后三点架构的指标、硬性规定以及设计原则，和具体项目的关联度很大，我们并没有模式化的工具来套用它。但架构风格是有很多固定的套路的。这些套路，往往是在日积月累的软件开发实践中，逐渐形成的。
@@ -160,14 +168,19 @@ All problems in computer science can be solved by another level of indirection.
 
 use std::fmt;
 
+```cpp
 pub use async_trait::async_trait;
 pub type BoxedError = Box<dyn std::error::Error>;
+```
 
+```text
 /// rerun 超过 5 次，就视为失败
 const MAX_RERUN: usize = 5;
+```
 
 /// plug 执行的结果
 #[must_use]
+```html
 pub enum PlugResult<Ctx> {
     Continue,
     Rerun,
@@ -175,22 +188,28 @@ pub enum PlugResult<Ctx> {
     NewPipe(Vec<Box<dyn Plug<Ctx>>>),
     Err(BoxedError),
 }
+```
 
 /// plug trait，任何 pipeline 中的组件需要实现这个 trait
 #[async_trait]
+```cpp
 pub trait Plug<Ctx>: fmt::Display {
     async fn call(&self, ctx: &mut Ctx) -> PlugResult<Ctx>;
 }
+```
 
 /// pipeline 结构
 #[derive(Default)]
+```html
 pub struct Pipeline<Ctx> {
     plugs: Vec<Box<dyn Plug<Ctx>>>,
     pos: usize,
     rerun: usize,
     executed: Vec<String>,
 }
+```
 
+```cpp
 impl<Ctx> Pipeline<Ctx> {
     /// 创建一个新的 pipeline
     pub fn new(plugs: Vec<Box<dyn Plug<Ctx>>>) -> Self {
@@ -201,13 +220,17 @@ impl<Ctx> Pipeline<Ctx> {
             executed: Vec::with_capacity(16),
         }
     }
+```
 
+```javascript
     /// 执行整个 pipeline，要么执行完毕，要么出错
     pub async fn execute(&mut self, ctx: &mut Ctx) -> Result<(), BoxedError> {
         while self.pos < self.plugs.len() {
             self.add_execution_log();
             let plug = &self.plugs[self.pos];
+```
 
+```javascript
             match plug.call(ctx).await {
                 PlugResult::Continue => {
                     self.pos += 1;
@@ -227,24 +250,33 @@ impl<Ctx> Pipeline<Ctx> {
                 }
                 PlugResult::Err(e) => return Err(e),
             }
+```
 
+```cpp
             // 如果 rerun 5 次，返回错误
             if self.rerun >= MAX_RERUN {
                 return Err(anyhow::anyhow!("max rerun").into());
             }
         }
+```
 
+```text
         Ok(())
     }
+```
 
+```text
     pub fn get_execution_log(&self) -> &[String] {
         &self.executed
     }
+```
 
+```text
     fn add_execution_log(&mut self) {
         self.executed.push(self.plugs[self.pos].to_string());
     }
 }
+```
 
 
 你可以在 playground 里运行包括完整示例代码的例子。

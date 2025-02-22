@@ -1,10 +1,12 @@
 ---
 title: 22并发编程之Asyncio
-date: 1739706057.5437288
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             22 并发编程之Asyncio
                             你好，我是景霄。
+```
 
 上节课，我们一起学习了Python并发编程的一种实现——多线程。今天这节课，我们继续学习Python并发编程的另一种实现方式——Asyncio。不同于协程那章，这节课我们更注重原理的理解。
 
@@ -13,8 +15,10 @@ categories: [Python核心技术与实战]
 诚然，多线程有诸多优点且应用广泛，但也存在一定的局限性：
 
 
+```text
 比如，多线程运行过程容易被打断，因此有可能出现race condition的情况；
 再如，线程切换本身存在一定的损耗，线程数不能无限增加，因此，如果你的 I/O操作非常heavy，多线程很有可能满足不了高效率、高质量的需求。
+```
 
 
 正是为了解决这些问题，Asyncio应运而生。
@@ -26,15 +30,19 @@ Sync VS Async
 我们首先来区分一下Sync（同步）和Async（异步）的概念。
 
 
+```text
 所谓Sync，是指操作一个接一个地执行，下一个操作必须等上一个操作完成后才能执行。
 而Async是指不同操作间可以相互交替执行，如果其中的某个操作被block了，程序并不会等待，而是会找出可执行的操作继续执行。
+```
 
 
 举个简单的例子，你的老板让你做一份这个季度的报表，并且邮件发给他。
 
 
+```text
 如果按照Sync的方式，你会先向软件输入这个季度的各项数据，接下来等待5min，等报表明细生成后，再写邮件发给他。
 但如果按照Async的方式，再你输完这个季度的各项数据后，便会开始写邮件。等报表明细生成后，你会暂停邮件，先去查看报表，确认后继续写邮件直到发送完毕。
+```
 
 
 Asyncio工作原理
@@ -50,8 +58,10 @@ Asyncio工作原理
 当任务把控制权交还给event loop时，event loop会根据其是否完成，把任务放到预备或等待状态的列表，然后遍历等待状态列表的任务，查看他们是否完成。
 
 
+```text
 如果完成，则将其放到预备状态的列表；
 如果未完成，则继续放在等待状态的列表。
+```
 
 
 而原先在预备状态列表的任务位置仍旧不变，因为它们还未运行。
@@ -64,19 +74,26 @@ Asyncio用法
 
 讲完了Asyncio的原理，我们结合具体的代码来看一下它的用法。还是以上节课下载网站内容为例，用Asyncio的写法我放在了下面代码中（省略了异常处理的一些操作），接下来我们一起来看：
 
+```python
 import asyncio
 import aiohttp
 import time
+```
 
+```python
 async def download_one(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             print('Read {} from {}'.format(resp.content_length, url))
+```
 
+```text
 async def download_all(sites):
     tasks = [asyncio.create_task(download_one(site)) for site in sites]
     await asyncio.gather(*tasks)
+```
 
+```python
 def main():
     sites = [
         'https://en.wikipedia.org/wiki/Portal:Arts',
@@ -99,11 +116,15 @@ def main():
     asyncio.run(download_all(sites))
     end_time = time.perf_counter()
     print('Download {} sites in {} seconds'.format(len(sites), end_time - start_time))
+```
     
+```python
 if __name__ == '__main__':
     main()
+```
 
 ## 输出
+```text
 Read 63153 from https://en.wikipedia.org/wiki/Java_(programming_language)
 Read 31461 from https://en.wikipedia.org/wiki/Portal:Society
 Read 23965 from https://en.wikipedia.org/wiki/Portal:Biography
@@ -120,23 +141,28 @@ Read 22318 from https://en.wikipedia.org/wiki/Portal:Science
 Read 36800 from https://en.wikipedia.org/wiki/Node.js
 Read 67028 from https://en.wikipedia.org/wiki/Computer_science
 Download 15 sites in 0.062144195078872144 seconds
+```
 
 
 这里的Async和await关键字是Asyncio的最新写法，表示这个语句/函数是non-block的，正好对应前面所讲的event loop的概念。如果任务执行的过程需要等待，则将其放入等待状态的列表中，然后继续执行预备状态列表里的任务。
 
 主函数里的asyncio.run(coro)是Asyncio的root call，表示拿到event loop，运行输入的coro，直到它结束，最后关闭这个event loop。事实上，asyncio.run()是Python3.7+才引入的，相当于老版本的以下语句：
 
+```text
 loop = asyncio.get_event_loop()
 try:
     loop.run_until_complete(coro)
 finally:
     loop.close()
+```
 
 
 至于Asyncio版本的函数download_all()，和之前多线程版本有很大的区别：
 
+```text
 tasks = [asyncio.create_task(download_one(site)) for site in sites]
 await asyncio.gather(*task)
+```
 
 
 这里的asyncio.create_task(coro)，表示对输入的协程coro创建一个任务，安排它的执行，并返回此任务对象。这个函数也是Python 3.7+新增的，如果是之前的版本，你可以用asyncio.ensure_future(coro)等效替代。可以看到，这里我们对每一个网站的下载，都创建了一个对应的任务。
@@ -163,6 +189,7 @@ Asyncio软件库的兼容性问题，在Python3的早期一直是个大问题，
 
 总的来说，你可以遵循以下伪代码的规范：
 
+```python
 if io_bound:
     if io_slow:
         print('Use Asyncio')
@@ -170,12 +197,15 @@ if io_bound:
         print('Use multi-threading')
 else if cpu_bound:
     print('Use multi-processing')
+```
 
 
 
+```text
 如果是I/O bound，并且I/O操作很慢，需要很多任务/线程协同实现，那么使用Asyncio更合适。
 如果是I/O bound，但是I/O操作很快，只需要有限数量的任务/线程，那么使用多线程就可以了。
 如果是CPU bound，则需要使用多进程来提高程序运行效率。
+```
 
 
 总结
@@ -196,23 +226,31 @@ Asyncio中的任务，在运行过程中不会被打断，因此不会出现race
 
 我把常规版本的写法放在了下面，你能通过查阅资料，写出它的多进程版本，并且比较程序的耗时吗？
 
+```python
 import time
 def cpu_bound(number):
     print(sum(i * i for i in range(number)))
+```
 
+```python
 def calculate_sums(numbers):
     for number in numbers:
         cpu_bound(number)
+```
 
+```python
 def main():
     start_time = time.perf_counter()  
     numbers = [10000000 + x for x in range(20)]
     calculate_sums(numbers)
     end_time = time.perf_counter()
     print('Calculation takes {} seconds'.format(end_time - start_time))
+```
     
+```python
 if __name__ == '__main__':
     main()
+```
 
 
 欢迎在留言区写下你的思考和答案，也欢迎你把今天的内容分享给你的同事朋友，我们一起交流、一起进步。

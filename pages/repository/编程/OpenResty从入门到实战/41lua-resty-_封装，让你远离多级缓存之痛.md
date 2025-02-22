@@ -1,10 +1,12 @@
 ---
 title: 41lua-resty-_封装，让你远离多级缓存之痛
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             41 lua-resty-_ 封装，让你远离多级缓存之痛
                             41 lua-resty-* 封装，让你远离多级缓存之痛
+```
 
 你好，我是温铭。
 
@@ -24,34 +26,44 @@ lua-resty-memcached-shdict
 
 不过，这个 lua-resty 库虽说是 OpenResty 官方的项目，但也并不完美。首先，它没有测试案例覆盖，这就意味着代码质量无法得到持续的保证；其次，它暴露的接口参数过多，有 11 个必填参数和 7 个选填参数：
 
+```css
 local memc_fetch, memc_store =
     shdict_memc.gen_memc_methods{
         tag = "my memcached server tag",
         debug_logger = dlog,
         warn_logger = warn,
         error_logger = error_log,
+```
 
         locks_shdict_name = "some_lua_shared_dict_name",
 
+```text
         shdict_set = meta_shdict_set,  
         shdict_get = meta_shdict_get,  
+```
 
         disable_shdict = false,  -- optional, default false
 
+```text
         memc_host = "127.0.0.1",
         memc_port = 11211,
         memc_timeout = 200,  -- in ms
         memc_conn_pool_size = 5,
         memc_fetch_retries = 2,  -- optional, default 1
         memc_fetch_retry_delay = 100, -- in ms, optional, default to 100 (ms)
+```
 
         memc_conn_max_idle_time = 10 * 1000,  -- in ms, for in-pool connections,optional, default to nil
 
+```text
         memc_store_retries = 2,  -- optional, default to 1
         memc_store_retry_delay = 100,  -- in ms, optional, default to 100 (ms)
+```
 
+```text
         store_ttl = 1,  -- in seconds, optional, default to 0 (i.e., never expires)
     }
+```
 
 
 这其中暴露的绝大部分参数，其实可以通过“新建一个 memcached 的处理函数”的方式来简化。当前这种把所有参数一股脑儿地丢给用户来填写的封装方式并不友好，所以，我也很欢迎有兴趣的开发者，贡献 PR 来做这方面的优化。
@@ -59,8 +71,10 @@ local memc_fetch, memc_store =
 另外，在这个封装库的文档中，其实也提到了进一步的优化方向：
 
 
+```text
 一是使用 lua-resty-lrucache ，来增加 worker 层的缓存，而不仅仅是 server 级别的 shared dict 缓存；
 二是使用 ngx.timer ，来做异步的缓存更新操作。
+```
 
 
 第一个方向其实是很不错的建议，因为 worker 内的缓存性能自然会更好；而第二个建议，就需要你根据自己的实际场景来考量了。不过，一般我并不推荐使用，这不仅是因为 timer 的数量是有限制的，而且如果这里的更新逻辑出错，就再也不会去更新缓存了，影响面比较大。
@@ -71,6 +85,7 @@ lua-resty-mlcache
 
 local mlcache = require "resty.mlcache"
 
+```text
 local cache, err = mlcache.new("cache_name", "cache_dict", {
     lru_size = 500,    -- size of the L1 (Lua VM) cache
     ttl = 3600,   -- 1h ttl for hits
@@ -79,6 +94,7 @@ local cache, err = mlcache.new("cache_name", "cache_dict", {
 if not cache then
     error("failed to create mlcache: " .. err)
 end
+```
 
 
 先来看第一段代码。这段代码的开头引入了 mlcache 库，并设置了初始化的参数。我们一般会把这段代码放到 init 阶段，只需要做一次就可以了。
@@ -87,20 +103,26 @@ end
 
 下面再来看第二段代码，这是请求处理时的逻辑代码：
 
+```javascript
 local function fetch_user(id)
     return db:query_user(id)
 end
+```
 
+```text
 local id = 123
 local user , err = cache:get(id , nil , fetch_user , id)
 if err then
     ngx.log(ngx.ERR , "failed to fetch user: ", err)
     return
 end
+```
 
+```python
 if user then
     print(user.id) -- 123
 end
+```
 
 
 你可以看到，这里已经把多层缓存都给隐藏了，你只需要使用 mlcache 的对象去获取缓存，并同时设置好缓存失效后的回调函数就可以了。这背后复杂的逻辑，就可以被完全地隐藏了。
@@ -120,9 +142,11 @@ L3 则是在 L2 缓存也没有命中的情况下，需要执行回调函数去�
 整体而言，从请求的角度来看，
 
 
+```text
 首先会去查询 worker 内的 L1 缓存，如果L1命中就直接返回。
 如果L1没有命中或者缓存失效，就会去查询 worker 间的 L2 缓存。如果L2命中就返回，并把结果缓存到 L1 中。
 如果L2 也没有命中或者缓存失效，就会调用回调函数，从数据源中查到数据，并写入到 L2 缓存中，这也就是L3数据层的功能。
+```
 
 
 从这个过程你也可以看出，缓存的更新是由终端请求来被动触发的。即使某个请求获取缓存失败了，后续的请求依然可以触发更新的逻辑，以便最大程度地保证缓存的安全性。
@@ -135,18 +159,24 @@ L1 也就是 lrucache 缓存，是用户真正接触到的那一层数据，我�
 
 local mlcache = require "resty.mlcache"
 
+```text
 local cache, err = mlcache.new("my_mlcache", "cache_shm", {
 l1_serializer = function(i)
     return i + 2
 end,
 })
+```
 
+```javascript
 local function callback()
     return 123456
 end
+```
 
+```text
 local data = assert(cache:get("number", nil, callback))
 assert(data == 123458)
+```
 
 
 简单解释一下。在这个案例中，回调函数返回数字 123456；而在 new 中，我们设置的 l1_serializer 函数会在设置 L1 缓存前，把传入的数字加 2，也就是变成 123458。通过这样的序列化函数，数据在 L1 和 L2 之间转换的时候，就可以更加灵活了。

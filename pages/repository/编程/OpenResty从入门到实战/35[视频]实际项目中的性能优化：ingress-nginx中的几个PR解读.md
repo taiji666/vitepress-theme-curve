@@ -1,18 +1,22 @@
 ---
 title: 35[视频]实际项目中的性能优化：ingress-nginx中的几个PR解读
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             35 [视频]实际项目中的性能优化：ingress-nginx中的几个PR解读
                             35 [视频]实际项目中的性能优化：ingress-nginx中的几个PR解读
+```
 
 你好，我是温铭。
 
 今天的内容，我同样会以视频的形式来讲解。老规矩，在你进行视频学习之前，先问你这么几个问题：
 
 
+```text
 如何在开源项目中找到可能存在的性能问题？
 在 Github 上，如何与其他开发者正确地交流？
+```
 
 
 这几个问题，也是今天视频课要解决的核心内容，希望你可以先自己思考一下，并带着问题来学习今天的视频内容。
@@ -28,8 +32,10 @@ ingress-nginx 是 k8s 官方的一个项目，主要使用Go、 Nginx 和 lua-ng
 下面是 ingress-nginx 中，和 OpenResty 性能相关的两个 PR：
 
 
+```text
 https://github.com/kubernetes/ingress-nginx/pull/3673
 https://github.com/kubernetes/ingress-nginx/pull/3674
+```
 
 
 从中你也可以发现，即使是资深的开发者，对 LuaJIT 相关的优化，可能也并不是很熟悉。一方面是因为，这两个 PR 涉及到的代码，并不会对整体系统造成严重的性能下降；另一个方面，这方面的优化知识，没有人系统地总结过，开发者即使想优化也找不到方向。

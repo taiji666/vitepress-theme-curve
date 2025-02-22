@@ -1,10 +1,12 @@
 ---
 title: 20超越Web服务器：特权进程和定时任务
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             20 超越 Web 服务器：特权进程和定时任务
                             你好，我是温铭。
+```
 
 前面我们介绍了 OpenResty API、共享字典缓存和 cosocket。它们实现的功能，都还在 Nginx 和 Web 服务器的范畴之内，算是提供了开发成本更低、更容易维护的一种实现，提供了可编程的 Web 服务器。
 
@@ -19,22 +21,28 @@ categories: [OpenResty从入门到实战]
 其实，OpenResty 的定时任务可以分为下面两种：
 
 
+```text
 ngx.timer.at，用来执行一次性的定时任务；
 ngx.time.every，用来执行固定周期的定时任务。
+```
 
 
 还记得上节课最后我留下的思考题吗？问题是如何突破 init_worker_by_lua 中不能使用 cosocket 的限制，这个答案其实就是 ngx.timer。
 
 下面这段代码，就是启动了一个延时为 0 的定时任务。它启动了回调函数 handler，并在这个函数中，用 cosocket 去访问一个网站：
 
+```javascript
 init_worker_by_lua_block {
         local function handler()
             local sock = ngx.socket.tcp()
             local ok, err = sock:connect(“www.baidu.com", 80)
         end
+```
 
+```text
         local ok, err = ngx.timer.at(0, handler)
     }
+```
 
 
 这样，我们就绕过了 cosocket 在这个阶段不能使用的限制。
@@ -44,8 +52,10 @@ init_worker_by_lua_block {
 那么，又该如何做到周期性运行呢？表面上来看，基于 ngx.timer.at 这个API 的话，你有两个选择：
 
 
+```text
 你可以在回调函数中，使用一个 while true 的死循环，执行完任务后 sleep 一段时间，自己来实现周期任务；
 你还可以在回调函数的最后，再创建另外一个新的 timer。
+```
 
 
 不过，在做出选择之前，有一点我们需要先明确下：timer 的本质是一个请求，虽然这个请求不是终端发起的；而对于请求来讲，在完成自己的任务后它就要退出，不能一直常驻，否则很容易造成各种资源的泄漏。
@@ -62,19 +72,23 @@ init_worker_by_lua_block {
 
 你也可以通过 Lua API，来获取当前等待执行和正在执行的定时任务的值，下面是两个示例：
 
+```css
 content_by_lua_block {
             ngx.timer.at(3, function() end)
             ngx.say(ngx.timer.pending_count())
         }
+```
 
 
 这段代码会打印出 1，表示有 1 个计划任务正在等待被执行。
 
+```css
 content_by_lua_block {
             ngx.timer.at(0.1, function() ngx.sleep(0.3) end)
             ngx.sleep(0.2)
             ngx.say(ngx.timer.running_count())
         }
+```
 
 
 这段代码会打印出 1，表示有 1 个计划任务正在运行中。
@@ -83,8 +97,10 @@ content_by_lua_block {
 
 接着来看特权进程。我们都知道 Nginx 主要分为 master 进程和 worker 进程，其中，真正处理用户请求的是 worker 进程。我们可以通过 lua-resty-core 中提供的 process.type API ，获取到进程的类型。比如，你可以用 resty 运行下面这个函数：
 
+```bash
 $ resty -e 'local process = require "ngx.process"
 ngx.say("process type:", process.type())'
+```
 
 
 你会看到，它返回的结果不是 worker， 而是 single。这意味 resty 启动的 Nginx 只有 worker 进程，没有 master 进程。其实，事实也是如此。在 resty 的实现中，你可以看到，下面这样的一行配置， 关闭了 master 进程：
@@ -95,38 +111,49 @@ master_process off;
 而OpenResty 在 Nginx 的基础上进行了扩展，增加了特权进程：privileged agent。特权进程很特别：
 
 
+```text
 它不监听任何端口，这就意味着不会对外提供任何服务；
 它拥有和 master 进程一样的权限，一般来说是 root 用户的权限，这就让它可以做很多 worker 进程不可能完成的任务；
 特权进程只能在 init_by_lua 上下文中开启；
 另外，特权进程只有运行在 init_worker_by_lua 上下文中才有意义，因为没有请求触发，也就不会走到content、access 等上下文去。
+```
 
 
 下面，我们来看一个开启特权进程的示例：
 
+```css
 init_by_lua_block {
     local process = require "ngx.process"
+```
 
+```text
     local ok, err = process.enable_privileged_agent()
     if not ok then
         ngx.log(ngx.ERR, "enables privileged agent failed error:", err)
     end
 }
+```
 
 
 通过这段代码开启特权进程后，再去启动 OpenResty 服务，我们就可以看到，Nginx 的进程中多了特权进程的身影：
 
+```text
 nginx: master process
 nginx: worker process
 nginx: privileged agent process
+```
 
 
 不过，如果特权只在 init_worker_by_lua 阶段运行一次，显然不是一个好主意，那我们应该怎么来触发特权进程呢？
 
 没错，答案就藏在刚刚讲过的知识里。既然它不监听端口，也就是不能被终端请求触发，那就只有使用我们刚才介绍的 ngx.timer ，来周期性地触发了：
 
+```css
 init_worker_by_lua_block {
     local process = require "ngx.process"
+```
 
+```javascript
     local function reload(premature)
         local f, err = io.open(ngx.config.prefix() .. "/logs/nginx.pid", "r")
         if not f then
@@ -136,7 +163,9 @@ init_worker_by_lua_block {
         f:close()
         os.execute("kill -HUP " .. pid)
     end
+```
 
+```text
     if process.type() == "privileged agent" then
          local ok, err = ngx.timer.every(5, reload)
         if not ok then
@@ -144,6 +173,7 @@ init_worker_by_lua_block {
         end
     end
 }
+```
 
 
 上面这段代码，实现了每 5 秒给 master 进程发送 HUP 信号量的功能。自然，你也可以在此基础上实现更多有趣的功能，比如轮询数据库，看是否有特权进程的任务并执行。因为特权进程是 root 权限，这显然就有点儿“后门”程序的意味了。
@@ -159,20 +189,24 @@ os.execute("kill -HUP " .. pid)
 
 为此，lua-resty-shell 库应运而生，使用它来调用命令行就是非阻塞的：
 
+```bash
 $ resty -e 'local shell = require "resty.shell"
 local ok, stdout, stderr, reason, status =
     shell.run([[echo "hello, world"]])
     ngx.say(stdout)
+```
 
 
 这段代码可以算是 hello world 的另外一种写法了，它调用系统的 echo 命令来完成输出。类似的，你可以用 resty.shell ，来替代 Lua 中的 os.execute 调用。
 
 我们知道，lua-resty-shell 的底层实现，依赖了 lua-resty-core 中的 [ngx.pipe] API，所以，这个使用 lua-resty-shell 打印出 hello wrold 的示例，改用 ngx.pipe ，可以写成下面这样：
 
+```bash
 $ resty -e 'local ngx_pipe = require "ngx.pipe"
 local proc = ngx_pipe.spawn({"echo", "hello world"})
 local data, err = proc:stdout_read_line()
 ngx.say(data)'
+```
 
 
 这其实也就是 lua-resty-shell 底层的实现代码了。你可以去查看 ngx.pipe 的文档和测试案例，来获取更多的使用方法，这里我就不再赘述了。

@@ -1,10 +1,12 @@
 ---
 title: 25答疑（二）：GIL与多线程是什么关系呢？
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             25 答疑（二）：GIL与多线程是什么关系呢？
                             你好，我是景霄。
+```
 
 不知不觉中，我们又一起完成了第二大章进阶篇的学习。我非常高兴看到很多同学一直在坚持积极地学习，并且留下了很多高质量的留言，值得我们互相思考交流。也有一些同学反复推敲，指出了文章中一些表达不严谨或是不当的地方，我也表示十分感谢。
 
@@ -16,10 +18,12 @@ categories: [Python核心技术与实战]
 
 先来回答第一个问题，两个同学都问到了，下面这段代码中的x，为什么是无限嵌套的列表？
 
+```text
 x = [1]
 x.append(x)
 x
 [1, [...]]
+```
 
 
 我们可以将上述操作画一个图，便于你更直观地理解：
@@ -48,35 +52,45 @@ Decorators is to modify the behavior of the function through a wrapper so we don
 如果你不知道装饰器，用常规的方法来编程，写出来的代码大概是下面这样的：
 
 # 发表评论
+```python
 def post_comment(request, ...):
     if not authenticate(request):
         raise Exception('U must log in first')
     ...
+```
     
 # 发表状态
+```python
 def post_moment(request, ...):
     if not authenticate(request):
         raise Exception('U must log in first')
     ...
+```
 
 
 显然，这样重复调用认证函数authenticate()的步骤，就显得非常冗余了。更好的解决办法，就是将认证函数authenticate()单独分离出来，写成一个装饰器，就像我们下面这样的写法。这样一来，代码便得到了高度的优化：
 
 # 发表评论
+```python
 @authenticate
 def post_comment(request, ...):
+```
 
 # 发表状态
+```python
 @authenticate
 def post_moment(request, ...):
+```
 
 
 不过也要注意，很多情况下，装饰器并不是唯一的方法。而我这里强调的，主要是使用装饰器带来的好处：
 
 
+```text
 代码更加简洁；
 逻辑更加清晰；
 程序的层次化、分离化更加明显。
+```
 
 
 而这也是我们应该遵循和优先选择的开发模式。

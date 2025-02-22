@@ -1,10 +1,12 @@
 ---
 title: 35RESTful&amp;Socket：行情数据对接和抓取
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             35 RESTful & Socket：行情数据对接和抓取
                             你好，我是景霄。
+```
 
 上一节课，我们介绍了交易所的交易模式，数字货币交易所RESTful接口的常见概念，以及如何调用RESTful接口进行订单操作。众所周知，买卖操作的前提，是你需要已知市场的最新情况。这节课里，我将介绍交易系统底层另一个最重要的部分，行情数据的对接和抓取。
 
@@ -39,9 +41,11 @@ categories: [Python核心技术与实战]
 我们把委托表里的具体用户隐去，相同价格的订单合并，就得到了下面这种委托账本。我们主要观察右边的数字部分，其中：
 
 
+```text
 上半部分里，第一列红色数字代表BTC的卖出价格，中间一列数字是这个价格区间的订单BTC总量，最右边一栏是从最低卖出价格到当前价格区间的积累订单量。
 中间的大字部分，9994.10 USD是当前的市场价格，也就是上一次成交交易的价格。
 下面绿色部分的含义与上半部分类似，不过指的是买入委托和对应的数量。
+```
 
 
 
@@ -58,17 +62,23 @@ Websocket介绍
 
 在本文的开头我们提到过：行情数据很讲究时效性。所以，行情从交易所产生到传播给我们的程序之间的延迟，应该越低越好。通常，交易所也提供了REST的行情数据抓取接口。比如下面这段代码：
 
+```python
 import requests
 import timeit
+```
 
 
+```python
 def get_orderbook():
   orderbook = requests.get("https://api.gemini.com/v1/book/btcusd").json()
+```
 
 
+```python
 n = 10
 latency = timeit.timeit('get_orderbook()', setup='from __main__ import get_orderbook', number=n) * 1.0 / n
 print('Latency is {} ms'.format(latency * 1000))
+```
 
 ###### 输出 #######
 
@@ -94,14 +104,19 @@ TCP handshake: 0.072758s, SSL handshake: 0.119409s
 
 概念听着很痛快，不过还是有些抽象。为了让你快速理解刚刚的这段话，我们还是来看两个简单的例子。二话不说，先看一段代码：
 
+```python
 import websocket
 import thread
+```
 
 # 在接收到服务器发送消息时调用
+```python
 def on_message(ws, message):
     print('Received: ' + message)
+```
 
 # 在和服务器建立完成连接时调用   
+```python
 def on_open(ws):
     # 线程运行函数
     def gao():
@@ -113,23 +128,31 @@ def on_open(ws):
             print('Sent: ' + msg)
         # 休息1秒用于接收服务器回复的消息
         time.sleep(1)
+```
         
+```python
         # 关闭Websocket的连接
         ws.close()
         print("Websocket closed")
+```
     
+```markdown
     # 在另一个线程运行gao()函数
     thread.start_new_thread(gao, ())
+```
 
 
+```python
 if __name__ == "__main__":
     ws = websocket.WebSocketApp("ws://echo.websocket.org/",
                               on_message = on_message,
                               on_open = on_open)
+```
     
     ws.run_forever()
 
 #### 输出 #####
+```text
 Sent: 0
 Sent: 1
 Received: 0
@@ -141,6 +164,7 @@ Sent: 4
 Received: 3
 Received: 4
 Websocket closed
+```
 
 
 这段代码尝试和wss://echo.websocket.org建立连接。当连接建立的时候，就会启动一条线程，连续向服务器发送5条消息。
@@ -157,13 +181,16 @@ Websocket全双工请求响应的示意图
 
 再来看第二段代码。为了解释”双向“，我们来看看获取Gemini的委托账单的例子。
 
+```python
 import ssl
 import websocket
 import json
+```
 
 # 全局计数器
 count = 5
 
+```python
 def on_message(ws, message):
     global count
     print(message)
@@ -171,19 +198,24 @@ def on_message(ws, message):
     # 接收了5次消息之后关闭websocket连接
     if count == 0:
         ws.close()
+```
 
+```python
 if __name__ == "__main__":
     ws = websocket.WebSocketApp(
         "wss://api.gemini.com/v1/marketdata/btcusd?top_of_book=true&offers=true",
         on_message=on_message)
     ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+```
 
 ###### 输出 #######
+```text
 {"type":"update","eventId":7275473603,"socket_sequence":0,"events":[{"type":"change","reason":"initial","price":"11386.12","delta":"1.307","remaining":"1.307","side":"ask"}]}
 {"type":"update","eventId":7275475120,"timestamp":1562380981,"timestampms":1562380981991,"socket_sequence":1,"events":[{"type":"change","side":"ask","price":"11386.62","remaining":"1","reason":"top-of-book"}]}
 {"type":"update","eventId":7275475271,"timestamp":1562380982,"timestampms":1562380982387,"socket_sequence":2,"events":[{"type":"change","side":"ask","price":"11386.12","remaining":"1.3148","reason":"top-of-book"}]}
 {"type":"update","eventId":7275475838,"timestamp":1562380986,"timestampms":1562380986270,"socket_sequence":3,"events":[{"type":"change","side":"ask","price":"11387.16","remaining":"0.072949","reason":"top-of-book"}]}
 {"type":"update","eventId":7275475935,"timestamp":1562380986,"timestampms":1562380986767,"socket_sequence":4,"events":[{"type":"change","side":"ask","price":"11389.22","remaining":"0.06204196","reason":"top-of-book"}]}
+```
 
 
 可以看到，在和Gemini建立连接后，我们并没有向服务器发送任何消息，没有任何请求，但是服务器却源源不断地向我们推送数据。这可比REST接口“每请求一次获得一次回复”的沟通方式高效多了！
@@ -202,29 +234,38 @@ Public 接口，即公开接口，提供 orderbook 服务，即每个人都能�
 
 我们以 orderbook 爬虫为例，先来看下如何抓取 orderbook 信息。下面的代码详细写了一个典型的爬虫，同时使用了类进行封装，希望你不要忘记我们这门课的目的，了解 Python 是如何应用于工程实践中的：
 
+```python
 import copy
 import json
 import ssl
 import time
 import websocket
+```
 
 
 class OrderBook(object):
 
+```text
     BIDS = 'bid'
     ASKS = 'ask'
+```
 
     def __init__(self, limit=20):
 
         self.limit = limit
 
+```text
         # (price, amount)
         self.bids = {}
         self.asks = {}
+```
 
+```text
         self.bids_sorted = []
         self.asks_sorted = []
+```
 
+```python
     def insert(self, price, amount, direction):
         if direction == self.BIDS:
             if amount == 0:
@@ -240,43 +281,61 @@ class OrderBook(object):
                 self.asks[price] = amount
         else:
             print('WARNING: unknown direction {}'.format(direction))
+```
 
+```python
     def sort_and_truncate(self):
         # sort
         self.bids_sorted = sorted([(price, amount) for price, amount in self.bids.items()], reverse=True)
         self.asks_sorted = sorted([(price, amount) for price, amount in self.asks.items()])
+```
 
+```markdown
         # truncate
         self.bids_sorted = self.bids_sorted[:self.limit]
         self.asks_sorted = self.asks_sorted[:self.limit]
+```
 
+```markdown
         # copy back to bids and asks
         self.bids = dict(self.bids_sorted)
         self.asks = dict(self.asks_sorted)
+```
 
+```python
     def get_copy_of_bids_and_asks(self):
         return copy.deepcopy(self.bids_sorted), copy.deepcopy(self.asks_sorted)
+```
 
 
+```python
 class Crawler:
     def __init__(self, symbol, output_file):
         self.orderbook = OrderBook(limit=10)
         self.output_file = output_file
+```
 
+```text
         self.ws = websocket.WebSocketApp('wss://api.gemini.com/v1/marketdata/{}'.format(symbol),
                                          on_message = lambda ws, message: self.on_message(message))
         self.ws.run_forever(sslopt={'cert_reqs': ssl.CERT_NONE})
+```
 
+```python
     def on_message(self, message):
         # 对收到的信息进行处理，然后送给 orderbook
         data = json.loads(message)
         for event in data['events']:
             price, amount, direction = float(event['price']), float(event['remaining']), event['side']
             self.orderbook.insert(price, amount, direction)
+```
 
+```markdown
         # 整理 orderbook，排序，只选取我们需要的前几个
         self.orderbook.sort_and_truncate()
+```
 
+```markdown
         # 输出到文件
         with open(self.output_file, 'a+') as f:
             bids, asks = self.orderbook.get_copy_of_bids_and_asks()
@@ -286,19 +345,24 @@ class Crawler:
                 'ts': int(time.time() * 1000)
             }
             f.write(json.dumps(output) + '\n')
+```
 
 
+```python
 if __name__ == '__main__':
     crawler = Crawler(symbol='BTCUSD', output_file='BTCUSD.txt')
+```
 
 ###### 输出 #######
 
+```text
 {"bids": [[11398.73, 0.96304843], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.95, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11407.92, 1.0], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11412.42, 1.0], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558996535}
 {"bids": [[11398.73, 0.96304843], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.95, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11407.92, 1.0], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11412.42, 1.0], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558997377}
 {"bids": [[11398.73, 0.96304843], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.95, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11412.42, 1.0], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558997765}
 {"bids": [[11398.73, 0.96304843], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.95, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558998638}
 {"bids": [[11398.73, 0.97131753], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.95, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558998645}
 {"bids": [[11398.73, 0.97131753], [11398.72, 0.98914437], [11397.32, 1.0], [11396.13, 2.0], [11395.87, 1.0], [11394.09, 0.11803397], [11394.08, 1.0], [11393.59, 0.1612581], [11392.96, 1.0]], "asks": [[11407.42, 1.30814001], [11409.48, 2.0], [11409.66, 2.0], [11412.15, 0.525], [11413.77, 0.11803397], [11413.99, 0.5], [11414.28, 1.0], [11414.72, 1.0]], "ts": 1562558998748}
+```
 
 
 代码比较长，接下来我们具体解释一下。

@@ -195,7 +195,7 @@ export const themeConfig = {
       name: "博客",
       list: [
         {
-          icon: "/images/logo/logo.webp",
+          icon: "/images/logo/taiji.svg",
           name: "主站",
           url: "/",
         },
@@ -274,9 +274,10 @@ export const themeConfig = {
       coverLayout: 'both',
       // 默认封面(随机展示)
       defaultCover: [
-        'https://example.com/1.avif',
-        'https://example.com/2.avif',
-        'https://example.com/3.avif'
+        'https://alist.doit.dns-dynamic.net/d/%E5%A4%A9%E7%BF%BC/%E5%9B%BE%E5%BA%8A/%E5%A3%81%E7%BA%B8/%E3%80%90%E5%93%B2%E9%A3%8E%E5%A3%81%E7%BA%B8%E3%80%91%E5%89%91%E5%AE%A2-%E6%B0%B4%E5%A2%A8.png',
+        'https://alist.doit.dns-dynamic.net/d/%E5%A4%A9%E7%BF%BC/%E5%9B%BE%E5%BA%8A/%E5%B0%81%E9%9D%A2/%E4%B8%8B%E9%9B%A8-%E5%95%86%E5%BA%97-%E7%BB%BF%E8%89%B2%E6%8A%A4%E7%9C%BC.webp',
+        "https://alist.doit.dns-dynamic.net/d/%E5%A4%A9%E7%BF%BC/%E5%9B%BE%E5%BA%8A/%E5%B0%81%E9%9D%A2/%E5%8A%A8%E7%89%A9-%E5%8F%AF%E7%88%B1-%E5%9B%B4%E6%A0%8F.webp",
+        // 'https://example.com/3.avif'
       ]
     }
   },
@@ -290,7 +291,7 @@ export const themeConfig = {
       },
       {
         icon: "github",
-        link: "https://www.github.com/imsyy/",
+        link: "https://www.github.com/taiji666/",
       },
       {
         icon: "telegram",

@@ -1,10 +1,12 @@
 ---
 title: 39Django：搭建监控平台
-date: 1739706057.574473
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             39 Django：搭建监控平台
                             你好，我是景霄。
+```
 
 通过前几节课的学习，相信你对量化交易系统已经有了一个最基本的认知，也能通过自己的代码，搭建一个简单的量化交易系统来进行盈利。
 
@@ -26,8 +28,10 @@ Django 最大的特色，在于将网页和数据库中复杂的关系，转化�
 
 说了这么多，接下来，我们通过上手使用进一步来了解。先来看一下，如何安装和使用 Django。你可以先按照下面代码块的内容来操作，安装Django ：
 
+```text
 pip3 install Django
 django-admin --version
+```
 
 ########## 输出 ##########
 
@@ -36,13 +40,16 @@ django-admin --version
 
 接着，我们来创建一个新的 Django 项目：
 
+```text
 django-admin startproject TradingMonitor
 cd TradingMonitor/
 python3 manage.py migrate
+```
 
 ########## 输出 ##########
 
 
+```text
   Applying contenttypes.0001_initial... OK
   Applying auth.0001_initial... OK
   Applying admin.0001_initial... OK
@@ -60,10 +67,12 @@ python3 manage.py migrate
   Applying auth.0010_alter_group_name_max_length... OK
   Applying auth.0011_update_proxy_permissions... OK
   Applying sessions.0001_initial... OK
+```
 
 
 这时，你能看到文件系统大概是下面这样的：
 
+```text
 TradingMonitor/
 ├── TradingMonitor
 │   ├── __init__.py
@@ -72,11 +81,13 @@ TradingMonitor/
 │   └── wsgi.py
 ├── db.sqlite3
 └── manage.py
+```
 
 
 我简单解释一下它的意思：
 
 
+```text
 TradingMonitor/TradingMonitor，表示项目最初的 Python 包；
 TradingMonitor/init.py，表示一个空文件，声明所在目录的包为一个 Python 包；
 TradingMonitor/settings.py，管理项目的配置信息；
@@ -84,6 +95,7 @@ TradingMonitor/urls.py，声明请求 URL 的映射关系；
 TradingMonitor/wsgi.py，表示Python 程序和 Web 服务器的通信协议；
 manage.py，表示一个命令行工具，用来和 Django 项目进行交互；
 Db.sqlite3，表示默认的数据库，可以在设置中替换成其他数据库。
+```
 
 
 另外，你可能注意到了上述命令中的python3 manage.py migrate，这个命令表示创建或更新数据库模式。每当 model 源代码被改变后，如果我们要将其应用到数据库上，就需要执行一次这个命令。
@@ -94,11 +106,13 @@ python3 manage.py createsuperuser
 
 ########## 输出 ##########
 
+```text
 Username (leave blank to use 'ubuntu'): admin
 Email address:  
 Password: 
 Password (again): 
 Superuser created successfully.
+```
 
 
 然后，我们来启动 Django 的 debugging 模式：
@@ -136,10 +150,12 @@ Django 无需数据库就可以使用，它通过对象关系映射器（object-
 from django.db import models
 
 
+```python
 class Position(models.Model):
     asset = models.CharField(max_length=10)
     timestamp = models.DateTimeField()
     amount = models.DecimalField(max_digits=10, decimal_places=3)
+```
 
 
 models.py 文件主要用一个 Python 类来描述数据表，称为模型 。运用这个类，你可以通过简单的 Python 代码来创建、检索、更新、删除数据库中的记录，而不用写一条又一条的SQL语句，这也是我们之前所说的避免通过 SQL 操作数据库。
@@ -147,9 +163,11 @@ models.py 文件主要用一个 Python 类来描述数据表，称为模型 。�
 在这里，我们创建了一个 Position 模型，用来表示我们的交易仓位信息。其中，
 
 
+```text
 asset 表示当前持有资产的代码，例如 btc；
 timestamp 表示时间戳；
 amount 则表示时间戳时刻的持仓信息。
+```
 
 
 设计视图 Views
@@ -160,13 +178,17 @@ amount 则表示时间戳时刻的持仓信息。
 
 #  TradingMonitor/views.py
 
+```python
 from django.shortcuts import render
 from .models import Position
+```
 
+```python
 def render_positions(request, asset):
     positions = Position.objects.filter(asset = asset)
     context = {'asset': asset, 'positions': positions}
     return render(request, 'positions.html', context)
+```
 
 
 不过，这个函数具体是怎么工作的呢？我们一行行来看。
@@ -187,15 +209,20 @@ return render(request, 'positions.html', context)，最后这行代码返回一�
 
 #  TradingMonitor/templates/positions.html
 
+```html
 <!DOCTYPE html>
 <html lang="en-US">
 <head>
 <title>Positions for {{asset}}</title>
 </head>
+```
 
+```html
 <body>
 <h1>Positions for {{asset}}</h1>
+```
 
+```html
 <table>
 <tr>
     <th>Time</th>
@@ -209,6 +236,7 @@ return render(request, 'positions.html', context)，最后这行代码返回一�
 {% endfor %}
 </table>
 </body>
+```
 
 
 我重点说一下几个地方。首先是<title>Positions for {{asset}}</title>，这里双大括号括住 asset 这个变量，这个变量对应的正是前面 context 字典中的 asset key。Django 的渲染引擎会将 asset ，替换成 context 中 asset 对应的内容，此处是替换成了 btc。
@@ -223,14 +251,18 @@ return render(request, 'positions.html', context)，最后这行代码返回一�
 
 #  TradingMonitor/urls.py
 
+```python
 from django.contrib import admin
 from django.urls import path
 from . import views
+```
 
+```text
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('positions/<str:asset>', views.render_positions),
 ]
+```
 
 
 到这里，我们就可以通过 http://127.0.0.1:8000/positions/btc 来访问啦！
@@ -241,12 +273,15 @@ urlpatterns = [
 
 第一步，在 TradingMonitor/TradingMonitor 下，新建一个文件夹 migrations；并在这个文件夹中，新建一个空文件 __init__.py。
 
+```text
 mkdir TradingMonitor/migrations
 touch TradingMonitor/migrations/__init__.py
+```
 
 
 此时，你的目录结构应该长成下面这样：
 
+```text
 TradingMonitor/
 ├── TradingMonitor
 │   ├── migrations
@@ -261,10 +296,12 @@ TradingMonitor/
 │   └── wsgi.py
 ├── db.sqlite3
 └── manage.py
+```
 
 
 第二步，修改 TradingMonitor/settings.py：
 
+```text
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -274,8 +311,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'TradingMonitor',  # 这里把我们的 app 加上
 ]
+```
 
 
+```text
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -291,6 +330,7 @@ TEMPLATES = [
         },
     },
 ]
+```
 
 
 第三步，运行 python manage.py makemigrations：
@@ -299,9 +339,11 @@ python manage.py makemigrations
 
 ########## 输出 ##########
 
+```markdown
 Migrations for 'TradingMonitor':
   TradingMonitor/migrations/0001_initial.py
     - Create model Position
+```
 
 
 第四步，运行 python manage.py migrate：
@@ -312,10 +354,12 @@ python manage.py migrate
 ########## 输出 ##########
 
 
+```text
 Operations to perform:
   Apply all migrations: TradingMonitor, admin, auth, contenttypes, sessions
 Running migrations:
   Applying TradingMonitor.0001_initial... OK
+```
 
 
 这几步的具体操作，我都用代码和注释表示了出来，你完全可以同步进行操作。操作完成后，现在，我们的数据结构就已经被成功同步到数据库中了。
@@ -332,9 +376,11 @@ Running migrations:
 除此之外，对于监控系统来说，其实还有着非常多的开源插件可以使用。有一些界面非常酷炫，有一些可以做到很高的稳定性和易用性，它们很多都可以结合 Django 做出很好的效果来。比较典型的有：
 
 
+```text
 Graphite 是一款存储时间序列数据，并通过 Django Web 应用程序在图形中显示的插件；
 Vimeo 则是一个基于 Graphite 的仪表板，具有附加功能和平滑的设计；
 Scout 监控 Django和Flask应用程序的性能，提供自动检测视图、SQL查询、模板等。
+```
 
 
 总结

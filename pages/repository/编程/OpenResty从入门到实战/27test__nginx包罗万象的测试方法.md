@@ -1,10 +1,12 @@
 ---
 title: 27test__nginx包罗万象的测试方法
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             27 test__nginx 包罗万象的测试方法
                             你好，我是温铭。
+```
 
 通过上节课的学习，你已经对 test::nginx 有了一个初步的认识，并运行了最简单的示例。不过，在实际的开源项目中，test::nginx 编写的测试案例显然要比示例代码复杂得多，也更加难以掌握，不然它也就称不上是拦路虎了。
 
@@ -22,7 +24,6 @@ Nginx 配置
 
 在做单元测试的时候，config 是最常用的原语，我们会在其中加载 Lua 库，并调用函数来做白盒测试。下面是节选的一段测试代码，并不能完整运行。它来自一个真实的开源项目，如果你对此有兴趣，可以点击链接查看完整的测试，也可以尝试在本机运行。
 
-=== TEST 1: sanity
 --- config
     location /t {
         content_by_lua_block {
@@ -49,7 +50,10 @@ request
 还是继续上面的测试案例，如果你想要单元测试的代码被运行，那就要发起一个 HTTP 请求，访问的地址是 config 中注明的 /t，正如下面的测试代码所示：
 
 --- request
+```text
+=== TEST 1: sanity
 GET /t
+```
 
 
 这段代码在 request 原语中，发起了一个 GET 请求，地址是 /t。这里，我们并没有注明访问的 ip 地址、域名和端口，也没有指定是 HTTP 1.0 还是 HTTP 1.1，这些细节都被 test::nginx 隐藏了，你不用去关心。这就是 DSL 的好处之一——你只需要关心业务逻辑，不用被各种细节所打扰。
@@ -63,8 +67,10 @@ GET /t  HTTP/1.0
 除了 GET 方法之外，POST 方法也是需要支持的。下面这个示例，可以 POST hello world 这个字符串到指定的地址：
 
 --- request
+```text
 POST /t  
 hello world
+```
 
 
 同样的， test::nginx 在这里为你自动计算了请求体长度，并自动增加了 host 和 connection 这两个请求头，以保证这是一个正常的请求。
@@ -82,9 +88,11 @@ request 还支持更为复杂和灵活的模式，那就是配合 eval 这个 fi
 关于 eval的用法，这里我们先看几个简单的例子，其他更复杂的，我们下节课继续介绍：
 
 --- request eval
+```text
 "POST /t
 hello\x00\x01\x02
 world\x03\x04\xff"
+```
 
 
 第一个例子中，我们用 eval 来指定不可打印的字符，这也是它的用处之一。双引号之间的内容，会被当做 perl 的字符串来处理后，再传给 request 来作为参数。
@@ -115,8 +123,10 @@ pipelined_requests
 比如这个示例就会在同一个连接中，依次访问这 4 个接口。这样做会有两个好处：
 
 
+```text
 第一是可以省去不少重复的测试代码，把 4 个测试案例压缩到一个测试案例中完成；
 第二也是最重要的原因，你可以用流水线的请求，来检测代码逻辑在多次访问的情况下，是否会有异常。
+```
 
 
 你可能会奇怪，我依次写多个测试案例，那么执行的时候，代码也会被多次执行，不也可以覆盖上面的第二个问题吗？
@@ -133,8 +143,10 @@ repeat_each
 
 自然，你可以在 run_test() 函数之前来设置它，比如将参数改为2：
 
+```text
 repeat_each(2);
 run_tests();
+```
 
 
 那么，每个测试案例就都会被运行两次，以此类推。
@@ -152,8 +164,10 @@ X-Foo: blah
 你可以用它来设置各种自定义的头。如果想设置多个头，那设置多行就可以了：
 
 --- more_headers
+```text
 X-Foo: 3
 User-Agent: openresty
+```
 
 
 处理响应
@@ -164,7 +178,6 @@ response_body
 
 与 request 原语对应的就是 response_body，下面是它们两个配置使用的例子：
 
-=== TEST 1: sanity
 --- config
     location /t {
         content_by_lua_block {
@@ -172,7 +185,6 @@ response_body
         }
     }
 --- request
-GET /t
 --- response_body
 hello
 
@@ -180,7 +192,11 @@ hello
 这个测试案例，在响应体是 hello 的情况下会通过，其他情况就会报错。但如何返回体很长，我们怎么检测才合适呢？别着急，test::nginx 已经为你考虑好了，它支持用用正则表达式来检测响应体，比如下面这样的写法：
 
 --- response_body_like
+```text
+=== TEST 1: sanity
+GET /t
 ^he\w+$
+```
 
 
 这样你就可以对响应体进行非常灵活的检测了。不仅如此，test::nginx 还支持 unlike 的操作：
@@ -194,7 +210,6 @@ hello
 同样的思路，了解完单个请求的检测后，我们再来看下多个请求的检测。下面是配合 pipelined_requests 一起使用的示例：
 
 --- pipelined_requests eval
-["GET /hello", "GET /world", "GET /foo", "GET /bar"]
 --- response_body eval
 ["hello", "world", "oo", "bar"]
 
@@ -206,8 +221,11 @@ response_headers
 第二个我们来说说响应头。响应头和请求头类似，每一行对应一个 header 的 key 和 value：
 
 --- response_headers
+```text
+["GET /hello", "GET /world", "GET /foo", "GET /bar"]
 X-RateLimit-Limit: 2
 X-RateLimit-Remaining: 1
+```
 
 
 和响应体的检测一样，响应头也支持正则表达式和 unlike 操作，分别是 response_headers_like 、raw_response_headers_like 和 raw_response_headers_unlike。

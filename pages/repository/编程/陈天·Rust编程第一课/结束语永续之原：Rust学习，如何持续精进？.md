@@ -1,10 +1,12 @@
 ---
 title: 结束语永续之原：Rust学习，如何持续精进？
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             结束语 永续之原：Rust学习，如何持续精进？
                             你好，我是陈天。
+```
 
 首先，恭喜你完成了这门课程！
 
@@ -44,6 +46,7 @@ categories: [陈天·Rust编程第一课]
 
 比如想知道上面Rc/Arc的问题，自然要看 Rc::new 的源码实现：
 
+```cpp
 pub fn new(value: T) -> Rc<T> {
     // There is an implicit weak pointer owned by all the strong
     // pointers, which ensures that the weak destructor never frees
@@ -53,6 +56,7 @@ pub fn new(value: T) -> Rc<T> {
         Box::leak(box RcBox { strong: Cell::new(1), weak: Cell::new(1), value }).into(),
     )
 }
+```
 
 
 不看不知道，一看吓一跳。可疑的 Box::leak 出现在我们眼前。这个 Box::leak 又是干什么的呢？顺着这个线索追溯下去，我们发现了一个宝贵的金矿（你可以回顾生命周期的那一讲）。
@@ -89,25 +93,32 @@ pub fn new(value: T) -> Rc<T> {
 
 比如有人问：HTTP/2 是怎么工作的？这样的问题，你除了可以看 RFC，阅读别人总结的经验，还可以动动手，几行代码就可以获得很多信息。比如：
 
+```cpp
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+```
 
+```cpp
 fn main() {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
+```
 
     let url = "<https://www.rust-lang.org/>";
 
+```javascript
     let _body = reqwest::blocking::get(url).unwrap().text().unwrap();
     info!("Fetching url: {}", url);
 }
+```
 
 
 这段代码相信你肯定能写得出来，但你是否尝试过 RUST_LOG=debug 甚至 RUST_LOG=trace 来看看输出的日志呢？又有没有尝试着顺着日志的脉络，去分析涉及的库呢？
 
 下面是这几行代码 RUST_LOG=debug 的输出，可以让你看到 HTTP/2 基本的运作方式，我建议你试试 RUST_LOG=trace（内容太多就不贴了），如果你能搞清楚输出的信息，那么 Rust 下用 hyper 处理 HTTP/2 的主流程你就比较明白了。
 
+```cpp
 ❯ RUST_LOG=debug cargo run --quiet
 2021-12-12T21:28:00.612897Z DEBUG reqwest::connect: starting new connection: <https://www.rust-lang.org/>    
 2021-12-12T21:28:00.613124Z DEBUG hyper::client::connect::dns: resolving host="www.rust-lang.org"
@@ -138,6 +149,7 @@ fn main() {
 2021-12-12T21:28:01.018665Z DEBUG Connection{peer=Client}: h2::codec::framed_read: received frame=Data { stream_id: StreamId(1) }
 2021-12-12T21:28:01.018885Z DEBUG Connection{peer=Client}: h2::codec::framed_read: received frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
 2021-12-12T21:28:01.020158Z  INFO http2: Fetching url: <https://www.rust-lang.org/>
+```
 
 
 所以，很多时候，知识就在我们身边，我们写一写代码就能获取。

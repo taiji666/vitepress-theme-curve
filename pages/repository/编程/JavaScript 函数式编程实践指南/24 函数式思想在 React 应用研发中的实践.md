@@ -1,6 +1,6 @@
 ---
 title: 24 函数式思想在 React 应用研发中的实践
-date: 1739708222.3942297
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 书接上回，本节我们将站在函数式编程的视角，探讨 React 从“Class组件+设计模式”到“函数组件+Hooks”的研发模式变革。
@@ -12,10 +12,12 @@ categories: [JavaScript 函数式编程实践指南]
 
 通过上一节的学习，我们已经知道，在 Class 组件占据统治地位的时期，为了更好地解决编码复杂度的问题，我们曾求助于一系列的 React 设计模式，这些设计模式包括但不限于：
 
+```markdown
 -   高阶组件
 -   render props
 -   容器组件/展示组件
 -   ...
+```
 
 其中，高阶组件和 render props 都是解决代码重用问题的经典模式。容器组件/展示组件虽然也是代码重用的一种思路，但它真正的威力其实并不在此，而在于“关注点分离”。
 
@@ -28,13 +30,17 @@ categories: [JavaScript 函数式编程实践指南]
 ### 高阶组件（HOC）的函数式本质
 
 > 高阶组件（HOC）是 React 中用于复用组件逻辑的一种高级技巧。HOC 自身不是 React API 的一部分，它是一种基于 React 的组合特性而形成的设计模式。
+```text
 具体而言，**高阶组件是参数为组件，返回值为新组件的函数。**
 ——React 官方文档
+```
 
 在这段描述里，有两个华点，是值得我们细细品味的：
 
+```markdown
 -   高阶组件是**函数**
 -   高阶组件是一种基于 React 的**组合特性**而形成的设计模式
+```
 
 #### 高阶组件是函数
 
@@ -160,9 +166,11 @@ export default withFetch
 
 这个组件主要做了这么几件事：
 
+```markdown
 -   它根据 `this.props` 中指定的 url，请求一个后端接口
 -   将获取到的数据(`data`)以 `state` 的形式维护在高阶组件的内部
 -   将高阶组件内部的 `state.data` 以 `props` 的形式传递给目标组件 `Component`
+```
 
 用一句话来概括这个过程：**高阶组件把状态【注入】到了目标** `Component`**里。**
 
@@ -180,8 +188,10 @@ const FetchCommentComponent = withFetch(Component)
 
 随着应用的迭代，我们会发现，`Component`仅仅具备“获取数据”这一个能力是不够的，产品经理希望你为它增加以下功能：
 
+```markdown
 1.  在请求发起前后，处理对应的 Loading 态（对应 HOC `withLoading`）
 1.  在请求失败的情况下，处理对应的 Error 态（对应 HOC `withError`）
+```
 
 在 `compose`的加持下，我们可以快速写出如下代码：
 
@@ -247,8 +257,10 @@ const App = () => {
 
 如果不去细看 `withLoading`和`withError`的具体实现逻辑，我们很难推测这些 `props`到底应该传什么样的值。
 
+```text
 尽管这样的代码已经给我们构成一些研发阻力，但这还不是最糟的情况——至少，案例中`withFetch`的逻辑对我们来说仍然是透明的。   
 更多的时候，我们见到的是下面这样的代码：
+```
 
 ```jsx
 // 定义一个 NetWorkComponent，组合多个高阶组件的能力
@@ -321,7 +333,7 @@ render props 被认为是比 HOC 更加优雅的代码重用解法。这里提�
 
 图中的代码是我基于楼上 HOC 的 `withFetch`简单改写出的 render props 版本。不熟悉 render props 的家人们可能会对 render 函数中的 `this.props.render()`感到困惑。这里简单介绍一下：`this.props.render()`可以是任意的一个函数组件，像这样：
 
-```
+```text
 <FetchComponent
   render={(data) => <div>{data.length}</div>}
   />
@@ -355,7 +367,7 @@ render props 被认为是比 HOC 更加优雅的代码重用解法。这里提�
 
 以 HOC 话题下的 `NetWorkComponent`组件为例，使用 Hooks，我们可以将它重构成这样：
 
-```
+```javascript
 const NewWorkComponent = () => {
   const {data, error, isLoading} = useFetch('xxx')  
   if(error) {
@@ -370,7 +382,7 @@ const NewWorkComponent = () => {
 
 由于不存在 `props`覆盖的问题，对于需要分别调用两次接口的场景，只需要像这样调用两次`useFetch`就可以了：
 
-```
+```javascript
 const NewWorkComponent = ({userId}) => {
   const {
     data: profileData, 
@@ -391,7 +403,7 @@ const NewWorkComponent = ({userId}) => {
 
 以 render props 话题下的“嵌套地狱”组件为例，使用 Hooks，我们可以将它的嵌套部分重构成这样：
 
-```
+```javascript
 const user = useUser()
 const mouse = useMouse()
 const scroll = useScroll()
@@ -407,8 +419,10 @@ return <ConsumingComponent
            />
 ```
 
+```text
 从以上的重构结果，我们可以看出：Hooks 能够帮我们在【**数据的准备工作**】和【**数据的渲染工作**】之间做一个更清晰的分离。  
 具体来说，在 render props 示例中，我们并不想关心组件之间如何嵌套，我们只关心我们在 render props 函数中会拿到什么样的值；在 HOC 示例中，我们也并不想关心每个 HOC 是怎么实现的、每个组件参数和 HOC 的映射关系又是什么样的，我们只关心目标组件能不能拿到它想要的 `props` 。但在【函数组件+Hooks】这种模式出现之前，尽管开发者“并不想关心”，却“不得不关心”。**因为这些模式都没有解决根本上的问题，那就是心智模型的问题。**
+```
 
   
 
@@ -419,8 +433,10 @@ return <ConsumingComponent
 
 render props 是有进步意义的，因为它以 render 函数为界，将整个组件划分为了两部分：
 
+```text
 -   **数据的准备工作——也就是“逻辑”**
 -   **数据的渲染工作——也就是“视图”**
+```
 
 其中，“视图”表现为一个纯函数组件，这个纯函数组件是高度独立的。尽管”视图“是高度独立的，“逻辑”却仍然耦合在组件的上下文里。这种程度的解耦是暧昧的、不彻底的。
 
@@ -443,21 +459,27 @@ render props 是有进步意义的，因为它以 render 函数为界，将整�
 
 容器组件与展示组件也是非常经典的设计模式。这个模式有很多的别名，比如：
 
+```markdown
 -   胖组件/瘦组件
 -   有状态组件/无状态组件
 -   聪明组件/傻瓜组件
 -   ...   
+```
 > 注：（斜线前面的名字是容器组件的别名，斜线后面的名字是展示组件的别名）
 
 名字叫啥不重要，这个模式的要义在于关注点分离，具体来说，先将组件逻辑分为两类：
 
+```text
 -   **数据的准备工作——也就是“逻辑”**
 -   **数据的渲染工作——也就是“视图”**
+```
 
 然后再把这两类逻辑分别塞进两类组件中：
 
+```markdown
 -   容器组件：负责做**数据的准备和分发工作**
 -   展示组件：负责做**数据的渲染工作**
+```
 
 这个模式强调的是容器组件和展示组件之间的父子关系：容器组件是父组件，它在完成数据的准备工作后，会通过 props 将数据分发给作为子组件的展示组件。
 
@@ -467,9 +489,11 @@ render props 是有进步意义的，因为它以 render 函数为界，将整�
 
 本节，我们探讨了 React 类组件时代的三个极具代表性的设计模式，它们分别是：
 
+```markdown
 -   HOC（高阶组件）
 -   render props
 -   容器组件/展示组件
+```
 
 这些设计模式并没有完全被 Hooks 所淘汰，直到今天，它们仍然有各自的用武之地。但 Hooks 的出现确实极大程度上削弱了设计模式的存在感。这背后的关键，在于 Hooks 独特的**函数式心智模型**，能够帮助我们更加自然、更加充分地实现**逻辑和视图的解耦**。
 

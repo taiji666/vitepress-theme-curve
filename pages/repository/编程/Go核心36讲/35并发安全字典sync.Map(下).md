@@ -1,10 +1,12 @@
 ---
 title: 35并发安全字典sync.Map(下)
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             35 并发安全字典sync.Map (下)
                             你好，我是郝林，今天我们继续来分享并发安全字典sync.Map的内容。
+```
 
 我们在上一篇文章中谈到了，由于并发安全字典提供的方法涉及的键和值的类型都是interface{}，所以我们在调用这些方法的时候，往往还需要对键和值的实际类型进行检查。
 
@@ -28,11 +30,13 @@ categories: [Go核心36讲]
 
 比如：
 
+```css
 type ConcurrentMap struct {
  m         sync.Map
  keyType   reflect.Type
  valueType reflect.Type
 }
+```
 
 
 这里ConcurrentMap类型代表的是：可自定义键类型和值类型的并发安全字典。这个类型同样有一个sync.Map类型的字段m，代表着其内部使用的并发安全字典。
@@ -49,12 +53,14 @@ type ConcurrentMap struct {
 
 因此，当我们根据ConcurrentMap在m字段的值中查找键值对的时候，就必须保证ConcurrentMap的类型是正确的。由于反射类型值之间可以直接使用操作符==或!=进行判等，所以这里的类型检查代码非常简单。
 
+```css
 func (cMap *ConcurrentMap) Load(key interface{}) (value interface{}, ok bool) {
  if reflect.TypeOf(key) != cMap.keyType {
   return
  }
  return cMap.m.Load(key)
 }
+```
 
 
 我们把一个接口类型值传入reflect.TypeOf函数，就可以得到与这个值的实际类型对应的反射类型值。
@@ -65,6 +71,7 @@ func (cMap *ConcurrentMap) Load(key interface{}) (value interface{}, ok bool) {
 
 再来说Store方法。Store方法接受两个参数key和value，它们的类型也都是interface{}。因此，我们的类型检查应该针对它们来做。
 
+```css
 func (cMap *ConcurrentMap) Store(key, value interface{}) {
  if reflect.TypeOf(key) != cMap.keyType {
   panic(fmt.Errorf("wrong key type: %v", reflect.TypeOf(key)))
@@ -74,6 +81,7 @@ func (cMap *ConcurrentMap) Store(key, value interface{}) {
  }
  cMap.m.Store(key, value)
 }
+```
 
 
 这里的类型检查代码与Load方法中的代码很类似，不同的是对检查结果的处理措施。当参数key或value的实际类型不符合要求时，Store方法会立即引发panic。
@@ -134,8 +142,10 @@ sync.Map中的read与dirty
 
 在这之后，一旦再有新的键值对存入，它就会依据只读字典去重建脏字典。这个时候，它会把只读字典中已被逻辑删除的键值对过滤掉。理所当然，这些转换操作肯定都需要在锁的保护下进行。
 
+```markdown
 -
 sync.Map中read与dirty的互换
+```
 
 综上所述，sync.Map的只读字典和脏字典中的键值对集合，并不是实时同步的，它们在某些时间段内可能会有不同。
 

@@ -1,10 +1,12 @@
 ---
 title: 29我应该迁移到HTTPS吗？
-date: 1739706057.3374302
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             29  我应该迁移到HTTPS吗？
                             今天是“安全篇”的最后一讲，我们已经学完了 HTTPS、TLS 相关的大部分知识。不过，或许你心里还会有一些困惑：
+```
 
 “HTTPS 这么复杂，我是否应该迁移到 HTTPS 呢？它能带来哪些好处呢？具体又应该怎么实施迁移呢？”
 
@@ -66,20 +68,26 @@ Google 等搜索巨头还利用自身的“话语权”优势，降低 HTTP 站�
 
 listen                443 ssl;
  
+```java
 ssl_certificate       xxx_rsa.crt;  #rsa2048 cert
 ssl_certificate_key   xxx_rsa.key;  #rsa2048 private key
+```
  
+```java
 ssl_certificate       xxx_ecc.crt;  #ecdsa cert
 ssl_certificate_key   xxx_ecc.key;  #ecdsa private ke
+```
 
 
 为了提高 HTTPS 的安全系数和性能，你还可以强制 Nginx 只支持 TLS1.2 以上的协议，打开“Session Ticket”会话复用：
 
 ssl_protocols               TLSv1.2 TLSv1.3;
  
+```text
 ssl_session_timeout         5m;
 ssl_session_tickets         on;
 ssl_session_ticket_key      ticket.key;
+```
 
 
 密码套件的选择方面，我给你的建议是以服务器的套件优先。这样可以避免恶意客户端故意选择较弱的套件、降低安全等级，然后密码套件向 TLS1.3“看齐”，只使用 ECDHE、AES 和 ChaCha20，支持“False Start”。
@@ -92,8 +100,10 @@ ssl_ciphers   ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RS
 
 如果你的服务器上使用了 OpenSSL 的分支 BorringSSL，那么还可以使用一个特殊的“等价密码组”（Equal preference cipher groups）特性，它可以让服务器配置一组“等价”的密码套件，在这些套件里允许客户端优先选择，比如这么配置：
 
+```text
 ssl_ciphers 
 [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305];
+```
 
 
 如果客户端硬件没有 AES 优化，服务器就会顺着客户端的意思，优先选择与 AES“等价”的 ChaCha20 算法，让客户端能够快一点。
@@ -116,10 +126,12 @@ ssl_ciphers
 
 这还是得用到 TLS 的“扩展”，给协议加个SNI（Server Name Indication）的“补充条款”。它的作用和 Host 字段差不多，客户端会在“Client Hello”时带上域名信息，这样服务器就可以根据名字而不是 IP 地址来选择证书。
 
+```text
 Extension: server_name (len=19)
     Server Name Indication extension
         Server Name Type: host_name (0)
         Server Name: www.chrono.com
+```
 
 
 Nginx 很早就基于 SNI 特性支持了 HTTPS 的虚拟主机，但在 OpenResty 里可还以编写 Lua 脚本，利用 Redis、MySQL 等数据库更灵活快速地加载证书。
@@ -130,8 +142,10 @@ Nginx 很早就基于 SNI 特性支持了 HTTPS 的虚拟主机，但在 OpenRes
 
 所以，我们就需要用到第 18 讲里的“重定向跳转”技术了，把不安全的 HTTP 网址用 301 或 302“重定向”到新的 HTTPS 网站，这在 Nginx 里也很容易做到，使用“return”或“rewrite”都可以。
 
+```text
 return 301 https://$host$request_uri;             # 永久重定向
 rewrite ^  https://$host$request_uri permanent;   # 永久重定向
+```
 
 
 但这种方式有两个问题。一个是重定向增加了网络成本，多出了一次请求；另一个是存在安全隐患，重定向的响应可能会被“中间人”窜改，实现“会话劫持”，跳转到恶意网站。
@@ -161,17 +175,21 @@ add_header Strict-Transport-Security max-age=15768000; #182.5days
 简单小结一下今天的内容：
 
 
+```text
 从 HTTP 迁移到 HTTPS 是“大势所趋”，能做就应该尽早做；
 升级 HTTPS 首先要申请数字证书，可以选择免费好用的“Let’s Encrypt”；
 配置 HTTPS 时需要注意选择恰当的 TLS 版本和密码套件，强化安全；
 原有的 HTTP 站点可以保留作为过渡，使用 301 重定向到 HTTPS。
+```
 
 
 课下作业
 
 
+```text
 结合你的实际工作，分析一下迁移 HTTPS 的难点有哪些，应该如何克服？
 参考上一讲，你觉得配置 HTTPS 时还应该加上哪些部分？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

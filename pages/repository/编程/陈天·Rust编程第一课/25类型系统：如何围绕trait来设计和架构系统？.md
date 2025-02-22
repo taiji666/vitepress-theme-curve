@@ -1,10 +1,12 @@
 ---
 title: 25类型系统：如何围绕trait来设计和架构系统？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             25 类型系统：如何围绕trait来设计和架构系统？
                             你好，我是陈天。
+```
 
 Trait，trait，trait，怎么又是 trait？how old are you?
 
@@ -24,6 +26,7 @@ Trait，trait，trait，怎么又是 trait？how old are you?
 
 在[第 5 讲]，thumbor 的项目里，我设计了一个 SpecTransform trait，通过它可以统一处理任意类型的、描述我们希望如何处理图片的 spec：
 
+```css
 // 一个 spec 可以包含上述的处理方式之一（这是 protobuf 定义）
 message Spec {
   oneof data {
@@ -36,24 +39,29 @@ message Spec {
     Watermark watermark = 7;
   }
 }
+```
 
 
 SpecTransform trait 的定义如下（代码）：
 
+```html
 // SpecTransform：未来如果添加更多的 spec，只需要实现它即可
 pub trait SpecTransform<T> {
     // 对图片使用 op 做 transform
     fn transform(&mut self, op: T);
 }
+```
 
 
 它可以用来对图片使用某个 spec 进行处理。
 
 但如果你阅读 GitHub 上的源码，你可能会发现一个没用到的文件 imageproc.rs 中类似的 trait（代码）：
 
+```css
 pub trait ImageTransform {
     fn transform(&self, image: &mut PhotonImage);
 }
+```
 
 
 这个 trait 是第一版的 trait。我依旧保留着它，就是想在此展示一下 trait 设计上的取舍。
@@ -64,10 +72,12 @@ hmm，这是个设计上的大问题啊。想想看，以目前所学的知识�
 
 对，泛型。我们可以使用泛型 trait 修改一下刚才那段代码：
 
+```html
 // 使用 trait 可以统一处理的接口，以后无论增加多少功能，只需要加新的 Spec，然后实现 ImageTransform 接口
 pub trait ImageTransform<Image> {
     fn transform(&self, image: &mut Image);
 }
+```
 
 
 把传入的 image 类型抽象成泛型类型之后，延迟了图片类型判断和支持的决策，可用性更高。
@@ -76,20 +86,24 @@ pub trait ImageTransform<Image> {
 
 你看，PhotonImage 下对于 Contrast 的 ImageTransform 的实现：
 
+```html
 impl ImageTransform<PhotonImage> for Contrast {
     fn transform(&self, image: &mut Image) {
         effects::adjust_contrast(image, self.contrast);
     }
 }
+```
 
 
 而同样的，PhotonImage 下对 Contract 的 SpecTransform 的实现：
 
+```cpp
 impl SpecTransform<&Contrast> for Photon {
     fn transform(&mut self, op: &Contrast) {
         effects::adjust_contrast(&mut self.0, op.contrast);
     }
 }
+```
 
 
 这两种方式基本上等价，但一个围绕着 Spec 展开，一个围绕着 Image 展开：-
@@ -122,13 +136,17 @@ let url = generate_url_with_spec(image_spec.into());
 
 就要比：
 
+```javascript
 let data = image_spec.encode_to_vec();
 let s = encode_config(data, URL_SAFE_NO_PAD);
 let url = generate_url_with_spec(s);
+```
 
 
+```text
 要简洁、自然得多。它把实现细节都屏蔽了起来，只让用户关心他们需要关心的逻辑。-
 所以，我们在设计 trait 的时候，除了关注功能，还要注意是否好用、易用。这也是为什么我们在介绍 KV server 的时候，不断强调，trait 在设计结束之后，不要先着急撰写实现 trait 的代码，而是最好先写一些对于 trait 使用的测试代码。
+```
 
 你在写这些测试代码的使用体验，就是别人在使用你的 trait 构建系统时的真实体验，如果它用起来别扭、啰嗦，不看文档就不容易用对，那这个 trait 本身还有待进一步迭代。
 
@@ -144,6 +162,7 @@ let url = generate_url_with_spec(s);
 
 在 Rust 里，桥接的工作可以通过函数来完成，但最好通过 trait 来桥接。继续看[第 5 讲]thumbor 里的另一个 trait Engine（代码）：
 
+```html
 // Engine trait：未来可以添加更多的 engine，主流程只需要替换 engine
 pub trait Engine {
     // 对 engine 按照 specs 进行一系列有序的处理
@@ -151,28 +170,35 @@ pub trait Engine {
     // 从 engine 中生成目标图片，注意这里用的是 self，而非 self 的引用
     fn generate(self, format: ImageOutputFormat) -> Vec<u8>;
 }
+```
 
 
 通过 Engine 这个 trait，我们把第三方的库 photon和自己设计的 Image Spec 连接起来，使得我们不用关心 Engine 背后究竟是什么，只需要调用 apply 和 generate 方法即可：
 
+```javascript
 // 使用 image engine 处理
 let mut engine: Photon = data
     .try_into()
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 engine.apply(&spec.specs);
 let image = engine.generate(ImageOutputFormat::Jpeg(85));
+```
 
 
 这段代码中，由于之前为 Photon 实现了 TryFrom，所以可以直接调用 try_into() 来得到一个 photon engine：
 
+```cpp
 // 从 Bytes 转换成 Photon 结构
 impl TryFrom<Bytes> for Photon {
     type Error = anyhow::Error;
+```
 
+```cpp
     fn try_from(data: Bytes) -> Result<Self, Self::Error> {
         Ok(Self(open_image_from_bytes(&data)?))
     }
 }
+```
 
 
 就桥接 thumbor 代码和 photon crate 而言，Engine 表现良好，它让我们不但很容易使用 photon crate，还可以很方便在未来需要的时候替换掉 photon crate。
@@ -181,6 +207,7 @@ impl TryFrom<Bytes> for Photon {
 
 可以为这个 trait 添加一个缺省的 create 方法：
 
+```html
 // Engine trait：未来可以添加更多的 engine，主流程只需要替换 engine
 pub trait Engine {
     // 生成一个新的 engine
@@ -197,33 +224,40 @@ pub trait Engine {
     // 从 engine 中生成目标图片，注意这里用的是 self，而非 self 的引用
     fn generate(self, format: ImageOutputFormat) -> Vec<u8>;
 }
+```
 
 
 注意看新 create 方法的约束：任何 T，只要实现了相应的 TryFrom/TryInto，就可以用这个缺省的 create() 方法来构造 Engine。
 
 有了这个接口后，上面使用 engine 的代码可以更加直观，省掉了第3行的try_into()处理：
 
+```javascript
 // 使用 image engine 处理
 let mut engine = Photon::create(data)
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 engine.apply(&spec.specs);
 let image = engine.generate(ImageOutputFormat::Jpeg(85));
+```
 
 
 桥接是架构中一个非常重要的思想，我们一定要掌握这个思想的精髓。
 
 再举个例子。比如现在想要系统可以通过访问某个 REST API，得到用户自己发布的、按时间顺序倒排的朋友圈。怎么写这段代码呢？最简单粗暴的方式是：
 
+```javascript
 let secret_api = api_with_user_token(&user, params);
 let data: Vec<Status> = reqwest::get(secret_api)?.json()?;
+```
 
 
 更好的方式是使用 trait 桥接来屏蔽实现细节：
 
+```html
 pub trait FriendCircle {
 	  fn get_published(&self, user: &User) -> Result<Vec<Status>, FriendCircleError>;
     ... 
 }
+```
 
 
 这样，我们的业务逻辑代码可以围绕着这个接口展开，而无需关心它具体的实现是来自 REST API，还是其它什么地方；也不用关心实现做没做 cache、有没有重传机制、具体都会返回什么样的错误（FriendCircleError 就已经提供了所有的出错可能）等等。
@@ -232,6 +266,7 @@ pub trait FriendCircle {
 
 继续看刚才的Engine 代码，在 Engine 和 T 之间通过 TryInto trait 进行了解耦，使得调用者可以灵活处理他们的 T：
 
+```html
 pub trait Engine {
     // 生成一个新的 engine
     fn create<T>(data: T) -> Result<Self>
@@ -244,6 +279,7 @@ pub trait Engine {
     }
     ...
 }
+```
 
 
 这里还体现了trait 在设计中，另一个很重要的作用，控制反转。
@@ -254,6 +290,7 @@ pub trait Engine {
 
 使用 trait 做控制反转另一个例子是[第 6 讲]中的 Dialect trait（代码）：
 
+```cpp
 pub trait Dialect: Debug + Any {
     /// Determine if a character starts a quoted identifier. The default
     /// implementation, accepting "double quoted" ids is both ANSI-compliant
@@ -268,16 +305,20 @@ pub trait Dialect: Debug + Any {
     /// Determine if a character is a valid unquoted identifier character
     fn is_identifier_part(&self, ch: char) -> bool;
 }
+```
 
 
 我们只需要为自己的 SQL 方言实现 Dialect trait：
 
+```css
 // 创建自己的 sql 方言。TyrDialect 支持 identifier 可以是简单的 url
 impl Dialect for TyrDialect {
     fn is_identifier_start(&self, ch: char) -> bool {
         ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
     }
+```
 
+```css
     // identifier 可以有 ':', '/', '?', '&', '='
     fn is_identifier_part(&self, ch: char) -> bool {
         ('a'..='z').contains(&ch)
@@ -286,6 +327,7 @@ impl Dialect for TyrDialect {
             || [':', '/', '?', '&', '=', '-', '_', '.'].contains(&ch)
     }
 }
+```
 
 
 就可以让 sql parser 解析我们的 SQL 方言：
@@ -310,11 +352,13 @@ let ast = Parser::parse_sql(&TyrDialect::default(), sql.as_ref())?;
 在做面向对象设计时，我们经常会探讨 SOLID 原则：
 
 
+```text
 SRP：单一职责原则，是指每个模块应该只负责单一的功能，不应该让多个功能耦合在一起，而是应该将其组合在一起。
 OCP：开闭原则，是指软件系统应该对修改关闭，而对扩展开放。
 LSP：里氏替换原则，是指如果组件可替换，那么这些可替换的组件应该遵守相同的约束，或者说接口。
 ISP：接口隔离原则，是指使用者只需要知道他们感兴趣的方法，而不该被迫了解和使用对他们来说无用的方法或者功能。
 DIP：依赖反转原则，是指某些场合下底层代码应该依赖高层代码，而非高层代码去依赖底层代码。
+```
 
 
 虽然 Rust 不是一门面向对象语言，但这些思想都是通用的。
@@ -322,15 +366,19 @@ DIP：依赖反转原则，是指某些场合下底层代码应该依赖高层�
 在过去的课程中，我一直强调 SRP 和 OCP。你看[第 6 讲]的 Fetch/Load trait，它们都只负责一个很简单的动作：
 
 #[async_trait]
+```cpp
 pub trait Fetch {
     type Error;
     async fn fetch(&self) -> Result<String, Self::Error>;
 }
+```
 
+```cpp
 pub trait Load {
     type Error;
     fn load(self) -> Result<DataSet, Self::Error>;
 }
+```
 
 
 以 Fetch 为例，我们先实现了 UrlFetcher，后来又根据需要，实现了 FileFetcher。
@@ -339,11 +387,13 @@ FileFetcher 的实现并不会对 UrlFetcher 的实现代码有任何影响，�
 
 前面提到的 SpecTransform/Engine trait，包括 [21 讲]中 KV server 里涉及的 CommandService trait：
 
+```css
 /// 对 Command 的处理的抽象
 pub trait CommandService {
     /// 处理 Command，返回 Response
     fn execute(self, store: &impl Storage) -> CommandResponse;
 }
+```
 
 
 也是 SRP 和 OCP 原则的践行者。
@@ -377,11 +427,13 @@ Component trait 可以做 trait object 么？
 
 如果你之前有前端开发的经验，比较一下 React/Vue/Elm component 和 yew component 的区别？
 
+```css
 yew on  master via 🦀 v1.55.0
 ❯ rgrep “pub trait” “*/.rs”
 examples/router/src/generator.rs
    155:1   pub trait Generated: Sized {
 packages/yew/src/html/component/mod.rs
+```
 
 42:1   pub trait Component: Sized + 'static {
 
@@ -389,24 +441,30 @@ packages/yew/src/html/component/properties.rs
 
  6:1   pub trait Properties: PartialEq {
 
+```css
 examples/boids/src/math.rs
    128:1   pub trait WeightedMean: Sized {
    152:1   pub trait Mean: Sized {
 packages/yew/src/functional/mod.rs
+```
 
 69:1   pub trait FunctionProvider {
 
 packages/yew/src/html/conversion.rs
 
+```html
  5:1   pub trait ImplicitClone: Clone {}
 18:1   pub trait IntoPropValue<T> {
+```
 
 packages/yew/src/html/listener/mod.rs
 
 27:1   pub trait TargetCast
 
+```css
 136:1   pub trait IntoEventCallback {
 packages/yew/src/scheduler.rs
+```
 
 11:1   pub trait Runnable {
 
@@ -416,37 +474,47 @@ packages/yew-router/src/routable.rs
 
 packages/yew-agent/src/pool.rs
 
+```css
 60:1   pub trait Dispatched: Agent + Sized + 'static {
 78:1   pub trait Dispatchable {}
+```
 
+```css
 packages/yew/src/html/component/scope.rs
    508:1   pub trait SendAsMessage {
 packages/yew-macro/src/stringify.rs
+```
 
 16:1   pub trait Stringify {
 
 packages/yew-agent/src/lib.rs
 
+```html
 22:1   pub trait Agent: Sized + 'static {
 82:1   pub trait Discoverer {
 92:1   pub trait Bridge<AGN: Agent> {
 98:1   pub trait Bridged: Agent + Sized + 'static {
+```
 
 packages/yew-agent/src/utils/store.rs
 
 20:1   pub trait Store: Sized + 'static {
 
+```css
 138:1   pub trait Bridgeable: Sized + ‘static {
 packages/yew-macro/src/html_tree/mod.rs
    178:1   pub trait ToNodeIterator {
 packages/yew/src/virtual_dom/listeners.rs
+```
 
 42:1   pub trait Listener {
 
 packages/yew-agent/src/worker/mod.rs
 
+```css
 17:1   pub trait Threaded {
 24:1   pub trait Packed {
+```
 
 
 

@@ -1,10 +1,12 @@
 ---
 title: 39高性能的关键：shareddict缓存和lru缓存
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             39 高性能的关键：shared dict 缓存和 lru 缓存
                             你好，我是温铭。
+```
 
 在前面几节课中，我已经把 OpenResty 自身的优化技巧和性能调优的工具都介绍过了，分别涉及到字符串、table、Lua API、LuaJIT、SystemTap、火焰图等。
 
@@ -23,21 +25,27 @@ categories: [OpenResty从入门到实战]
 一般来说，缓存有两个原则。
 
 
+```text
 一是越靠近用户的请求越好。比如，能用本地缓存的就不要发送 HTTP 请求，能用 CDN 缓存的就不要打到源站，能用 OpenResty 缓存的就不要打到数据库。
 二是尽量使用本进程和本机的缓存解决。因为跨了进程和机器甚至机房，缓存的网络开销就会非常大，这一点在高并发的时候会非常明显。
+```
 
 
 自然，在OpenResty 中，缓存的设计和使用也遵循这两个原则。OpenResty 中有两个缓存的组件：shared dict 缓存和 lru 缓存。前者只能缓存字符串对象，缓存的数据有且只有一份，每一个 worker 都可以进行访问，所以常用于 worker 之间的数据通信。后者则可以缓存所有的 Lua 对象，但只能在单个 worker 进程内访问，有多少个 worker，就会有多少份缓存数据。
 
 下面这两个简单的表格，可以说明 shared dict 和 lru 缓存的区别：
 
+```markdown
 -
 -
 shared dict 和 lru 缓存，并没有哪一个更好的说法，而是应该根据你的场景来配合使用。
+```
 
 
+```text
 如果你没有 worker 之间共享数据的需求，那么lru 可以缓存数组、函数等复杂的数据类型，并且性能最高，自然是首选。
 但如果你需要在 worker 之间共享数据，那就可以在 lru 缓存的基础上，加上 shared dict 的缓存，构成两级缓存的架构。
+```
 
 
 接下来，我们具体来看看这两种缓存方式。
@@ -46,9 +54,11 @@ shared dict 和 lru 缓存，并没有哪一个更好的说法，而是应该根
 
 在 Lua 章节中，我们已经对 shared dict 做了具体的介绍，这里先简单回顾下它的使用方法：
 
+```bash
 $ resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
                                dict:set("Tom", 56)
                                print(dict:get("Tom"))'
+```
 
 
 你需要事先在 Nginx 的配置文件中，声明一个内存区 dogs，然后在 Lua 代码中才可以使用。如果你在使用的过程中，发现给 dogs 分配的空间不够用，那么是需要先修改 Nginx 配置文件，然后重新加载 Nginx 才能生效的。因为我们并不能在运行时进行扩容和缩容。
@@ -59,9 +69,11 @@ $ resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
 
 第一个问题，缓存数据的序列化。由于共享字典中只能缓存字符串对象，所以，如果你想要缓存数组，就少不了要在 set 的时候要做一次序列化，在 get 的时候做一次反序列化：
 
+```python
 resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
                         dict:set("Tom", require("cjson").encode({a=111}))
                         print(require("cjson").decode(dict:get("Tom")).a)'
+```
 
 
 不过，这类序列化和反序列化操作是非常消耗 CPU 资源的。如果每个请求都有那么几次这种操作，那么，在火焰图上你就能很明显地看到它们的消耗。
@@ -76,11 +88,13 @@ stale 数据
 
 共享字典中还有一个 get_stale 的读取数据的方法，相比 get 方法，多了一个过期数据的返回值：
 
+```python
 resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
                             dict:set("Tom", 56, 0.01)
                             ngx.sleep(0.02)
                              local val, flags, stale = dict:get_stale("Tom")
                             print(val)'
+```
 
 
 在上面的这个示例中，数据只在共享字典中缓存了 0.01 秒，在 set 后的 0.02 秒后，数据就已经超时了。这时候，通过 get 接口就不会获取到数据了，但通过 get_stale 还可能获取到过期的数据。这里我之所以用“可能”两个字，是因为过期数据所占用的空间，是有一定几率被回收，再给其他数据使用的，这也就是 LRU 算法。
@@ -90,8 +104,10 @@ resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
 举个例子，数据源存储在 MySQL 中，我们从 MySQL 中获取到数据后，在 shared dict 中设置了 5 秒超时，那么，当这个数据过期后，我们就会有两个选择：
 
 
+```text
 当这个数据不存在时，重新去 MySQL 中再查询一次，把结果放到缓存中；
 判断 MySQL 的数据是否发生了变化，如果没有变化，就把缓存中过期的数据读取出来，修改它的过期时间，让它继续生效。
+```
 
 
 很明显，后者是更优化的方案，这样可以尽可能少地去和 MySQL 交互，让终端的请求都从最快的缓存中获取数据。
@@ -102,37 +118,45 @@ lru 缓存
 
 lru 缓存的接口只有 5 个：new、set、get、delete 和 flush_all。和上面问题相关的就只有 get 接口，让我们先来了解下这个接口是如何使用的：
 
+```python
 resty -e 'local lrucache = require "resty.lrucache"
 local cache, err = lrucache.new(200)
 cache:set("dog", 32, 0.01)
 ngx.sleep(0.02)
 local data, stale_data = cache:get("dog")
 print(stale_data)'
+```
 
 
 你可以看到，在lru 缓存中， get 接口的第二个返回值直接就是 stale_data，而不是像 shared dict 那样分为了 get 和 get_stale 两个不同的 API。这样的接口封装，对于使用过期数据来说显然更加友好。
 
 在实际的项目中，我们一般推荐使用版本号来区分不同的数据，这样，在数据发声变化后，它的版本号也就跟着变了。比如，在 etcd 中的 modifiedIndex ，就可以拿来当作版本号，来标记数据是否发生了变化。有了版本号的概念后，我们就可以对 lru 缓存做一个简单的二次封装，比如来看下面的伪码，摘自https://github.com/iresty/apisix/blob/master/lua/apisix/core/lrucache.lua ：
 
+```text
 local function (key, version, create_obj_fun, ...)
     local obj, stale_obj = lru_obj:get(key)
     -- 如果数据没有过期，并且版本没有变化，就直接返回缓存数据
     if obj and obj._cache_ver == version then
         return obj
     end
+```
 
+```text
     -- 如果数据已经过期，但还能获取到，并且版本没有变化，就直接返回缓存中的过期数据
     if stale_obj and stale_obj._cache_ver == version then
         lru_obj:set(key, obj, item_ttl)
         return stale_obj
     end
+```
 
+```text
     -- 如果找不到过期数据，或者版本号有变化，就从数据源获取数据
     local obj, err = create_obj_fun(...)
     obj._cache_ver = version
     lru_obj:set(key, obj, item_ttl)
     return obj, err
 end
+```
 
 
 从这段代码中你可以看到，我们通过引入版本号的概念，在版本号没有变化的情况下，充分利用了过期数据来减少对数据源的压力，达到了性能的最优。

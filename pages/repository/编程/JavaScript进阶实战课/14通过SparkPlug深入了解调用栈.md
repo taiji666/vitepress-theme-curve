@@ -1,10 +1,12 @@
 ---
 title: 14通过SparkPlug深入了解调用栈
-date: 1739706057.605278
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             14 通过SparkPlug深入了解调用栈
                             你好，我是石川。
+```
 
 在第11讲的时候，我们通过函数中的闭包了解了栈和堆这两种数据结构。在12讲中，我们通过递归了解了函数在调用栈中的循环执行。那么今天，我们再通过V8的Sparkplug编译器来深入的了解下JavaScript引擎中的调用栈，其中栈帧（stack frame），栈指针（stack pointer）和帧指针（frame pointer）的概念。
 
@@ -34,10 +36,12 @@ categories: [JavaScript进阶实战课]
 
 第二个方法是Sparkplug不会像TurboFan那样生成任何中间码 (IR)。什么是IR呢？它是一种从抽象到具象的分层结构。在具象中可以对具体内容比如新的ES标准，或特定机器比如IBM、ARM或Intel做特殊的机器码生成。TurboFan用的是基于节点海思想的IR。TurboFan在接受到Ignition的指示后，会进行优化处理，并生成针对于平台的机器代码。相反，Sparkplug在字节码上的单次线性传递中直接编译为机器码，产出与该字节码执行相匹配的代码。所以事实上，整个Sparkplug编译器是一个for循环内的switch语句，分配到基于每个固定的字节码的机器码的生成函数上。
 
+```text
 //  Sparkplug 编译器的部分代码
 for (; !iterator.done(); iterator.Advance()) {
   VisitSingleBytecode();
 }
+```
 
 
 IR的缺失意味着除了非常有限的窥孔优化外，Sparkplug的优化机会有限。这就是说因为它没有独立于架构的中间阶段，所以必须将整个实现分别移植到支持的每个架构中。但是实际上呢，这些都不是问题，因为Sparkplug是一个简单快速的编译器，所以代码很容易移植；而且因为在工作流中还是有TurboFan的，所以不需要进行大量优化。并且我们看到TurboFan的反优化会回到SparkPlug，而不是Ignition。
@@ -91,8 +95,10 @@ Sparkplug实际的代码很少，基本工作就是内置模块调用和控制�
 参考
 
 
+```text
 V8 博客：https://v8.dev/blog/sparkplug
 隔壁班宫文学老师的课程：《编译原理之美》
+```
 
 
                         

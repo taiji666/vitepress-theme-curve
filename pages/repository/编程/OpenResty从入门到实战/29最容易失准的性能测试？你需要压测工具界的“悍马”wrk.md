@@ -1,10 +1,12 @@
 ---
 title: 29最容易失准的性能测试？你需要压测工具界的“悍马”wrk
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             29 最容易失准的性能测试？你需要压测工具界的“悍马”wrk
                             你好，我是温铭。
+```
 
 在测试章节的最后一节课，我和你来聊聊性能测试。这部分内容并非 OpenResty 独有，对于其他的后端服务来说，都是一样适用的。
 
@@ -47,8 +49,10 @@ wrk -t12 -c400 -d30s http://127.0.0.1:8080/index.html
 
 我们通过下面这个命令，查看 SELinux 是否开启：
 
+```bash
 $ sestatus
 SELinux status: disabled
+```
 
 
 如果显示是开启的（enforcing），你可以通过$ setenforce 0来临时关闭；同时修改 /etc/selinux/config 文件来永久关闭，将 SELINUX=enforcing 改为 SELINUX=disabled。
@@ -57,15 +61,19 @@ SELinux status: disabled
 
 然后，你需要用下面的命令，查看下当前系统的全局最大打开文件数：
 
+```bash
 $ cat /proc/sys/fs/file-nr
 3984 0 3255296
+```
 
 
 这里的最后一个数字，就是最大打开文件数。如果你的机器中这个数字比较小，那就需要修改 /etc/sysctl.conf 文件来增大：
 
+```text
 fs.file-max = 1020000
 net.ipv4.ip_conntrack_max = 1020000
 net.ipv4.netfilter.ip_conntrack_max = 1020000
+```
 
 
 修改完以后，还需要重启系统服务来生效：
@@ -77,8 +85,10 @@ sudo sysctl -p /etc/sysctl.conf
 
 除了系统的全局最大打开文件数，一个进程可以打开的文件数也是有限制的，你可以通过命令 ulimit 来查看：
 
+```bash
 $ ulimit -n
 1024
+```
 
 
 你会发现，这个值默认是 1024，是一个很低的数值。因为每一个用户请求都会对应着一个文件句柄，而压力测试会产生大量的请求，所以我们需要增大这个数值，把它改为百万级别，你可以用下面的命令来临时修改：
@@ -88,17 +98,21 @@ $ ulimit -n 1024000
 
 也可以修改配置文件 /etc/security/limits.conf 来永久生效：
 
+```markdown
 * hard nofile 1024000
 * soft nofile 1024000
+```
 
 
 检查项四：Nginx 配置
 
 最后，你还需要对 Nginx 的配置，做一个小的修改，也就是下面这两行代码的操作：
 
+```css
 events {
     worker_connections 10240;
 }
+```
 
 
 这样，我们就可以把每个 worker 的连接数增大了。因为它的默认值只有 512，这在大压力的测试下显然是不够的。
@@ -115,8 +129,10 @@ events {
 
 这个工具的使用也很简单。我们分别启动一个 server 和 client，对应着监听 7000 端口的服务端程序，以及发起压力测试的客户端程序，目的是为了模拟真实环境下的压力测试：
 
+```text
 ./server 7000
 ./client 127.0.0.1 7000
+```
 
 
 紧接着，client 会向 server 发送请求，检测当前的系统环境能否支持 100 万并发连接。你可以自己去运行一下，看看结果。
@@ -131,6 +147,7 @@ events {
 
 好了，到现在，万事俱备，只欠东风了。让我们开始用 wrk 来做压力测试吧！
 
+```bash
 $ wrk -d 30 http://127.0.0.2:9080/hello
 Running 30s test @ http://127.0.0.2:9080/hello
   2 threads and 10 connections
@@ -140,6 +157,7 @@ Running 30s test @ http://127.0.0.2:9080/hello
   499149 requests in 30.10s, 124.22MB read
 Requests/sec:  16582.76
 Transfer/sec:      4.13MB
+```
 
 
 这里，我并没有指定参数，所以wrk会默认启动 2 个线程和 10 个长连接。其实，你也并不需要把wrk 的线程数和连接数调整得很大，只要能够让目标程序跑满 CPU 就达到要求了。
@@ -149,8 +167,10 @@ Transfer/sec:      4.13MB
 从现象上来看，如果 CPU 满载，而且压测停止后，CPU 和内存占用迅速降低，那么恭喜你，这次压测顺利完成。但如果有下面这样的异常，作为服务端开发的你就得特别留意了。
 
 
+```text
 CPU 不能满载。这不会是 wrk 的问题，可能是网络的限制，更可能是你的代码中有阻塞的操作。你可以通过 review 代码来确定，也可以使用 off CPU 火焰图来确定。
 CPU 一直满载，即使压测停止仍然如此。这说明在代码中存在热循环，可能是正则表达式引起的，也可能是 LuaJIT 的 bug 引起的，这两点都是我在真实的环境中遇到过的问题。这时，你就需要用 on CPU 火焰图来确定了。
+```
 
 
 最后再来一起看下 wrk 的统计结果。关于这个结果，我们一般会关注两个值：
@@ -161,11 +181,13 @@ CPU 一直满载，即使压测停止仍然如此。这说明在代码中存在�
 
 另外， wrk 还提供了 latency 参数，可以把延时的分布百分比详细地打印出来，比如：
 
+```text
 Latency Distribution
      50%  134.00us
      75%  180.00us
      90%  247.00us
      99%  552.00us
+```
 
 
 不过，wrk 的延时分布数据并不准确，因为它人为地加入了网络和工具的扰动，放大了延时，这一点需要你特别注意。关于wrk Latency Distribution，你可以通过我以前写的这篇文章来了解详细内容。

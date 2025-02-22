@@ -1,10 +1,12 @@
 ---
 title: 大咖助场开悟之坡（上）：Rust的现状、机遇与挑战
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             大咖助场 开悟之坡（上）：Rust的现状、机遇与挑战
                             你好，我是张汉东。
+```
 
 本月应陈天兄邀请，为他的极客时间课程写一篇加餐文章。2021 年也马上要过去了，我也正好借此机会对 Rust 语言的现状、机遇和挑战来做一次盘点，希望给正在学习 Rust 的朋友提供一个全局视角。这篇文章包含一些客观的数据，也有一些个人观点，仅供参考。
 
@@ -27,9 +29,11 @@ Rust 现状
 Rust 语言 2015年发布 1.0 稳定版开始，已经连续发布了两大版次 2018 Edition 和 2021 Edition。
 
 
+```text
 2015 Edition：Rust 0.1.0 ~ Rust 1.0 稳定版，主题是 “稳定性”
 2018 Edition：Rust 1.0 ~ 1.31.0 稳定版，主题是 “生产力”
 2021 Edition: Rust 1.31.0 ~ 1.56.0 稳定版，主题是“成熟”
+```
 
 
 可以说，Rust 语言已经足够成熟到能将其应用于生产环境。但是判断一门编程语言的成熟度，其实还有很多讲究。
@@ -93,6 +97,7 @@ StackOverflow 问题数量：Rust 相关问题一共有 24924 个，平均每周
 Rust的应用场景基本可以同时覆盖 C/Cpp/Java/Go/Python 的应用领域。大致可以分成十大领域：
 
 
+```text
 数据处理与服务。 代表产品和项目包括：TiKV/Timely Dataflow/Vector/tantivy/tremor-rs/databend等
 云原生。代表产品和项目包括： StratoVirt/Firecracker/Krustlet/linkerd2-proxy/Lucet/WasmCloud/Habitat 等
 操作系统： Rust for Linux/Coreutils/Occulum/Redox/Tock/Theseus 等
@@ -103,6 +108,7 @@ Rust的应用场景基本可以同时覆盖 C/Cpp/Java/Go/Python 的应用领域
 区块链/元宇宙： Diem/Substrate /Nervos CKB/Near/ Solana/nannou/makepad/makepad 等
 安全：rustscan/feroxbuster/rusty-tor /sn0int/sniffglue 等
 其他语言生态基础设施：比如 swc/deno/rome 等前端基础设施工具，WebAssembly 技术等。
+```
 
 
 可持续发展能力
@@ -148,9 +154,11 @@ Rust 造就了哪些工作岗位需求
 基本上目前全球Rust岗位招聘，种类已经非常多了，按数量排名前三的：
 
 
+```text
 区块链/ 量化金融/银行业
 基础设施（云原生平台开发）： 数据库/存储/数据服务/操作系统/容器/分布式系统
 平台工具类： 远程桌面/远程服务类产品/SaaS/远程工作类产品（比如Nexthink）
+```
 
 
 还有AI/机器学习/机器人、客户端跨平台组件开发、区块链安全/ 信息安全的安全工程师、嵌入式工程师、广告服务商类比如 Adinmo、音视频实时通信工程师，以及电商平台、软件咨询。

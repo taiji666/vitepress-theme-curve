@@ -1,10 +1,12 @@
 ---
 title: 10JIT编译器的死穴：为什么要避免使用NYI？
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             10 JIT编译器的死穴：为什么要避免使用 NYI ？
                             你好，我是温铭。
+```
 
 上一节，我们一起了解了 LuaJIT 中的 FFI。如果你的项目中只用到了 OpenResty 提供的 API，没有自己调用 C 函数的需求，那么 FFI 对你而言并没有那么重要，你只需要确保开启了 lua-resty-core 即可。
 
@@ -44,8 +46,10 @@ NYI 的替代方案
 
 第一个我们来看string.gsub() 函数。它是 Lua 内置的字符串操作函数，作用是做全局的字符串替换，比如下面这个例子：
 
+```bash
 $ resty -e 'local new = string.gsub("banana", "a", "A"); print(new)'
 bAnAnA
+```
 
 
 这个函数是一个 NYI 原语，无法被 JIT 编译。
@@ -95,16 +99,20 @@ ngx.re.find("foo bar", "^foo", "jo")
 
 第三个我们来看unpack() 函数。unpack() 也是要避免使用的函数，特别是不要在循环体中使用。你可以改用数组的下标去访问，比如下面代码的这个例子：
 
+```bash
 $ resty -e '
  local a = {100, 200, 300, 400}
  for i = 1, 2 do
     print(unpack(a))
  end'
+```
 
+```bash
 $ resty -e 'local a = {100, 200, 300, 400}
  for i = 1, 2 do
     print(a[1], a[2], a[3], a[4])
  end'
+```
 
 
 让我们再深究一下 unpack，这次我们可以用restydoc 来搜索一下：
@@ -123,8 +131,10 @@ $ restydoc -s unpack
 说完这四个例子，我们来总结一下，要想规避 NYI 原语的使用，你需要注意下面这两点：
 
 
+```text
 请优先使用 OpenResty 提供的 API，而不是 Lua 的标准库函数。这里要牢记， Lua 是嵌入式语言，我们实际上是在 OpenResty 中编程，而不是 Lua。
 如果万不得已要使用 NYI 原语，请一定确保它没有在代码热路径上。
+```
 
 
 如何检测 NYI？
@@ -141,30 +151,37 @@ $ restydoc -s unpack
 
 我们可以先在 init_by_lua 中，添加以下两行代码：
 
+```text
 local v = require "jit.v"
 v.on("/tmp/jit.log")
+```
 
 
 然后，运行你自己的压力测试工具，或者跑几百个单元测试集，让 LuaJIT 足够热，触发 JIT 编译。这些都完成后，再来检查 /tmp/jit.log 的结果。
 
 当然，这个方法相对比较繁琐，如果你想要简单验证的话， 使用 resty 就足够了，这个 OpenResty 的 CLI 带有相关选项：
 
+```text
 $resty -j v -e 'for i=1, 1000 do
       local newstr, n, err = ngx.re.gsub("hello, world", "([a-z])[a-z]+", "[$0,$1]", "i")
  end'
  [TRACE   1 (command line -e):1 stitch C:107bc91fd]
  [TRACE   2 (1/stitch) (command line -e):2 -> 1]
+```
 
 
 其中，resty 的 -j 就是和 LuaJIT 相关的选项；后面的值为 dump 和 v，就对应着开启 jit.dump 和 jit.v 模式。
 
 在 jit.v 模块的输出中，每一行都是一个成功编译的 trace 对象。刚刚是一个能够被 JIT 的例子，而如果遇到 NYI 原语，输出里面就会指明 NYI，比如下面这个 pairs 的例子：
 
+```text
 $resty -j v -e 'local t = {}
  for i=1,100 do
      t[i] = i
  end
+```
 
+```text
  for i=1, 1000 do
      for j=1,1000 do
          for k,v in pairs(t) do
@@ -172,12 +189,15 @@ $resty -j v -e 'local t = {}
          end
      end
  end'
+```
 
 
 它就不能被 JIT，所以结果里，指明了第 8 行中有 NYI 原语。
 
+```text
  [TRACE   1 (command line -e):2 loop]
  [TRACE --- (command line -e):7 -- NYI: bytecode 72 at (command line -e):8]
+```
 
 
 写在最后

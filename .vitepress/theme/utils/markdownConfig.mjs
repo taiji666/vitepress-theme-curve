@@ -2,6 +2,12 @@ import { tabsMarkdownPlugin } from "vitepress-plugin-tabs";
 import markdownItAttrs from "markdown-it-attrs";
 import container from "markdown-it-container";
 
+
+// markdown-it-flexible-containers
+// import 'markdown-it-flexible-containers';
+
+
+
 // markdown-it
 const markdownConfig = (md, themeConfig) => {
   // 插件
@@ -118,6 +124,34 @@ const markdownConfig = (md, themeConfig) => {
     }
     return fence(...args);
   };  
+  //语法错误
+  // md.options.html = true
+  // md.options.quiet = true // 这会让 markdown-it 在遇到非致命错误时继续运行
+  // containerTypes.forEach(type => {
+  //   md.use(markdownItContainer, type, {
+  //     validate: (params) => params.trim().startsWith(type),
+  //     render: (tokens, idx) => {
+  //       try {
+  //         const token = tokens[idx];
+  //         // 处理开始标签
+  //         if (token.nesting === 1) {
+  //           return `<div class="${type}">\n`;
+  //         }
+  //         // 处理结束标签
+  //         else {
+  //           return '</div>\n';
+  //         }
+  //       } catch (err) {
+  //         // 捕获并输出警告，而非抛出错误
+  //         console.warn(`Error in ${type} container:`, err);
+  //         return ''; // 返回空内容避免中断
+  //       }
+  //     }
+  //   });
+  // });
+  
+  // md.use(require('markdown-it-flexible-containers'));
+
 };
 
 export default markdownConfig;

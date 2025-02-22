@@ -1,10 +1,12 @@
 ---
 title: 18if语句、for语句和switch语句
-date: 1739706057.6533997
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             18 if语句、for语句和switch语句
                             在上两篇文章中，我主要为你讲解了与go语句、goroutine和Go语言调度器有关的知识和技法。
+```
 
 内容很多，你不用急于完全消化，可以在编程实践过程中逐步理解和感悟，争取夯实它们。
 
@@ -18,6 +20,7 @@ categories: [Go核心36讲]
 本问题中的代码都被放在了命令源码文件demo41.go的main函数中的。为了专注问题本身，本篇文章中展示的编程题会省略掉一部分代码包声明语句、代码包导入语句和main函数本身的声明部分。
 
 
+```css
 numbers1 := []int{1, 2, 3, 4, 5, 6}
 for i := range numbers1 {
 	if i == 3 {
@@ -25,6 +28,7 @@ for i := range numbers1 {
 	}
 }
 fmt.Println(numbers1)
+```
 
 
 我先声明了一个元素类型为int的切片类型的变量numbers1，在该切片中有6个元素值，分别是从1到6的整数。我用一条携带range子句的for语句去迭代numbers1变量中的所有元素值。
@@ -55,6 +59,7 @@ fmt.Println(numbers1)
 
 现在，我稍稍修改一下上面的代码。我们再来估算一下打印内容。
 
+```css
 numbers2 := [...]int{1, 2, 3, 4, 5, 6}
 maxIndex2 := len(numbers2) - 1
 for i, e := range numbers2 {
@@ -65,6 +70,7 @@ for i, e := range numbers2 {
 	}
 }
 fmt.Println(numbers2)
+```
 
 
 注意，我把迭代的对象换成了numbers2。numbers2中的元素值同样是从1到6的6个整数，并且元素类型同样是int，但它是一个数组而不是一个切片。
@@ -78,8 +84,10 @@ fmt.Println(numbers2)
 这里需要注意两点：
 
 
+```text
 range表达式只会在for语句开始执行时被求值一次，无论后边会有多少次迭代；
 range表达式的求值结果会被复制，也就是说，被迭代的对象是range表达式结果值的副本而不是原值。
+```
 
 
 基于这两个规则，我们接着往下看。在第一次迭代时，我改变的是numbers2的第二个元素的值，新值为3，也就是1和2之和。
@@ -100,6 +108,7 @@ range表达式的求值结果会被复制，也就是说，被迭代的对象是
 
 先来看一段代码。
 
+```css
 value1 := [...]int8{0, 1, 2, 3, 4, 5, 6}
 switch 1 + 3 {
 case value1[0], value1[1]:
@@ -109,6 +118,7 @@ case value1[2], value1[3]:
 case value1[4], value1[5], value1[6]:
 	fmt.Println("4 or 5 or 6")
 }
+```
 
 
 我先声明了一个数组类型的变量value1，该变量的元素类型是int8。在后边的switch语句中，被夹在switch关键字和左花括号{之间的是1 + 3，这个位置上的代码被称为switch表达式。这个switch语句还包含了三个case子句，而每个case子句又各包含了一个case表达式和一条打印语句。
@@ -135,6 +145,7 @@ case value1[4], value1[5], value1[6]:
 
 再来看一段很类似的代码：
 
+```css
 value2 := [...]int8{0, 1, 2, 3, 4, 5, 6}
 switch value2[4] {
 case 0, 1:
@@ -144,6 +155,7 @@ case 2, 3:
 case 4, 5, 6:
 	fmt.Println("4 or 5 or 6")
 }
+```
 
 
 其中的变量value2与value1的值是完全相同的。但不同的是，我把switch表达式换成了value2[4]，并把下边那三个case表达式分别换为了case 0, 1、case 2, 3和case 4, 5, 6。
@@ -170,6 +182,7 @@ switch语句会进行有限的类型转换，但肯定不能保证这种转换�
 
 正因为如此，switch语句不允许case表达式中的子表达式结果值存在相等的情况，不论这些结果值相等的子表达式，是否存在于不同的case表达式中，都会是这样的结果。具体请看这段代码：
 
+```css
 value3 := [...]int8{0, 1, 2, 3, 4, 5, 6}
 switch value3[4] {
 case 0, 1, 2:
@@ -179,6 +192,7 @@ case 2, 3, 4:
 case 4, 5, 6:
 	fmt.Println("4 or 5 or 6")
 }
+```
 
 
 变量value3的值同value1，依然是由从0到6的7个整数组成的数组，元素类型是int8。switch表达式是value3[4]，三个case表达式分别是case 0, 1, 2、case 2, 3, 4和case 4, 5, 6。
@@ -187,6 +201,7 @@ case 4, 5, 6:
 
 比如，子表达式1+1和2不能同时出现，1+3和4也不能同时出现。有了这个约束的约束，我们就可以想办法绕过这个对子表达式的限制了。再看一段代码：
 
+```css
 value5 := [...]int8{0, 1, 2, 3, 4, 5, 6}
 switch value5[4] {
 case value5[0], value5[1], value5[2]:
@@ -196,6 +211,7 @@ case value5[2], value5[3], value5[4]:
 case value5[4], value5[5], value5[6]:
 	fmt.Println("4 or 5 or 6")
 }
+```
 
 
 变量名换成了value5，但这不是重点。重点是，我把case表达式中的常量都换成了诸如value5[0]这样的索引表达式。
@@ -204,6 +220,7 @@ case value5[4], value5[5], value5[6]:
 
 不过，这种绕过方式对用于类型判断的switch语句（以下简称为类型switch语句）就无效了。因为类型switch语句中的case表达式的子表达式，都必须直接由类型字面量表示，而无法通过间接的方式表示。代码如下：
 
+```css
 value6 := interface{}(byte(127))
 switch t := value6.(type) {
 case uint8, uint16:
@@ -213,6 +230,7 @@ case byte:
 default:
 	fmt.Printf("unsupported type: %T", t)
 }
+```
 
 
 变量value6的值是空接口类型的。该值包装了一个byte类型的值127。我在后面使用类型switch语句来判断value6的实际类型，并打印相应的内容。
@@ -238,8 +256,10 @@ default:
 思考题
 
 
+```text
 在类型switch语句中，我们怎样对被判断类型的那个值做相应的类型转换？
 在if语句中，初始化子句声明的变量的作用域是什么？
+```
 
 
 戳此查看Go语言专栏文章配套详细代码。

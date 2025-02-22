@@ -1,10 +1,12 @@
 ---
 title: 21阶段实操（1）：构建一个简单的KVserver-基本流程
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             21 阶段实操（1）：构建一个简单的KV server-基本流程
                             你好，我是陈天。
+```
 
 从第七讲开始，我们一路过关斩将，和所有权、生命周期死磕，跟类型系统和 trait 反复拉锯，为的是啥？就是为了能够读懂别人写的代码，进而让自己也能写出越来越复杂且优雅的代码。
 
@@ -15,9 +17,11 @@ categories: [陈天·Rust编程第一课]
 为什么选 KV server 来实操呢？因为它是一个足够简单又足够复杂的服务。参考工作中用到的 Redis/Memcached 等服务，来梳理它的需求。
 
 
+```text
 最核心的功能是根据不同的命令进行诸如数据存贮、读取、监听等操作；
 而客户端要能通过网络访问 KV server，发送包含命令的请求，得到结果；
 数据要能根据需要，存储在内存中或者持久化到磁盘上。
+```
 
 
 先来一个短平糙的实现
@@ -26,6 +30,7 @@ categories: [陈天·Rust编程第一课]
 
 我们看一个省却了不少细节的意大利面条式的版本，你可以随着我的注释重点看流程：
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use dashmap::DashMap;
@@ -36,34 +41,48 @@ use kv::{
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     let addr = "127.0.0.1:9527";
     let listener = TcpListener::bind(addr).await?;
     info!("Start listening on {}", addr);
+```
 
+```cpp
     // 使用 DashMap 创建放在内存中的 kv store
     let table: Arc<DashMap<String, Value>> = Arc::new(DashMap::new());
+```
 
+```css
     loop {
         // 得到一个客户端请求
         let (stream, addr) = listener.accept().await?;
         info!("Client {:?} connected", addr);
+```
 
+```javascript
         // 复制 db，让它在 tokio 任务中可以使用
         let db = table.clone();
+```
 
+```cpp
         // 创建一个 tokio 任务处理这个客户端
         tokio::spawn(async move {
             // 使用 AsyncProstStream 来处理 TCP Frame
             // Frame: 两字节 frame 长度，后面是 protobuf 二进制
             let mut stream =
                 AsyncProstStream::<_, CommandRequest, CommandResponse, _>::from(stream).for_async();
+```
 
+```javascript
             // 从 stream 里取下一个消息（拿出来后已经自动 decode 了）
             while let Some(Ok(msg)) = stream.next().await {
                 info!("Got a new command: {:?}", msg);
@@ -73,7 +92,9 @@ async fn main() -> Result<()> {
                     // 其它暂不处理
                     _ => unimplemented!(),
                 };
+```
 
+```text
                 info!("Got response: {:?}", resp);
                 // 把 CommandResponse 发送给客户端
                 stream.send(resp).await.unwrap();
@@ -81,7 +102,9 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
+```javascript
 // 处理 hset 命令
 fn hset(cmd: Hset, db: &DashMap<String, Value>) -> CommandResponse {
     match cmd.pair {
@@ -97,16 +120,19 @@ fn hset(cmd: Hset, db: &DashMap<String, Value>) -> CommandResponse {
         v => KvError::InvalidCommand(format!("hset: {:?}", v)).into(),
     }
 }
+```
 
 
 这段代码非常地平铺直叙，从输入到输出，一蹴而就，如果这样写，任务确实能很快完成，但是它有种“完成之后，哪管洪水滔天”的感觉。
 
 你复制代码后，打开两个窗口，分别运行 “cargo run –example naive_server” 和 “cargo run –example client”，就可以看到运行 server 的窗口有如下打印：
 
+```css
 Sep 19 22:25:34.016  INFO naive_server: Start listening on 127.0.0.1:9527
 Sep 19 22:25:38.401  INFO naive_server: Client 127.0.0.1:51650 connected
 Sep 19 22:25:38.401  INFO naive_server: Got a new command: CommandRequest { request_data: Some(Hset(Hset { table: "table1", pair: Some(Kvpair { key: "hello", value: Some(Value { value: Some(String("world")) }) }) })) }
 Sep 19 22:25:38.401  INFO naive_server: Got response: CommandResponse { status: 200, message: "", values: [Value { value: None }], pairs: [] }
+```
 
 
 虽然整体功能算是搞定了，不过以后想继续为这个 KV server 增加新的功能，就需要来来回回改这段代码。
@@ -128,6 +154,7 @@ Sep 19 22:25:38.401  INFO naive_server: Got response: CommandResponse { status: 
 这个流程中有一些关键问题需要进一步探索：
 
 
+```text
 客户端和服务器用什么协议通信？TCP？gRPC？HTTP？支持一种还是多种？
 客户端和服务器之间交互的应用层协议如何定义？怎么做序列化/反序列化？是用 Protobuf、JSON 还是 Redis RESP？或者也可以支持多种？
 服务器都支持哪些命令？第一版优先支持哪些？
@@ -135,6 +162,7 @@ Sep 19 22:25:38.401  INFO naive_server: Got response: CommandResponse { status: 
 对于存储，要支持不同的存储引擎么？比如 MemDB（内存）、RocksDB（磁盘）、SledDB（磁盘）等。对于 MemDB，我们考虑支持 WAL（Write-Ahead Log） 和 snapshot 么？
 整个系统可以配置么？比如服务使用哪个端口、哪个存储引擎？
 …
+```
 
 
 如果你想做好架构，那么，问出这些问题，并且找到这些问题的答案就很重要。值得注意的是，这里面很多问题产品经理并不能帮你回答，或者TA的回答会将你带入歧路。作为一个架构师，我们需要对系统未来如何应对变化负责。
@@ -167,6 +195,7 @@ syntax = "proto3";
 
 package abi;
 
+```css
 // 来自客户端的命令请求
 message CommandRequest {
   oneof request_data {
@@ -181,7 +210,9 @@ message CommandRequest {
     Hmexist hmexist = 9;
   }
 }
+```
 
+```css
 // 服务器的响应
 message CommandResponse {
   // 状态码；复用 HTTP 2xx/4xx/5xx 状态码
@@ -193,22 +224,30 @@ message CommandResponse {
   // 成功返回的 kv pairs
   repeated Kvpair pairs = 4;
 }
+```
 
+```css
 // 从 table 中获取一个 key，返回 value
 message Hget {
   string table = 1;
   string key = 2;
 }
+```
 
+```css
 // 从 table 中获取所有的 Kvpair
 message Hgetall { string table = 1; }
+```
 
+```css
 // 从 table 中获取一组 key，返回它们的 value
 message Hmget {
   string table = 1;
   repeated string keys = 2;
 }
+```
 
+```css
 // 返回的值
 message Value {
   oneof value {
@@ -219,50 +258,65 @@ message Value {
     bool bool = 5;
   }
 }
+```
 
+```css
 // 返回的 kvpair
 message Kvpair {
   string key = 1;
   Value value = 2;
 }
+```
 
+```css
 // 往 table 里存一个 kvpair，
 // 如果 table 不存在就创建这个 table
 message Hset {
   string table = 1;
   Kvpair pair = 2;
 }
+```
 
+```css
 // 往 table 中存一组 kvpair，
 // 如果 table 不存在就创建这个 table
 message Hmset {
   string table = 1;
   repeated Kvpair pairs = 2;
 }
+```
 
+```css
 // 从 table 中删除一个 key，返回它之前的值
 message Hdel {
   string table = 1;
   string key = 2;
 }
+```
 
+```css
 // 从 table 中删除一组 key，返回它们之前的值
 message Hmdel {
   string table = 1;
   repeated string keys = 2;
 }
+```
 
+```css
 // 查看 key 是否存在
 message Hexist {
   string table = 1;
   string key = 2;
 }
+```
 
+```css
 // 查看一组 key 是否存在
 message Hmexist {
   string table = 1;
   repeated string keys = 2;
 }
+```
 
 
 通过 prost，这个 protobuf 文件可以被编译成 Rust 代码（主要是 struct 和 enum），供我们使用。你应该还记得，之前在[第 5 讲]谈到 thumbor 的开发时，已经见识到了 prost 处理 protobuf 的方式了。
@@ -273,15 +327,18 @@ CommandService trait
 
 我们目前打算支持 9 种命令，未来可能支持更多命令。所以最好定义一个 trait 来统一处理所有的命令，返回处理结果。在处理命令的时候，需要和存储发生关系，这样才能根据请求中携带的参数读取数据，或者把请求中的数据存入存储系统中。所以，这个 trait 可以这么定义：
 
+```css
 /// 对 Command 的处理的抽象
 pub trait CommandService {
     /// 处理 Command，返回 Response
     fn execute(self, store: &impl Storage) -> CommandResponse;
 }
+```
 
 
 有了这个 trait，并且每一个命令都实现了这个 trait 后，dispatch 方法就可以是类似这样的代码：
 
+```javascript
 // 从 Request 中得到 Response，目前处理 HGET/HGETALL/HSET
 pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
     match cmd.request_data {
@@ -292,6 +349,7 @@ pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
         _ => KvError::Internal("Not implemented".into()).into(),
     }
 }
+```
 
 
 这样，未来我们支持新命令时，只需要做两件事：为命令实现 CommandService、在 dispatch 方法中添加新命令的支持。
@@ -300,6 +358,7 @@ Storage trait
 
 再来看为不同的存储而设计的 Storage trait，它提供 KV store 的主要接口：
 
+```html
 /// 对存储的抽象，我们不关心数据存在哪儿，但需要定义外界如何和存储打交道
 pub trait Storage {
     /// 从一个 HashTable 里获取一个 key 的 value
@@ -315,12 +374,14 @@ pub trait Storage {
     /// 遍历 HashTable，返回 kv pair 的 Iterator
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError>;
 }
+```
 
 
 在 CommandService trait 中已经看到，在处理客户端请求的时候，与之打交道的是 Storage trait，而非具体的某个 store。这样做的好处是，未来根据业务的需要，在不同的场景下添加不同的 store，只需要为其实现 Storage trait 即可，不必修改 CommandService 有关的代码。
 
 比如在 HGET 命令的实现时，我们使用 Storage::get 方法，从 table 中获取数据，它跟某个具体的存储方案无关：
 
+```javascript
 impl CommandService for Hget {
     fn execute(self, store: &impl Storage) -> CommandResponse {
         match store.get(&self.table, &self.key) {
@@ -330,6 +391,7 @@ impl CommandService for Hget {
         }
     }
 }
+```
 
 
 Storage trait 里面的绝大多数方法相信你可以定义出来，但 get_iter() 这个接口可能你会比较困惑，因为它返回了一个 Box，为什么？

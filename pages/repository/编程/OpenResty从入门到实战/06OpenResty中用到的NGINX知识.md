@@ -1,10 +1,12 @@
 ---
 title: 06OpenResty中用到的NGINX知识
-date: 1739706057.145951
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             06 OpenResty 中用到的 NGINX 知识
                             你好，我是温铭。
+```
 
 通过前面几篇文章的介绍，相信你对 OpenResty 的轮廓已经有了一个大概的认知。下面几节课里，我会带你熟悉下 OpenResty 的两个基石：NGINX 和 LuaJIT。万丈高楼平地起，掌握些这些基础的知识，才能更好地去学习 OpenResty。
 
@@ -13,15 +15,18 @@ categories: [OpenResty从入门到实战]
 说到配置，其实，在 OpenResty 的开发中，我们需要注意下面几点：
 
 
+```text
 要尽可能少地配置 nginx.conf；
 避免使用if、set 、rewrite 等多个指令的配合；
 能通过 Lua 代码解决的，就别用 NGINX 的配置、变量和模块来解决。
+```
 
 
 这样可以最大限度地提高可读性、可维护性和可扩展性。
 
 下面这段 NGINX 配置，就是一个典型的反例，可以说是把配置项当成了代码来使用：
 
+```text
 location ~ ^/mobile/(web/app.htm) {
             set $type $1;
             set $orig_args $args;
@@ -30,6 +35,7 @@ location ~ ^/mobile/(web/app.htm) {
             }
             proxy_pass http://foo.com/$type?$orig_args;
 }
+```
 
 
 这是我们在使用 OpenResty 进行开发时需要避免的。
@@ -42,31 +48,41 @@ NGINX 配置
 
 worker_processes auto;
 
+```text
 pid logs/nginx.pid;
 error_log logs/error.log notice;
+```
 
 worker_rlimit_nofile 65535;
 
+```css
 events {
     worker_connections 16384;
 }
+```
 
+```css
 http {
     server {
 	listen 80;
 	listen 443 ssl;
+```
 
+```text
         location / {
 	    proxy_pass https://foo.com;
 	    }
     }
 }
+```
 
+```css
 stream {
     server {
         listen 53 udp;
     }
 }
+```
 
 
 不过，即使是简单的配置，背后也涉及到了一些很重要的基础概念。
@@ -110,26 +126,34 @@ Worker 进程则是“一线员工”，用来处理终端用户的请求。它�
 
 执行阶段也是 NGINX 重要的特性，与 OpenResty 的具体实现密切相关。NGINX 有 11 个执行阶段，我们可以从 ngx_http_core_module.h 的源码中看到：
 
+```css
 typedef enum {
     NGX_HTTP_POST_READ_PHASE = 0,
+```
 
     NGX_HTTP_SERVER_REWRITE_PHASE,
 
+```text
     NGX_HTTP_FIND_CONFIG_PHASE,
     NGX_HTTP_REWRITE_PHASE,
     NGX_HTTP_POST_REWRITE_PHASE,
+```
 
     NGX_HTTP_PREACCESS_PHASE,
 
+```text
     NGX_HTTP_ACCESS_PHASE,
     NGX_HTTP_POST_ACCESS_PHASE,
+```
 
     NGX_HTTP_PRECONTENT_PHASE,
 
     NGX_HTTP_CONTENT_PHASE,
 
+```text
     NGX_HTTP_LOG_PHASE
 } ngx_http_phases;
+```
 
 
 如果你想详细了解这 11 个阶段的作用，可以学习陶辉老师的视频课程，或者 NGINX 文档，这里我就不再赘述。
@@ -145,6 +169,7 @@ typedef enum {
 对于业务代码来说，其实大部分的操作都可以在 content_by_lua 里面完成，但我更推荐的做法，是根据不同的功能来进行拆分，比如下面这样：
 
 
+```text
 set_by_lua：设置变量；
 rewrite_by_lua：转发、重定向等；
 access_by_lua：准入、权限等；
@@ -152,24 +177,29 @@ content_by_lua：生成返回内容；
 header_filter_by_lua：应答头过滤处理；
 body_filter_by_lua：应答体过滤处理；
 log_by_lua：日志记录。
+```
 
 
 我举一个例子来说明这样拆分的好处。我们假设，你对外提供了很多明文 API，现在需要增加自定义的加密和解密逻辑。那么请问，你需要修改所有 API 的代码吗？
 
 # 明文协议版本
+```css
 location /mixed {
     content_by_lua '...';       # 处理请求
 }
+```
 
 
 当然不用。事实上，利用阶段的特性，我们只需要简单地在 access 阶段解密，在 body filter 阶段加密就可以了，原来 content 阶段的代码是不用做任何修改的：
 
 # 加密协议版本
+```css
 location /mixed {
     access_by_lua '...';        # 请求体解密
     content_by_lua '...';       # 处理请求，不需要关心通信协议
     body_filter_by_lua '...';   # 应答体加密
 }
+```
 
 
 二进制热升级

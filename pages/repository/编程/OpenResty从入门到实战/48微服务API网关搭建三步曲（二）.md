@@ -1,10 +1,12 @@
 ---
 title: 48微服务API网关搭建三步曲（二）
-date: 1739706057.2093432
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             48 微服务API网关搭建三步曲（二）
                             你好，我是温铭。
+```
 
 在明白了微服务 API 网关的核心组件和抽象概念后，我们就要开始技术选型，并动手去实现它了。今天，我们就分别来看下，路由、插件、schema 和存储这四个核心组件的技术选型问题。
 
@@ -31,9 +33,11 @@ categories: [OpenResty从入门到实战]
 事实上，本着最小化够用并且更贴近 K8s 的原则，etcd 就是一个恰到好处的选型了：
 
 
+```text
 API 网关的配置数据每秒钟的变化次数不会很多，etcd 在性能上是足够的；
 集群和动态伸缩方面，更是 etcd 天生的优势；
 etcd还具备 watch 的接口，不用轮询去获取变更。
+```
 
 
 其实还有一点，可以让我们更加放心地选择 etcd——它已经是 K8s 体系中保存配置的默认选型了，显然已经经过了很多比 API 网关更加复杂的场景的验证。
@@ -44,10 +48,12 @@ etcd还具备 watch 的接口，不用轮询去获取变更。
 
 我们先来看下，在 OpenResty 下有哪些现成的路由可以拿来使用。老规矩，让我们在 awesome-resty 的项目中逐个查找一遍，这其中就有专门的 Routing Libraries：
 
+```text
     •    lua-resty-route — A URL routing library for OpenResty supporting multiple route matchers, middleware, and HTTP and WebSockets handlers to mention a few of its features
     •    router.lua — A barebones router for Lua, it matches URLs and executes Lua functions
     •    lua-resty-r3 — libr3 OpenResty implementation, libr3 is a high-performance path dispatching library. It compiles your route paths into a prefix tree (trie). By using the constructed prefix trie in the start-up time, you may dispatch your routes with efficiency
     •    lua-resty-libr3 — High-performance path dispatching library base on libr3 for OpenResty
+```
 
 
 你可以看到，这里面包含了四个路由库的实现。前面两个路由都是纯 Lua 实现，相对比较简单，所以有不少功能的欠缺，还不能达到生成的要求。
@@ -60,6 +66,7 @@ etcd还具备 watch 的接口，不用轮询去获取变更。
 
 正好， Redis 的作者开源了一个基数树，也就是压缩前缀树的 C 实现。顺藤摸瓜，我们还可以找到 rax 在 OpenResty 中可用的 FFI 封装库，它的示例代码如下：
 
+```text
 local radix = require("resty.radixtree")
 local rx = radix.new({
     {
@@ -76,11 +83,14 @@ local rx = radix.new({
         vars = {"arg_name", "jack"},
     }
 })
+```
 
+```text
 ngx.say(rx:match("/aa", {host = "foo.com",
                      method = "GET",
                      remote_addr = "127.0.0.1"
                     }))
+```
 
 
 从中你也可以看出， lua-resty-radixtree 支持根据 uri、host、http method、http header、Nginx 变量、IP 地址等多个维度，作为路由查找的条件；同时，基数树的时间复杂度为 O(K)，性能远比现有 API 网关常用的“遍历+hash 缓存”的方式，来得更为高效。
@@ -89,6 +99,7 @@ schema
 
 schema 的选择其实要容易得多，我们在前面介绍过的 lua-rapidjson ，就是非常好的一个选择。这部分你完全没有必要自己去写一个，json schema 已经足够强大了。下面就是一个简单的示例：
 
+```text
 local schema = {
     type = "object",
     properties = {
@@ -100,6 +111,7 @@ local schema = {
     additionalProperties = false,
     required = {"count", "time_window", "key", "rejected_code"},
 }
+```
 
 
 插件
@@ -125,10 +137,12 @@ local schema = {
 从这个图中我们可以看出，当一个用户请求进入 API 网关时，
 
 
+```text
 首先，会根据请求的方法、uri、host、请求头等条件，去路由规则中进行匹配。如果命中了某条路由规则，就会从 etcd 中获取对应的插件列表。
 然后，和本地开启的插件列表进行交集，得到最终可以运行的插件列表。
 再接着，根据插件的优先级，逐个运行插件。
 最后，根据上游的健康检查和负载均衡算法，把这个请求发送给上游。
+```
 
 
 当架构设计完成后，我们就胸有成竹，可以去编写具体的代码了。这其实就像盖房子一样，只有在你拥有设计的蓝图和坚实的地基之后，才能去做砖瓦堆砌的具体工作。

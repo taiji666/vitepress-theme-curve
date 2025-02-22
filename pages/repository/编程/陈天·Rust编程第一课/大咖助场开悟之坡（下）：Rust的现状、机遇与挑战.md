@@ -1,10 +1,12 @@
 ---
 title: 大咖助场开悟之坡（下）：Rust的现状、机遇与挑战
-date: 1739706057.415844
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             大咖助场 开悟之坡（下）：Rust的现状、机遇与挑战
                             你好，我是张汉东。
+```
 
 上篇我们聊了Rust语言的现状和机遇，从语言自身的成熟度、语言的生态和应用场景，以及语言的可持续发展能力这三个方面，比较系统地说明Rust发展相对成熟的现状。
 
@@ -12,10 +14,10 @@ Rust 语言作为一门新生语言，虽然目前倍受欢迎，但是面临的
 
 挑战主要来自两个方面：
 
-
+```text
 领域的选择。一门语言唱的再好，如果不被应用，也是没有什么用处。Rust 语言当前面临的挑战就是在领域中的应用。而目前最受关注的是，Rust 进入 Linux 内核开发，如果成功，其意义是划时代的。
 语言自身特性的进化。Rust 语言还有很多特性需要支持和进化，后面也会罗列一些待完善的相关特性。
-
+```
 
 Rust For Linux 的进展和预判
 
@@ -49,28 +51,22 @@ Rust 进入内核肯定会有一些维护者需要学习该语言，用来 revie
 
 另外还有一些Rust自身特性的稳定问题：
 
-
 目前内核工作还在使用一些 Unstable 的 Rust 特性，导致兼容性不够好，不能确保以后更新的 Rust 编译器能正常编译相关代码。
-
 
 Ojedal 说，但是如果 Rust 进入 Linux 内核，就会改变这种情况，对于一些 Unstable Rust 特性，Rust 官方团队也会考虑让其稳定。这是一种推动力，迟早会建立一个只使用 Rust 稳定版的内核，到时候兼容问题就会消失。
 
-
 另一位内核开发者 Thomas Gleixner 担心 Rust 并没有正式支持内存顺序，这可能会有问题。
-
 
 但是另一位从事三十年cpp 并发编程的 Linux 内核维护者 Paul McKenney 则写了一系列文章来探讨 Rust 社区该如何就Rust 进入 Linux 内核这件事正确处理内存顺序模型。对此我也写了另一篇文章【我读】Rust 语言应该使用什么内存模型？ 。
 
-
 关于 Rust 对 GCC 的支持，其中 rustc_codegen_gcc进展最快，目前已通过了部分的 rustc 测试，rustc_codegen_llvm是目前的主要开发项目，Rust GCC预计在 1~2 年内完成。
-
 
 这次大会的结论有2点：
 
-
+```text
 Rust 肯定会在 Linux 内核中进行一次具有时代意义的实验。
 Rust 进入 Linux 内核，对推动 Rust 进化具有很重要的战略意义。
-
+```
 
 最新消息
 
@@ -78,13 +74,13 @@ Rust 进入 Linux 内核，对推动 Rust 进化具有很重要的战略意义�
 
 我对这部分视频内容做了一个简要总结，你可以对照要点找自己需要的看一看。
 
-
+```text
 介绍 Unsafe Rust 和 Safe Rust。
 在 Linux 内核中使用 Rust ，采用一个理念：封装 Unsafe 操作，提供一个安全抽象给内核开发者使用。这个安全抽象位于 https://github.com/Rust-for-Linux/linux/tree/rust/rust 的 kernel 模块中。
 给出一个简单的示例来说明如何编写内核驱动。
 对比 C 语言示例，给出在 Rust 中什么是 Safety 的行为。
 介绍了文档、测试和遵循的编码准则。
-
+```
 
 综合上面我们了解到的这些信息，可以推测，Rust for Linux 在不远的将来会进入到 Linux 进行一次试验，这次试验的意义是划时代的。如果试验成功，那么就意味着 Rust 正式从 C 语言手里拿到了时代的交接棒。
 
@@ -93,8 +89,6 @@ Rust 语言特性的完善
 下面来聊一聊最近Rust语言又完善了哪些特性。特别说明一下，这些本来就是高级知识，是Rust 语言的挑战，所以这些知识点你现在也许不太理解，但不用害怕，这些只是 Rust 语言进化路上必须要完善的东西，改进只是为了让 Rust 更好。目前并不影响你学习和使用 Rust 。
 
 我们会讲4个已完善的特性，最后也顺带介绍一下还有哪些待完善的特性，供你参考。
-
-
 
 安全 I/O 问题
 
@@ -106,16 +100,15 @@ Rust 语言特性的完善
 
 而且，很多 API 通过接受原始句柄来进行 I/O 操作：
 
+```cpp
 pub fn do_some_io<FD: AsRawFd>(input: &FD) -> io::Result<()> {
     some_syscall(input.as_raw_fd())
 }
-
+```
 
 AsRawFd并没有限制as_raw_fd的返回值，所以do_some_io最终可以在任意的RawFd值上进行 I/O操作，甚至可以写do_some_io(&7)，因为RawFd本身实现了AsRawFd。这可能会导致程序访问错误的资源。甚至通过创建在其他部分私有的句柄别名来打破封装边界，导致一些诡异的远隔作用（Action at a distance）。
 
-
 远隔作用（Action at a distance）是一种程式设计中的反模式，是指程式某一部分的行为会广泛的受到程式其他部分指令的影响，而且要找到影响其他程式的指令很困难，甚至根本无法进行。
-
 
 在一些特殊的情况下，违反 I/O 安全甚至会导致内存安全。
 
@@ -123,18 +116,17 @@ AsRawFd并没有限制as_raw_fd的返回值，所以do_some_io最终可以在任
 
 对于Windows来说，也有类似的类型，但都是Handle和Socket形式。
 
-
-
 和其他类型相比，I/O 类型并不区分可变和不可变。操作系统资源可以在Rust的控制之外以各种方式共享，所以I/O可以被认为是使用内部可变性。
 
-然后新增了三个概念，AsFd、Into<OwnedFd>和From<OwnedFd>。
+然后新增了三个概念，```AsFd、Into<OwnedFd>和From<OwnedFd>```。
 
 这三个概念是AsRawFd::as_raw_fd、IntoRawFd::into_raw_fd和FromRawFd::from_raw_fd的概念性替代，分别适用于大多数使用情况。它们以OwnedFd和BorrowedFd的方式工作，所以它们自动执行其I/O安全不变性。
 
+```cpp
 pub fn do_some_io<FD: AsFd>(input: &FD) -> io::Result<()> {
     some_syscall(input.as_fd())
 }
-
+```
 
 使用这个类型，就会避免之前那个问题。由于AsFd只针对那些适当拥有或借用其文件描述符的类型实现，这个版本的do_some_io不必担心被传递假的或悬空的文件描述符。
 
@@ -144,17 +136,20 @@ pub fn do_some_io<FD: AsFd>(input: &FD) -> io::Result<()> {
 
 比如：
 
+```javascript
 fn foo() -> Result<PathBuf, io::Error> {
     let base = env::current_dir()?;
     Ok(base.join("foo"))
 }
-
+```
 
 那么这就引出了一个术语： Ok-Wrapping 。很明显，这个写法不够优雅，还有很大的改进空间。
 
 因此 Rust 官方成员 withoutboats 开发了一个库 fehler，引入了一个 throw 语法。用法如下：
 
-#[throws(i32)]
+# [throws(i32)]
+
+```css
 fn foo(x: bool) -> i32 {
     if x {
         0
@@ -162,9 +157,11 @@ fn foo(x: bool) -> i32 {
         throw!(1);
     }
 }
+```
 
 // 上面foo函数错误处理等价于下面bar函数
 
+```css
 fn bar(x: bool) -> Result<i32, i32> {
     if x {
         Ok(0)
@@ -172,7 +169,7 @@ fn bar(x: bool) -> Result<i32, i32> {
         Err(1)
     }
 }
-
+```
 
 通过 throw 宏语法，来帮助开发者省略 Ok-wrapping 和 Err-wrapping 的手动操作。这个库一时在社区引起了一些讨论，它也在促进着 Rust 错误处理的体验提升。
 
@@ -182,87 +179,106 @@ fn bar(x: bool) -> Result<i32, i32> {
 
 ControlFlow 的源码：
 
+```text
 enum ControlFlow<B, C = ()> {
     /// Exit the operation without running subsequent phases.
     Break(B),
     /// Move on to the next phase of the operation as normal.
     Continue(C),
 }
+```
 
+```html
 impl<B, C> ControlFlow<B, C> {
     fn is_break(&self) -> bool;
     fn is_continue(&self) -> bool;
     fn break_value(self) -> Option<B>;
     fn continue_value(self) -> Option<C>;
 }
-
+```
 
 ControlFlow 中包含了两个值：
 
-
+```cpp
 ControlFlow::Break，表示提前退出。但不一定是Error 的情况，也可能是 Ok。
 ControlFlow::Continue，表示继续。
-
+```
 
 新的trait FromResidual：
 
+```cpp
 trait FromResidual<Residual = <Self as Try>::Residual> {
     fn from_residual(r: Residual) -> Self;
 }
-
+```
 
 Residual 这个单词有“剩余”的意思，因为要把 Result/Option/ ControlFlow 之类的类型，拆分成两部分（两条路径），用这个词也就好理解了。
 
 而 Try trait 继承自 FromResidual trait ：
 
+```css
 pub trait Try: FromResidual {
     /// The type of the value consumed or produced when not short-circuiting.
     type Output;
+```
 
+```text
     /// A type that "colours" the short-circuit value so it can stay associated
     /// with the type constructor from which it came.
     type Residual;
+```
 
+```cpp
     /// Used in `try{}` blocks to wrap the result of the block.
     fn from_output(x: Self::Output) -> Self;
+```
 
+```cpp
     /// Determine whether to short-circuit (by returning `ControlFlow::Break`)
     /// or continue executing (by returning `ControlFlow::Continue`).
     fn branch(self) -> ControlFlow<Self::Residual, Self::Output>;
 }
+```
 
+```cpp
 pub trait FromResidual<Residual = <Self as Try>::Residual> {
     /// Recreate the type implementing `Try` from a related residual
     fn from_residual(x: Residual) -> Self;
 }
-
+```
 
 所以，在 Try trait 中有两个关联类型：
 
-
+```text
 Output，如果是 Result 的话，就对应 Ok-wrapping 。
 Residual，如果是 Result 的话，就对应 Err-wrapping 。
-
+```
 
 所以，现在 ? 操作符的行为就变成了：
 
+```javascript
 match Try::branch(x) {
     ControlFlow::Continue(v) => v,
     ControlFlow::Break(r) => return FromResidual::from_residual(r),
 }
-
+```
 
 然后内部给 Rusult 实现 Try ：
 
+```cpp
 impl<T, E> ops::Try for Result<T, E> {
     type Output = T;
     type Residual = Result<!, E>;
+```
 
+```css
     #[inline]
     fn from_output(c: T) -> Self {
         Ok(c)
     }
+```
 
+```javascript
     #[inline]
     fn branch(self) -> ControlFlow<Self::Residual, T> {
         match self {
@@ -271,7 +287,9 @@ impl<T, E> ops::Try for Result<T, E> {
         }
     }
 }
+```
 
+```javascript
 impl<T, E, F: From<E>> ops::FromResidual<Result<!, E>> for Result<T, F> {
     fn from_residual(x: Result<!, E>) -> Self {
         match x {
@@ -279,7 +297,7 @@ impl<T, E, F: From<E>> ops::FromResidual<Result<!, E>> for Result<T, F> {
         }
     }
 }
-
+```
 
 再给 Option/Poll 实现 Try ，就能达成错误处理大一统。
 
@@ -291,40 +309,49 @@ impl<T, E, F: From<E>> ops::FromResidual<Result<!, E>> for Result<T, F> {
 
 什么是泛型关联类型？ 见下面代码：
 
+```css
 trait Iterable {
     type Item<'a>; // 'a 也是泛型参数
 }
+```
 
+```html
 trait Foo {
     type Bar<T>;
 }
-
+```
 
 就是这样一个简单的语法，让我们在关联类型里也能参与类型构造，就是实现起来却非常复杂。
 
 但无论多复杂，这个特性是 Rust 语言必须要支持的功能，它非常有用。最典型的就是用来实现流迭代器：
 
+```cpp
 trait StreamingIterator {
     type Item<'a>;
     fn next<'a>(&'a mut self) -> Option<Self::Item<'a>>;
 }
+```
 
-
+```cpp
 现在 Rust 还不支持这种写法。这种写法可以解决当前迭代器性能慢的问题。-
 比如标准库中的std::io::lines 方法，可以为 io::BufRead 类型生成一个迭代器，但是它当前只能返回 io::Result<Vec<u8>>，这就意味着它会为每一行进行内存分配，而产生一个新的Vec<u8> ，导致迭代器性能很慢。StackOverflow上有这个问题的讨论和优化方案。
+```
 
 但是如果支持 GAT 的话，解决这个问题将变得非常简单：
 
+```cpp
 trait Iterator {
     type Item<'s>;
     fn next(&mut self) -> Option<Self::Item<'_>>;
 }
+```
 
+```cpp
 impl<B: BufRead> Iterator for Lines<B> {
     type Item<'s> = io::Result<&'s str>;
     fn next(&mut self) -> Option<Self::Item<'_>> { … }
 }
-
+```
 
 GAT 的实现还能推进“异步 trait”的支持。目前 Rust 异步还有很多限制，比如 trait 无法支持 async 方法，也是因为GAT 功能未完善而导致的。
 
@@ -336,66 +363,77 @@ GAT 的实现还能推进“异步 trait”的支持。目前 Rust 异步还有�
 
 什么是泛型特化呢？
 
+```cpp
 trait Example {
     type Output;
     fn generate(self) -> Self::Output;
 }
+```
 
+```cpp
 impl<T> Example for T {
     type Output = Box<T>;
     fn generate(self) -> Box<T> { Box::new(self) }
 }
+```
 
+```css
 impl Example for bool {
     type Output = bool;
     fn generate(self) -> bool { self }
 }
-
+```
 
 简单来说，就是可以为泛型以及更加具体的类型来实现同一个 trait 。在调用该trait 方法时，倾向于优先使用更具体的类型实现。这就是对“泛型特化”最直观的一个理解。
 
 泛型特化带来两个重要意义：
 
-
+```text
 性能优化。特化扩展了零成本抽象的范围，可以为某个统一抽象下的具体实现，定制高性能实现。
 代码重用。泛型特化可以提供一些默认（但不完整的）实现，某些情况下可以减少重复代码。
-
+```
 
 其实曾经特化还要为“高效继承（efficient-inheritance）”做为实现基础，但是现在高效继承这个提议并未被正式采纳。但我想，作为代码高效重用的一种手段，在未来肯定会被重新提及。
 
 泛型特化功能，离最终稳定还有很长的路，目前官方正准备稳定特化的一个子集（subset）叫 min_specialization，旨在让泛型特化有一个最小化可用（mvp）的实现，在此基础上再慢慢稳定整体功能。现在 min_specialization 还没有具体稳定的日期，如果要使用此功能，只能在 Nightly Rust 下添加 #![feature(min_specialization)] 来使用。
 
-#![feature(min_specialization)]
+# ![feature(min_specialization)]
+
 use std::fmt::Debug;
 
+```css
 trait Destroy {
     fn destroy(self);
 }
+```
 
+```css
 impl<T: Debug> Destroy for T {
     default fn destroy(self) {
         println!("Destroyed something!");
     }
 }
+```
 
 struct Special;
 
+```css
 impl Destroy for Special {
     fn destroy(self) {
         println!("Destroyed Special something!");
     }
 }
+```
 
+```javascript
 fn main() {
     "hello".destroy(); // Destroyed something!
     let sp = Special;
     sp.destroy(); // Destroyed Special something!
 }
-
+```
 
 其他待完善特性
-
-
 
 异步 async trait、async drop
 
@@ -403,14 +441,19 @@ Rust 目前异步虽然早已稳定，但还有很多需要完善的地方。为
 
 对于异步 trait 功能，首先会稳定的一个 mvp 功能是：trait 中的静态的 async fn 方法。
 
+```css
 trait Service {
     async fn request(&self, key: i32) -> Response;
 }
+```
 
+```css
 struct MyService {
     db: Database
 }
+```
 
+```css
 impl Service for MyService {
     async fn request(&self, key: i32) -> Response {
         Response {
@@ -418,19 +461,22 @@ impl Service for MyService {
         }
     }
 }
-
+```
 
 在 trait 中支持 async fn 非常有用。但是目前只能通过 async-trait 来支持这个功能。因为当前 trait 中直接写 async fn 不是动态安全的（dyn safety，之前叫对象安全）。
 
 现在这个 mvp 功能提出将 async fn 脱糖为静态分发的 trait，比如这样：
 
+```html
 trait Service {
     type RequestFut<'a>: Future<Output = Response>
     where
         Self: 'a;
     fn request(&self, key: i32) -> RequestFut;
 }
+```
 
+```css
 impl Service for MyService {
     type RequestFut<'a> = impl Future + 'a
     where
@@ -439,7 +485,7 @@ impl Service for MyService {
         async { ... }
     }
 }
-
+```
 
 对于 异步 drop 功能，目前也给出了一个方案，但没有类似 mvp 的落地计划。更多解释可以去查看异步基础计划的内容。
 
@@ -467,6 +513,7 @@ asm! 宏允许在 Rust 中内联汇编。
 
 总的来说，就是让 asm! 宏更加通用，相比于 llvm_asm!，它有更好的语法。
 
+```css
 // 旧的 asm! 宏写法
 let i: u64 = 3;
 let o: u64;
@@ -480,7 +527,9 @@ unsafe {
     );
 }
 assert_eq!(o, 8);
+```
 
+```javascript
 // 新的 asm! 宏写法：
 let x: u64 = 3;
 let y: u64;
@@ -488,7 +537,7 @@ unsafe {
     asm!("add {0}, {number}", inout(reg) x => y, number = const 5);
 }
 assert_eq!(y, 8);
-
+```
 
 上面示例中，inout(reg) x语句表示编译器应该找到一个合适的通用寄存器，用x的当前值准备该寄存器，将加法指令的输出存储在同一个通用寄存器中，然后将该通用寄存器的值存储在x中。
 
@@ -510,15 +559,16 @@ deref pattern 是一个代表，它可以看作是Rust 官方对 Rust 语言诸�
 
 该特性简单来说，就是想让 Rust 语言在 match 模式匹配中也支持 deref：
 
+```javascript
 let x: Option<Rc<bool>> = ...;
 match x {
     Some(deref true) => ...,
     Some(x) => ...,
     None => ...,
 }
+```
 
-
-比如上面代码，匹配 Option<Rc<bool>> 的时候，可以无视其中的 Rc，直接透明操作 bool。上面例子里是一种解决方案，就是增加一个 deref 关键字。当然最终使用什么方案并未确定。
+比如上面代码，匹配 Option```<Rc<bool>>``` 的时候，可以无视其中的 Rc，直接透明操作 bool。上面例子里是一种解决方案，就是增加一个 deref 关键字。当然最终使用什么方案并未确定。
 
 这里提到这个特性，是想说，Rust 语言目前在人体工程学方面，还有很多提升的空间；并且，Rust 团队也在不断的努力，让 Rust 语言使用起来更加方便和优雅。
 
@@ -529,7 +579,3 @@ Rust 语言自身相对已经成熟，生态也足够丰富，并且在一些应
 Rust在系统语言的地位上，更像是当年的 C 语言。同样是通用语言，Rust现在在操作系统、云原生、物联网等关键系统领域成为刚需。因为“安全”现在已经是必选项了，这是 Rust 语言的时代机遇。同时，Rust 语言也在不同领域造就了新的职业岗位。
 
 我们也看到，Rust 语言还有很多需要完善的地方，但这些都在官方团队的计划之中。我相信，在 Rust 基金会的引领下，Rust 肯定会迈向广泛应用的美好未来。
-
-                        
-                        
-                            

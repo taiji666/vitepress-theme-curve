@@ -1,10 +1,12 @@
 ---
 title: 38WebSocket：沙盒里的TCP
-date: 1739706057.3526535
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             38  WebSocket：沙盒里的TCP
                             在之前讲 TCP/IP 协议栈的时候，我说过有“TCP Socket”，它实际上是一种功能接口，通过这些接口就可以使用 TCP/IP 协议栈在传输层收发数据。
+```
 
 那么，你知道还有一种东西叫“WebSocket”吗？
 
@@ -48,9 +50,11 @@ WebSocket 的默认端口也选择了 80 和 443，因为现在互联网上的�
 
 下面我举几个 WebSocket 服务的例子，你看看，是不是和 HTTP 几乎一模一样：
 
+```text
 ws://www.chrono.com
 ws://www.chrono.com:8080/srv
 wss://www.chrono.com:445/im?user_id=xxx
+```
 
 
 要注意的一点是，WebSocket 的名字容易让人产生误解，虽然大多数情况下我们会在浏览器里调用 API 来使用 WebSocket，但它不是一个“调用接口的集合”，而是一个通信协议，所以我觉得把它理解成“TCP over Web”会更恰当一些。
@@ -100,15 +104,19 @@ WebSocket 的握手
 WebSocket 的握手是一个标准的 HTTP GET 请求，但要带上两个协议升级的专用头字段：
 
 
+```text
 “Connection: Upgrade”，表示要求协议“升级”；
 “Upgrade: websocket”，表示要“升级”成 WebSocket 协议。
+```
 
 
 另外，为了防止普通的 HTTP 消息被“意外”识别成 WebSocket，握手消息还增加了两个额外的认证用头字段（所谓的“挑战”，Challenge）：
 
 
+```text
 Sec-WebSocket-Key：一个 Base64 编码的 16 字节随机数，作为简单的认证密钥；
 Sec-WebSocket-Version：协议的版本号，当前必须是 13。
+```
 
 
 
@@ -119,9 +127,11 @@ WebSocket 的握手响应报文也是有特殊格式的，要用字段“Sec-Web
 
 具体的做法是把请求头里“Sec-WebSocket-Key”的值，加上一个专用的 UUID “258EAFA5-E914-47DA-95CA-C5AB0DC85B11”，再计算 SHA-1 摘要。
 
+```text
 encode_base64(
   sha1( 
     Sec-WebSocket-Key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11' ))
+```
 
 
 客户端收到响应报文，就可以用同样的算法，比对值是否相等，如果相等，就说明返回的报文确实是刚才握手时连接的服务器，认证成功。
@@ -137,19 +147,23 @@ encode_base64(
 不过自由也是有代价的，WebSocket 虽然是在应用层，但使用方式却与“TCP Socket”差不多，过于“原始”，用户必须自己管理连接、缓存、状态，开发上比 HTTP 复杂的多，所以是否要在项目中引入 WebSocket 必须慎重考虑。
 
 
+```text
 HTTP 的“请求 - 应答”模式不适合开发“实时通信”应用，效率低，难以实现动态页面，所以出现了 WebSocket；
 WebSocket 是一个“全双工”的通信协议，相当于对 TCP 做了一层“薄薄的包装”，让它运行在浏览器环境里；
 WebSocket 使用兼容 HTTP 的 URI 来发现服务，但定义了新的协议名“ws”和“wss”，端口号也沿用了 80 和 443；
 WebSocket 使用二进制帧，结构比较简单，特殊的地方是有个“掩码”操作，客户端发数据必须掩码，服务器则不用；
 WebSocket 利用 HTTP 协议实现连接握手，发送 GET 请求要求“协议升级”，握手过程中有个非常简单的认证机制，目的是防止误连接。
+```
 
 
 课下作业
 
 
+```text
 WebSocket 与 HTTP/2 有很多相似点，比如都可以从 HTTP/1 升级，都采用二进制帧结构，你能比较一下这两个协议吗？
 试着自己解释一下 WebSocket 里的”Web“和”Socket“的含义。
 结合自己的实际工作，你觉得 WebSocket 适合用在哪些场景里？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

@@ -1,10 +1,12 @@
 ---
 title: 17为什么能成为更好的Web服务器？动态处理请求和响应是关键
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             17 为什么能成为更好的Web服务器？动态处理请求和响应是关键
                             你好，我是温铭。经过前面内容的铺垫后， 相信你已经对 OpenResty 的概念和如何学习它有了基本的认识。今天这节课，我们来看一下 OpenResty 如何处理终端请求和响应。
+```
 
 虽然 OpenResty 是基于 NGINX 的 Web 服务器，但它与 NGINX 却有本质的不同：NGINX 由静态的配置文件驱动，而 OpenResty 是由 Lua API 驱动的，所以能提供更多的灵活性和可编程性。
 
@@ -15,6 +17,7 @@ API 分类
 首先我们要知道，OpenResty 的 API 主要分为下面几个大类：
 
 
+```text
 处理请求和响应；
 SSL 相关；
 shared dict；
@@ -23,6 +26,7 @@ cosocket；
 process 和 worker；
 获取 NGINX 变量和配置；
 字符串、时间、编解码等通用功能。
+```
 
 
 这里，我建议你同时打开 OpenResty 的 Lua API 文档，对照着其中的 API 列表 ，看看是否能和这个分类联系起来。
@@ -31,10 +35,12 @@ OpenResty 的 API 不仅仅存在于 lua-nginx-module 项目中，也存在于 l
 
 而对于不在 lua-nginx-module 项目中的 API，你需要单独 require 才能使用。举个例子，比如你想使用 split 这个字符串分割函数，就需要按照下面的方法来调用：
 
+```bash
 $ resty -e 'local ngx_re = require "ngx.re"
  local res, err = ngx_re.split("a,b,c,d", ",", nil, {pos = 5})
  print(res)
  '
+```
 
 
 当然，这可能会给你带来一个困惑：在 lua-nginx-module 项目中，明明有 ngx.re.sub、ngx.re.find 等好几个 ngx.re 开头的 API，为什么单单是 ngx.re.split 这个 API ，需要 require 后才能使用呢？
@@ -52,8 +58,10 @@ $ resty -e 'local ngx_re = require "ngx.re"
 首先是请求行，HTTP 的请求行中包含请求方法、URI 和 HTTP 协议版本。在 NGINX 中，你可以通过内置变量的方式，来获取其中的值；而在 OpenResty 中对应的则是 ngx.var.* 这个 API。我们来看两个例子。
 
 
+```text
 $scheme 这个内置变量，在 NGINX 中代表协议的名字，是 “http” 或者 “https”；而在 OpenResty 中，你可以通过 ngx.var.scheme 来返回同样的值。
 $request_method 代表的是请求的方法，“GET”、“POST” 等；而在 OpenResty 中，你可以通过 ngx.var. request_method 来返回同样的值。
+```
 
 
 至于完整的 NGINX 内置变量列表，你可以访问 NGINX 的官方文档来获取：http://nginx.org/en/docs/http/ngx_http_core_module.html#variables。
@@ -63,9 +71,11 @@ $request_method 代表的是请求的方法，“GET”、“POST” 等；而�
 这其实是很多方面因素的综合考虑结果：
 
 
+```text
 首先是对性能的考虑。ngx.var 的效率不高，不建议反复读取；
 也有对程序友好的考虑，ngx.var 返回的是字符串，而非 Lua 对象，遇到获取 args 这种可能返回多个值的情况，就不好处理了；
 另外是对灵活性的考虑，绝大部分的 ngx.var 是只读的，只有很少数的变量是可写的，比如 $args 和 limit_rate，可很多时候，我们会有修改 method、URI 和 args 的需求。
+```
 
 
 所以， OpenResty 提供了多个专门操作请求行的 API，它们可以对请求行进行改写，以便后续的重定向等操作。
@@ -86,9 +96,11 @@ $ resty -e 'print(ngx.HTTP_POST)'
 
 这样一来，get 方法的返回值为字符串，而set 方法的输入值却是数字，就很容易让你在写代码的时候想当然了。如果是 set 时候传值混淆的情况还好，API 会崩溃报出 500 的错误；但如果是下面这种判断逻辑的代码：
 
+```text
 if (ngx.req.get_method() == ngx.HTTP_POST) then
     -- do something
  end
+```
 
 
 这种代码是可以正常运行的，不会报出任何错误，甚至在 code review 时也很难发现。不幸的是，我就犯过类似的错误，对此记忆犹新：当时已经经过了两轮 code review，还有不完整的测试案例尝试覆盖，然而，最终还是因为线上环境异常才追踪到了这里。
@@ -102,8 +114,10 @@ if (ngx.req.get_method() == ngx.HTTP_POST) then
 
 那么，如何用等价的 Lua API 来解决呢？答案就是下面这两行代码。
 
+```text
 ngx.req.set_uri_args("a=3")
 ngx.req.set_uri("/foo")
+```
 
 
 其实，如果你看过官方文档，就会发现 ngx.req.set_uri 还有第二个参数：jump，默认是 false。如果设置为 true，就等同于把 rewrite 指令的 flag 设置为 last，而非上面示例中的 break。
@@ -114,21 +128,27 @@ ngx.req.set_uri("/foo")
 
 再来看下和请求头有关的 API。我们知道，HTTP 的请求头是 key : value 格式的，比如：
 
+```text
 Accept: text/css,*/*;q=0.1
 Accept-Encoding: gzip, deflate, br
+```
 
 
 在OpenResty 中，你可以使用 ngx.req.get_headers 来解析和获取请求头，返回值的类型则是 table：
 
 local h, err = ngx.req.get_headers()
 
+```text
   if err == "truncated" then
       -- one can choose to ignore or reject the current request here
   end
+```
 
+```text
   for k, v in pairs(h) do
       ...
   end
+```
 
 
 这里默认返回前 100 个 header，如果请求头超过了 100 个，就会返回 truncated 的错误信息，由开发者自己决定如何处理。你可能会好奇为什么会有这样的处理，这一点先留个悬念，在后面安全漏洞的章节中我会提到。
@@ -137,8 +157,10 @@ local h, err = ngx.req.get_headers()
 
 看完了获取请求头，我们再来看看应该如何改写和删除请求头，这两种操作的 API 其实都很直观：
 
+```text
 ngx.req.set_header("Content-Type", "text/css")
 ngx.req.clear_header("Content-Type")
+```
 
 
 当然，官方文档中也提到了其他方法来删除请求头，比如把 header 的值设置为 nil等，但为了代码更加清晰的考虑，我还是推荐统一用 clear_header 来操作。
@@ -147,6 +169,7 @@ ngx.req.clear_header("Content-Type")
 
 最后来看请求体。出于性能考虑，OpenResty 不会主动读取请求体的内容，除非你在 nginx.conf 中强制开启了 lua_need_request_body 指令。此外，对于比较大的请求体，OpenResty 会把内容保存在磁盘的临时文件中，所以读取请求体的完整流程是下面这样的：
 
+```text
 ngx.req.read_body()
 local data = ngx.req.get_body_data()
 if not data then
@@ -154,6 +177,7 @@ if not data then
      -- io.open(tmp_file)
      -- ...
  end
+```
 
 
 这段代码中有读取磁盘文件的 IO 阻塞操作。你应该根据实际情况来调整 client_body_buffer_size 配置的大小（64 位系统下默认是 16 KB），尽量减少阻塞的操作；你也可以把 client_body_buffer_size 和 client_max_body_size 配置成一样的，完全在内存中来处理，当然，这取决于你内存的大小和处理的并发请求数。
@@ -186,17 +210,21 @@ ngx.status = ngx.HTTP_FORBIDDEN
 
 说到响应头，其实，你有两种方法来设置它。第一种是最简单的：
 
+```text
 ngx.header.content_type = 'text/plain'
 ngx.header["X-My-Header"] = 'blah blah'
 ngx.header["X-My-Header"] = nil -- 删除
+```
 
 
 这里的 ngx.header 保存了响应头的信息，可以读取、修改和删除。
 
 第二种设置响应头的方法是 ngx_resp.add_header ，来自 lua-resty-core 仓库，它可以增加一个头信息，用下面的方法来调用：
 
+```text
 local ngx_resp = require "ngx.resp"
 ngx_resp.add_header("Foo", "bar")
+```
 
 
 与第一种方法的不同之处在于，add header 不会覆盖已经存在的同名字段。
@@ -212,8 +240,10 @@ ngx.say('hello, world')
 
 为了避免字符串拼接的低效，ngx.say / ngx.print 不仅支持字符串作为参数，也支持数组格式：
 
+```bash
 $ resty -e 'ngx.say({"hello", ", ", "world"})'
  hello, world
+```
 
 
 这样在 Lua 层面就跳过了字符串的拼接，把这个它不擅长的事情丢给了 C 函数去处理。

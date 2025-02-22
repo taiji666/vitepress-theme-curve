@@ -1,6 +1,6 @@
 ---
 title: 9 思考：持久化数据结构，是 Immutability 的唯一答案吗？
-date: 1739708222.3973165
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 ## React 与函数式编程
@@ -81,10 +81,12 @@ const nextState = produce(baseState, recipe)
 
 这个 API 里有几个要素：
 
+```markdown
 -   (base)state：源数据，是我们想要修改的目标数据
 -   recipe：一个函数，我们可以在其中描述数据的写逻辑
 -   draft：recipe 函数的默认入参，它是对源数据的代理，我们可以把想要应用在源数据的变更应用在 draft 上
 -   produce：入口函数，它负责把上述要素串起来。具体逻辑请看下文分解。
+```
 
 记住上述要素的基本特性，我们接下来要冲一波源码了xdm！
 
@@ -184,7 +186,7 @@ function produce(base, recipe) {
 
 接下来我尝试对这个超简易版的 producer 进行一系列的调用（解析在注释里）：
 
-```
+```text
 // 这是我的源对象
 const baseObj = {
   a: 1,

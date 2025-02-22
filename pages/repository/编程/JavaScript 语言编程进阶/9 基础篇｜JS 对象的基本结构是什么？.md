@@ -1,6 +1,6 @@
 ---
 title: 9 基础篇｜JS 对象的基本结构是什么？
-date: 1739707492.912006
+date: 2025-02-22
 categories: [JavaScript 语言编程进阶]
 ---
 在 ECMAScript 规范的定义中，`对象代表属性的集合`，可以理解为 `key-value` 结构的数据容器。
@@ -26,23 +26,28 @@ Symbol.matchAll.toString() // "Symbol(Symbol.matchAll)"
 
 在 `ES3` 时代，规范规定，一个对象属性（`Property`）可以包含下列 3 个属性（`Attribute`）：
 
+```markdown
 1.  ReadOnly
 2.  DontEnum
 3.  DontDelete
+```
 
 从 ES5 开始，重新定义了属性的结构，现在它可能包含下面这 6 种属性，为了避免歧义，后面我称之为`属性参数`：
 
+```text
 1.  \[\[Value]]
 2.  \[\[Writable]]
 3.  \[\[Get]]
 4.  \[\[Set]]
 5.  \[\[Enumerable]]
 6.  \[\[Configurable]]
+```
 
 这几种参数并非允许同时存在，其中 \[\[Enumerable]] 和 \[\[Configurable]] 可以一直在，而 \[\[Value]]+\[\[Writable]] 与 \[\[Get]]+ \[\[Set]] 这两对之间是互斥的。这里事实上代表了 ECMAScript 对属性成员的两种格式定义：`数据属性（Data Property）`和`存取器属性（Accessor Property）`。
 
 它们的属性差异如下：
 
+```html
 <table>
     <thead>
         <tr>
@@ -71,6 +76,7 @@ Symbol.matchAll.toString() // "Symbol(Symbol.matchAll)"
         </tr>
     </tbody>
 </table>
+```
 
 从功能上来讲，`存取器属性是数据属性的超集`，数据属性能实现的，存取器属性也都能实现，比如存取器属性中不定义 `[[Set]]` 就相当于数据属性中 `[[Writable]]` 设为 false，即只读。
 
@@ -151,9 +157,11 @@ class Foo {
 
 还有哪些耳熟能详的属性是不可遍历的呢？我举几个例子：
 
+```markdown
 1.  数组的所有方法，比如 concat、filter、map、reduce，在 `for...in` 时都不可见，这个我们在数组那一章提到过；
 2.  字符串的 length 属性，在 `for...in` 时也不可见；
 3.  数字对象的所有方法，比如 toPrecision、toFixed、toExponential 等。
+```
 
 直接赋值定义给对象的属性，或者类的非函数成员，默认都是可枚举的，比如下面中的 foo、bar 和 baz：
 
@@ -180,12 +188,14 @@ Object.getOwnPropertyDescriptor(obj, 'name').enumerable; // false
 
 `configurable` 参数代表是否`可配置`，这背后代表的行为要更复杂，按照 ECMAScript 定义，如果其为 false，那么：
 
+```markdown
 1.  不允许删除此属性；
 2.  不允许在数据属性和存取器属性之间变换；
 3.  不允许修改描述符的其他参数（但不包括修改 `value`，以及把 `writable` 设为 false）：
     *   不允许修改 enumerable 的值；
     *   不允许修改 set/get 的值；
     *   不允许将 writable 从 false 改为 true。
+```
 
 其他都还容易记得住，也能理解允许对 `value` 的修改，但为什么还能允许把 `writable` 从 true 改成 false 呢？很遗憾，我没有在 ECMAScript 的规范中找到对这个策略的解释。我们不妨粗浅地这样理解：**`configurable` 并不是为了完全锁定对象，要不然也不会允许对 `value` 的修改，它只是想保证对象结构和表达的稳定性，那么把一个对象从可写改成只读，似乎并不会影响这种稳定性**。
 
@@ -276,6 +286,7 @@ set 和 get 可以不成对出现，如果缺失了 set，那么该属性就是�
 
 两种属性结构我们就讨论到这。但是对于一个对象来说，除了这些后期定义的属性之外，还有很多内部属性发挥着至关重要的作用，比如前面我们在函数那一讲当中提到 `[[Call]]` 和 `[[Construct]]` 都属于对象内部可能存在的属性。除此之外， ECMAScript 还定义了如下这些内部属性：
 
+```html
 <table>
             <thead>
                 <tr>
@@ -334,6 +345,7 @@ set 和 get 可以不成对出现，如果缺失了 set，那么该属性就是�
                 </tr>
             </tbody>
         </table>
+```
 
 有经验的同学可能已经发现了，里面的函数都有对应的 API 可用，比如其中的 `[[DefineOwnProperty]]` 其实就对应着 `Object.defineProperty`。确实如此，当我们调用静态函数 `Object.defineProperty` 的时候，本质上是在对象身上调用其 `[[DefineOwnProperty]]` 内部函数，其他函数大体也是如此。
 
@@ -491,8 +503,10 @@ for (let key in Object.create(null)) {
 
 对象的结构看着比较复杂，但实际上说起来也比较简单，它可以分成两个部分。
 
+```markdown
 1.  一部分是自定义的属性，这部分属性以`属性描述符`的形式存在，可以是`数据属性`也可以是`存取器属性`。无论哪种，最终行为都会受到公共参数 `enumerable` 和 `configurable` 的控制。
 2.  另一部分是内部的属性，特别需要关注是 `[[Prototype]]`，通过它，不同对象可以组成了一个单向的`原型链`，属性的访问顺着原型链向上查找，一直到 `Object.prototype` 为止。
+```
 
 ![image.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/10b8247f8d2e40338e8d450c3c686780~tplv-k3u1fbpfcp-watermark.image?)
 

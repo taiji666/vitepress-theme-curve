@@ -1,10 +1,12 @@
 ---
 title: 06Python“黑箱”：输入与输出
-date: 1739706057.5345864
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             06 Python “黑箱”：输入与输出
                             你好，我是景霄。
+```
 
 世纪之交的论坛上曾有一句流行语：在互联网上，没人知道你是一条狗。互联网刚刚兴起时，一根网线链接到你家，信息通过这条高速线缆直达你的屏幕，你通过键盘飞速回应朋友的消息，信息再次通过网线飞入错综复杂的虚拟世界，再进入朋友家。抽象来看，一台台的电脑就是一个个黑箱，黑箱有了输入和输出，就拥有了图灵机运作的必要条件。
 
@@ -16,43 +18,59 @@ Python 程序也是一个黑箱：通过输入流将数据送达，通过输出�
 
 最简单直接的输入来自键盘操作，比如下面这个例子。
 
+```text
 name = input('your name:')
 gender = input('you are a boy?(y/n)')
+```
 
 ###### 输入 ######
+```text
 your name:Jack
 you are a boy?
+```
 
+```css
 welcome_str = 'Welcome to the matrix {prefix} {name}.'
 welcome_dic = {
     'prefix': 'Mr.' if gender == 'y' else 'Mrs',
     'name': name
 }
+```
 
+```python
 print('authorizing...')
 print(welcome_str.format(**welcome_dic))
+```
 
 ########## 输出 ##########
+```text
 authorizing...
 Welcome to the matrix Mr. Jack.
+```
 
 
 input() 函数暂停程序运行，同时等待键盘输入；直到回车被按下，函数的参数即为提示语，输入的类型永远是字符串型（str）。注意，初学者在这里很容易犯错，下面的例子我会讲到。print() 函数则接受字符串、数字、字典、列表甚至一些自定义类的输出。
 
 我们再来看下面这个例子。
 
+```text
 a = input()
 1
 b = input()
 2
+```
 
 print('a + b = {}'.format(a + b))
 ########## 输出 ##############
+```python
 a + b = 12
 print('type of a is {}, type of b is {}'.format(type(a), type(b)))
+```
 ########## 输出 ##############
+```python
 type of a is <class 'str'>, type of b is <class 'str'>
 print('a + b = {}'.format(int(a) + int(b)))
+```
 ########## 输出 ##############
 a + b = 3
 
@@ -101,42 +119,59 @@ And when this happens, and when we allow freedom ring, when we let it ring from 
 import re
 
 # 你不用太关心这个函数
+```python
 def parse(text):
     # 使用正则表达式去除标点符号和换行符
     text = re.sub(r'[^\w ]', ' ', text)
+```
 
+```markdown
     # 转为小写
     text = text.lower()
+```
     
+```markdown
     # 生成所有单词的列表
     word_list = text.split(' ')
+```
     
+```markdown
     # 去除空白单词
     word_list = filter(None, word_list)
+```
     
+```python
     # 生成单词和词频的字典
     word_cnt = {}
     for word in word_list:
         if word not in word_cnt:
             word_cnt[word] = 0
         word_cnt[word] += 1
+```
     
+```markdown
     # 按照词频排序
     sorted_word_cnt = sorted(word_cnt.items(), key=lambda kv: kv[1], reverse=True)
+```
     
     return sorted_word_cnt
 
+```text
 with open('in.txt', 'r') as fin:
     text = fin.read()
+```
 
 word_and_freq = parse(text)
 
+```text
 with open('out.txt', 'w') as fout:
     for word, freq in word_and_freq:
         fout.write('{} {}\n'.format(word, freq))
+```
 
 ########## 输出(省略较长的中间结果) ##########
 
+```text
 and 15
 be 13
 will 11
@@ -146,9 +181,11 @@ of 10
 a 8
 we 8
 day 6
+```
 
 ...
 
+```text
 old 1
 negro 1
 spiritual 1
@@ -156,6 +193,7 @@ thank 1
 god 1
 almighty 1
 are 1
+```
 
 
 你不用太关心 parse() 函数的具体实现，你只需要知道，它做的事情是把输入的 text 字符串，转化为我们需要的排序后的词频统计。而 sorted_word_cnt 则是一个二元组的列表（list of tuples）。
@@ -202,29 +240,37 @@ JSON（JavaScript Object Notation）是一种轻量级的数据交换格式，�
 
 import json
 
+```text
 params = {
     'symbol': '123456',
     'type': 'limit',
     'price': 123.4,
     'amount': 23
 }
+```
 
 params_str = json.dumps(params)
 
+```python
 print('after json serialization')
 print('type of params_str = {}, params_str = {}'.format(type(params_str), params))
+```
 
 original_params = json.loads(params_str)
 
+```python
 print('after json deserialization')
 print('type of original_params = {}, original_params = {}'.format(type(original_params), original_params))
+```
 
 ########## 输出 ##########
 
+```html
 after json serialization
 type of params_str = <class 'str'>, params_str = {'symbol': '123456', 'type': 'limit', 'price': 123.4, 'amount': 23}
 after json deserialization
 type of original_params = <class 'dict'>, original_params = {'symbol': '123456', 'type': 'limit', 'price': 123.4, 'amount': 23}
+```
 
 
 其中，
@@ -245,26 +291,36 @@ json.dumps() 这个函数，接受 Python 的基本数据类型，然后将其�
 
 import json
 
+```text
 params = {
     'symbol': '123456',
     'type': 'limit',
     'price': 123.4,
     'amount': 23
 }
+```
 
+```text
 with open('params.json', 'w') as fout:
     params_str = json.dump(params, fout)
+```
 
+```text
 with open('params.json', 'r') as fin:
     original_params = json.load(fin)
+```
 
+```python
 print('after json deserialization')
 print('type of original_params = {}, original_params = {}'.format(type(original_params), original_params))
+```
 
 ########## 输出 ##########
 
+```html
 after json deserialization
 type of original_params = <class 'dict'>, original_params = {'symbol': '123456', 'type': 'limit', 'price': 123.4, 'amount': 23}
+```
 
 
 这样，我们就简单清晰地实现了读写 JSON 字符串的过程。当开发一个第三方应用程序时，你可以通过 JSON 将用户的个人配置输出到文件，方便下次程序启动时自动读取。这也是现在普遍运用的成熟做法。

@@ -1,10 +1,12 @@
 ---
 title: 加餐带你上手SWIG：一份清晰好用的SWIG编程实践指南
-date: 1739706057.580942
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             加餐 带你上手SWIG：一份清晰好用的SWIG编程实践指南
                             你好，我是卢誉声，Autodesk 数据平台和计算平台资深软件工程师，也是《移动平台深度神经网络实战》和《分布式实时处理系统：原理架构与实现》的作者，主要从事C/C++、JavaScript开发工作和平台架构方面的研发工作，对SWIG也有比较深的研究。很高兴受极客时间邀请来做本次分享，今天，我们就来聊一聊SWIG这个话题。
+```
 
 我们都知道，Python 是一门易于上手并实验友好的胶水语言。现在有很多机器学习开发或研究人员，都选择Python作为主力编程语言；流行的机器学习框架也都会提供Python语言的支持作为调用接口和工具。因此，相较于学习成本更高的C++来说，把Python作为进入机器学习世界的首选编程语言，就再合适不过了。
 
@@ -28,7 +30,7 @@ SWIG，是一款能够连接C/C++与多种高级编程语言（我们在这里�
 
 我们通常使用SWIG来创建高级解释或编译型的编程环境和接口，它也常被用来当作C/C++编写原型的测试工具。一个典型的应用场景，便是解析和创建C/C++接口，生成胶水代码供像Python这样的高级编程语言调用。近期发布的4.0.0版本，更是带来了对C++的显著改进和支持，这其中包括（不局限于）下面几点。
 
-
+```text
 针对C#、Java和Ruby而改进的STL包装器。
 针对Java、Python和Ruby，增加C++11标准下的STL容器的支持。
 改进了对C++11和C++14代码的支持。
@@ -36,7 +38,7 @@ SWIG，是一款能够连接C/C++与多种高级编程语言（我们在这里�
 一系列针对C预处理器的极端case修复。
 一系列针对成员函数指针问题的修复。
 低支持的Python版本为2.7、3.2-3.7。
-
+```
 
 使用Python实现PCA算法
 
@@ -48,11 +50,13 @@ SWIG，是一款能够连接C/C++与多种高级编程语言（我们在这里�
 
 import numpy as np
 
+```python
 def compute_pca(data):
     m = np.mean(data, axis=0)
     datac = np.array([obs - m for obs in data])
     T = np.dot(datac, datac.T)
     [u,s,v] = np.linalg.svd(T)
+```
 
     pcs = [np.dot(datac.T, item) for item in u.T ]
 
@@ -60,6 +64,7 @@ def compute_pca(data):
 
      return pcs, m, s, T, u
 
+```python
  def compute_projections(I,pcs,m):
      projections = []
      for i in I:
@@ -68,65 +73,76 @@ def compute_pca(data):
              w.append(np.dot(i - m, p))
          projections.append(w)
      return projections
+```
 
+```python
  def reconstruct(w, X, m,dim = 5):
      return np.dot(w[:dim],X[:dim,:]) + m
+```
 
+```python
  def normalize(samples, maxs = None):
      if not maxs:
          maxs = np.max(samples)
      return np.array([np.ravel(s) / maxs for s in samples])
-
+```
 
 现在，我们保存这段编写好的代码，并通过下面的命令来执行：
 
-python3 testPCAPurePython.py 
-
+python3 testPCAPurePython.py
 
 准备SWIG
 
 这样，我们已经获得了一些进展——使用Python编写了一个PCA算法，并得到了一些结果。接下来，我们看一下如何开始SWIG的开发工作。我会先从编译相关组件开始，再介绍一个简单使用的例子，为后续内容做准备。
 
-首先，我们从SWIG的网站（http://swig.org/download.html）下载源代码包，并开始构建：
+首先，我们从SWIG的网站（<http://swig.org/download.html）下载源代码包，并开始构建：>
 
-$ wget https://newcontinuum.dl.sourceforge.net/project/swig/swig/swig-4.0.0/swig-4.0.0.tar.gz # 下载路径可能会有所变化
-$ tar -xvf swig-4.0.0.tar.gz
-$ cd swig-4.0.0
-$ wget https://ftp.pcre.org/pub/pcre/pcre-8.43.tar.gz # SWIG需要依赖pcre工作
-$ sh ./Tools/pcre-build.sh # 该脚本会将pcre自动构建成SWIG使用的静态库
-$ ./configure # 注意需要安装bison，如果没有安装需要读者手动安装
-$ make
-$ sudo make install
+```bash
+wget https://newcontinuum.dl.sourceforge.net/project/swig/swig/swig-4.0.0/swig-4.0.0.tar.gz # 下载路径可能会有所变化
+tar -xvf swig-4.0.0.tar.gz
+cd swig-4.0.0
+wget https://ftp.pcre.org/pub/pcre/pcre-8.43.tar.gz # SWIG需要依赖pcre工作
+sh ./Tools/pcre-build.sh # 该脚本会将pcre自动构建成SWIG使用的静态库
+./configure # 注意需要安装bison，如果没有安装需要读者手动安装
+make
+sudo make install
+```
 
-
-一切就绪后，我们就来编写一个简单的例子吧。这个例子同样来源于SWIG网站（http://swig.org/tutorial.html）。我们先来创建一个简单的c文件，你可以通过你习惯使用的文本编辑器（比如vi），创建一个名为example.c的文件，并编写代码。代码内容我放在了代码清单2中。
+一切就绪后，我们就来编写一个简单的例子吧。这个例子同样来源于SWIG网站（<http://swig.org/tutorial.html）。我们先来创建一个简单的c文件，你可以通过你习惯使用的文本编辑器（比如vi），创建一个名为example.c的文件，并编写代码。代码内容我放在了代码清单2中。>
 
 代码清单2，example.c：
 
-#include <time.h>
+# include <time.h>
+
 double My_variable = 3.0;
 
+```text
 int fact(int n) {
     if (n <= 1) return 1;
     else return n*fact(n-1);
 }
+```
 
+```text
 int my_mod(int x, int y) {
     return (x%y);
 }
-       
+```
+
+```text
 char *get_time()
 {
     time_t ltime;
     time(&ltime);
     return ctime(&ltime);
 }
-
+```
 
 接下来，我们编写一个名为example.i的接口定义文件，和稍后用作测试的Python脚本，内容如代码清单3和代码清单4所示。
 
 代码清单3，example.i：
 
+```text
 %module example
 %{
 /* Put header files here or function declarations like below */
@@ -135,30 +151,34 @@ extern int fact(int n);
 extern int my_mod(int x, int y);
 extern char *get_time();
 %}
+```
 
+```text
 extern double My_variable;
 extern int fact(int n);
 extern int my_mod(int x, int y);
 extern char *get_time();
-
+```
 
 我来解释下清单3这段代码。第1行，我们定义了模块的名称为example。第2-8行，我们直接指定了example.c中的函数定义，也可以定义一个example.h头文件，并将这些定义加入其中；然后，在 %{ … %}结构体中包含example.h，来实现相同的功能。第10-13行，则是定义了导出的接口，以便你在Python中直接调用这些接口。
 
 代码清单4，testExample.py：
 
+```python
 import example
 print(example.fact(5))
 print(example.my_mod(7,3))
 print(example.get_time())
-
+```
 
 好了， 到现在为止，我们已经准备就绪了。现在，我们来执行下面的代码，创建目标文件和最后链接的文件吧：
 
+```text
 swig -python example.i
 gcc -c -fPIC example.c example_wrap.c -I/usr/include/python3.6
 gcc -shared example.o example_wrap.o -o _example.so
 python3 testExample.py # 测试调用
-
+```
 
 其实，从代码清单4中你也能够看到，通过导入example，我们可以直接在Python脚本中，调用使用C实现的函数接口，并获得返回值。
 
@@ -172,11 +192,13 @@ python3 testExample.py # 测试调用
 
 代码清单5，pca.h：
 
-#pragma once
+# pragma once
 
-#include <vector>
-#include <string>
-#include <armadillo>
+```css
+# include <vector>
+# include <string>
+# include <armadillo>
+
 
 class pca {
 public:
@@ -184,8 +206,11 @@ public:
     explicit pca(long num_vars);
     virtual ~pca();
 
-    bool operator==(const pca& other);
 
+    bool operator==(const pca& other);
+```
+
+```cpp
     void set_num_variables(long num_vars);
     long get_num_variables() const;
     void add_record(const std::vector<double>& record);
@@ -195,15 +220,21 @@ public:
     bool get_do_normalize() const;
     void set_solver(const std::string& solver);
     std::string get_solver() const;
+```
 
     void solve();
 
+```text
     double check_eigenvectors_orthogonal() const;
     double check_projection_accurate() const;
+```
 
+```cpp
     void save(const std::string& basename) const;
     void load(const std::string& basename);
+```
 
+```cpp
     void set_num_retained(long num_retained);
     long get_num_retained() const;
     std::vector<double> to_principal_space(const std::vector<double>& record) const;
@@ -215,7 +246,9 @@ public:
     std::vector<double> get_principal(long eigen_index) const;
     std::vector<double> get_mean_values() const;
     std::vector<double> get_sigma_values() const;
+```
 
+```cpp
 protected:
     long num_vars_;
     long num_records_;
@@ -235,16 +268,18 @@ protected:
     void assert_num_vars_();
     void resize_data_if_needed_();
 };
-
+```
 
 接着，我们再来编写具体实现pca.cpp，也就是代码清单6的内容。
 
 代码清单6，pca.cpp：
 
-#include "pca.h"
-#include "utils.h"
-#include <stdexcept>
-#include <random>
+```cpp
+# include "pca.h"
+# include "utils.h"
+# include <stdexcept>
+# include <random>
+
 
 pca::pca()
     : num_vars_(0),
@@ -255,7 +290,9 @@ pca::pca()
       num_retained_(1),
       energy_(1)
 {}
+```
 
+```cpp
 pca::pca(long num_vars)
     : num_vars_(num_vars),
       num_records_(0),
@@ -275,10 +312,14 @@ pca::pca(long num_vars)
     assert_num_vars_();
     initialize_();
 }
+```
 
+```text
 pca::~pca()
 {}
+```
 
+```cpp
 bool pca::operator==(const pca& other) {
     const double eps = 1e-5;
     if (num_vars_ == other.num_vars_ &&
@@ -298,19 +339,25 @@ bool pca::operator==(const pca& other) {
     else
         return false;
 }
+```
 
+```cpp
 void pca::resize_data_if_needed_() {
     if (num_records_ == record_buffer_) {
         record_buffer_ += record_buffer_;
         data_.resize(record_buffer_, num_vars_);
     }
 }
+```
 
+```cpp
 void pca::assert_num_vars_() {
     if (num_vars_ < 2)
         throw std::invalid_argument("Number of variables smaller than two.");
 }
+```
 
+```cpp
 void pca::initialize_() {
     data_.zeros();
     eigval_.zeros();
@@ -320,7 +367,9 @@ void pca::initialize_() {
     sigma_.zeros();
     energy_.zeros();
 }
+```
 
+```cpp
 void pca::set_num_variables(long num_vars) {
     num_vars_ = num_vars;
     assert_num_vars_();
@@ -332,76 +381,112 @@ void pca::set_num_variables(long num_vars) {
     sigma_.resize(num_vars_);
     initialize_();
 }
+```
 
+```cpp
 void pca::add_record(const std::vector<double>& record) {
     assert_num_vars_();
+```
 
+```cpp
     if (num_vars_ != long(record.size()))
         throw std::domain_error(utils::join("Record has the wrong size: ", record.size()));
+```
 
+```cpp
     resize_data_if_needed_();
     arma::Row<double> row(&record.front(), record.size());
     data_.row(num_records_) = std::move(row);
     ++num_records_;
 }
+```
 
+```cpp
 std::vector<double> pca::get_record(long record_index) const {
     return std::move(utils::extract_row_vector(data_, record_index));
 }
+```
 
+```cpp
 void pca::set_do_normalize(bool do_normalize) {
     do_normalize_ = do_normalize;
 }
+```
 
+```cpp
 void pca::set_solver(const std::string& solver) {
     if (solver!="standard" && solver!="dc")
         throw std::invalid_argument(utils::join("No such solver available: ", solver));
     solver_ = solver;
 }
+```
 
+```cpp
 void pca::solve() {
     assert_num_vars_();
+```
 
+```cpp
     if (num_records_ < 2)
         throw std::logic_error("Number of records smaller than two.");
+```
 
     data_.resize(num_records_, num_vars_);
 
+```cpp
     mean_ = utils::compute_column_means(data_);
     utils::remove_column_means(data_, mean_);
+```
 
+```cpp
     sigma_ = utils::compute_column_rms(data_);
     if (do_normalize_) utils::normalize_by_column(data_, sigma_);
+```
 
+```cpp
     arma::Col<double> eigval(num_vars_);
     arma::Mat<double> eigvec(num_vars_, num_vars_);
+```
 
+```cpp
     arma::Mat<double> cov_mat = utils::make_covariance_matrix(data_);
     arma::eig_sym(eigval, eigvec, cov_mat, solver_.c_str());
     arma::uvec indices = arma::sort_index(eigval, 1);
+```
 
+```text
     for (long i=0; i<num_vars_; ++i) {
         eigval_(i) = eigval(indices(i));
         eigvec_.col(i) = eigvec.col(indices(i));
     }
+```
 
+```cpp
     utils::enforce_positive_sign_by_column(eigvec_);
     proj_eigvec_ = eigvec_;
+```
 
     princomp_ = data_ * eigvec_;
 
+```cpp
     energy_(0) = arma::sum(eigval_);
     eigval_ *= 1./energy_(0);
 }
+```
 
+```cpp
 void pca::set_num_retained(long num_retained) {
     if (num_retained<=0 || num_retained>num_vars_)
         throw std::range_error(utils::join("Value out of range: ", num_retained));
+```
 
+```text
     num_retained_ = num_retained;
     proj_eigvec_ = eigvec_.submat(0, 0, eigvec_.n_rows-1, num_retained_-1);
 }
+```
 
+```cpp
 std::vector<double> pca::to_principal_space(const std::vector<double>& data) const {
     arma::Col<double> column(&data.front(), data.size());
     column -= mean_;
@@ -409,7 +494,9 @@ std::vector<double> pca::to_principal_space(const std::vector<double>& data) con
     const arma::Row<double> row(column.t() * proj_eigvec_);
     return std::move(utils::extract_row_vector(row, 0));
 }
+```
 
+```cpp
 std::vector<double> pca::to_variable_space(const std::vector<double>& data) const {
     const arma::Row<double> row(&data.front(), data.size());
     arma::Col<double> column(arma::trans(row * proj_eigvec_.t()));
@@ -417,68 +504,98 @@ std::vector<double> pca::to_variable_space(const std::vector<double>& data) cons
     column += mean_;
     return std::move(utils::extract_column_vector(column, 0));
 }
+```
 
+```cpp
 double pca::get_energy() const {
     return energy_(0);
 }
+```
 
+```cpp
 double pca::get_eigenvalue(long eigen_index) const {
     if (eigen_index >= num_vars_)
         throw std::range_error(utils::join("Index out of range: ", eigen_index));
     return eigval_(eigen_index);
 }
+```
 
+```cpp
 std::vector<double> pca::get_eigenvalues() const {
     return std::move(utils::extract_column_vector(eigval_, 0));
 }
+```
 
+```cpp
 std::vector<double> pca::get_eigenvector(long eigen_index) const {
     return std::move(utils::extract_column_vector(eigvec_, eigen_index));
 }
+```
 
+```cpp
 std::vector<double> pca::get_principal(long eigen_index) const {
     return std::move(utils::extract_column_vector(princomp_, eigen_index));
 }
+```
 
+```cpp
 double pca::check_eigenvectors_orthogonal() const {
     return std::abs(arma::det(eigvec_));
 }
+```
 
+```cpp
 double pca::check_projection_accurate() const {
     if (data_.n_cols!=eigvec_.n_cols || data_.n_rows!=princomp_.n_rows)
         throw std::runtime_error("No proper data matrix present that the projection could be compared with.");
     const arma::Mat<double> diff = (princomp_ * arma::trans(eigvec_)) - data_;
     return 1 - arma::sum(arma::sum( arma::abs(diff) )) / diff.n_elem;
 }
+```
 
+```cpp
 bool pca::get_do_normalize() const {
     return do_normalize_;
 }
+```
 
+```cpp
 std::string pca::get_solver() const {
     return solver_;
 }
+```
 
+```cpp
 std::vector<double> pca::get_mean_values() const {
     return std::move(utils::extract_column_vector(mean_, 0));
 }
+```
 
+```cpp
 std::vector<double> pca::get_sigma_values() const {
     return std::move(utils::extract_column_vector(sigma_, 0));
 }
+```
 
+```cpp
 long pca::get_num_variables() const {
     return num_vars_;
 }
+```
 
+```cpp
 long pca::get_num_records() const {
     return num_records_;
 }
+```
 
+```cpp
 long pca::get_num_retained() const {
     return num_retained_;
 }
+```
 
+```cpp
 void pca::save(const std::string& basename) const {
     const std::string filename = basename + ".pca";
     std::ofstream file(filename.c_str());
@@ -489,7 +606,9 @@ void pca::save(const std::string& basename) const {
     utils::write_property(file, "num_retained", num_retained_);
     utils::write_property(file, "do_normalize", do_normalize_);
     file.close();
+```
 
+```cpp
     utils::write_matrix_object(basename + ".eigval", eigval_);
     utils::write_matrix_object(basename + ".eigvec", eigvec_);
     utils::write_matrix_object(basename + ".princomp", princomp_);
@@ -497,7 +616,9 @@ void pca::save(const std::string& basename) const {
     utils::write_matrix_object(basename + ".mean", mean_);
     utils::write_matrix_object(basename + ".sigma", sigma_);
 }
+```
 
+```cpp
 void pca::load(const std::string& basename) {
     const std::string filename = basename + ".pca";
     std::ifstream file(filename.c_str());
@@ -508,26 +629,32 @@ void pca::load(const std::string& basename) {
     utils::read_property(file, "num_retained", num_retained_);
     utils::read_property(file, "do_normalize", do_normalize_);
     file.close();
+```
 
+```cpp
     utils::read_matrix_object(basename + ".eigval", eigval_);
     utils::read_matrix_object(basename + ".eigvec", eigvec_);
     utils::read_matrix_object(basename + ".princomp", princomp_);
     utils::read_matrix_object(basename + ".energy", energy_);
     utils::read_matrix_object(basename + ".mean", mean_);
     utils::read_matrix_object(basename + ".sigma", sigma_);
+```
 
+```text
     set_num_retained(num_retained_);
 }
-
+```
 
 这里要注意了，代码清单6中用到了utils.h这个文件，它是对部分矩阵和数学计算的封装，内容我放在了代码清单7中。
 
 代码清单7，utils.h：
 
-#pragma once
- 
-#include <armadillo>
-#include <sstream>
+```cpp
+# pragma once
+
+# include <armadillo>
+# include <sstream>
+
 
 namespace utils {
 arma::Mat<double> make_covariance_matrix(const arma::Mat<double>& data);
@@ -544,7 +671,9 @@ template<typename T>
 void write_matrix_object(const std::string& filename, const T& matrix) {
     assert_file_good(matrix.quiet_save(filename, arma::arma_ascii), filename);
 }
+```
 
+```cpp
 template<typename T>
 void read_matrix_object(const std::string& filename, T& matrix) {
     assert_file_good(matrix.quiet_load(filename), filename);
@@ -568,17 +697,23 @@ bool is_approx_equal_container(const T& container1, const U& container2, const V
 }
 double get_mean(const std::vector<double>& iter);
 double get_sigma(const std::vector<double>& iter);
+```
 
+```cpp
 struct join_helper {
     static void add_to_stream(std::ostream& stream) {}
+```
 
+```cpp
     template<typename T, typename... Args>
     static void add_to_stream(std::ostream& stream, const T& arg, const Args&... args) {
         stream << arg;
         add_to_stream(stream, args...);
     }
 };
+```
 
+```cpp
 template<typename T, typename... Args>
 std::string join(const T& arg, const Args&... args) {
     std::ostringstream stream;
@@ -586,12 +721,16 @@ std::string join(const T& arg, const Args&... args) {
     join_helper::add_to_stream(stream, args...);
     return stream.str();
 }
+```
 
+```cpp
 template<typename T>
 void write_property(std::ostream& file, const std::string& key, const T& value) {
     file << key << "\t" << value << std::endl;
 }
+```
 
+```cpp
 template<typename T>
 void read_property(std::istream& file, const std::string& key, T& value) {
     std::string tmp;
@@ -608,25 +747,29 @@ void read_property(std::istream& file, const std::string& key, T& value) {
         throw std::domain_error(join("No such key available: ", key));
     file.seekg(0);
 }
+```
 
 } //utils
-
 
 至于具体的实现代码，我放在了在代码清单8utils.cpp中。
 
 代码清单8，utils.cpp：
 
-#include "utils.h"
-#include <stdexcept>
-#include <sstream>
-#include <numeric>
+```cpp
+# include "utils.h"
+# include <stdexcept>
+# include <sstream>
+# include <numeric>
 
 namespace utils {
+
 
 arma::Mat<double> make_covariance_matrix(const arma::Mat<double>& data) {
     return std::move( (data.t()*data) * (1./(data.n_rows-1)) );
 }
+```
 
+```cpp
 arma::Mat<double> make_shuffled_matrix(const arma::Mat<double>& data) {
     const long n_rows = data.n_rows;
     const long n_cols = data.n_cols;
@@ -638,7 +781,9 @@ arma::Mat<double> make_shuffled_matrix(const arma::Mat<double>& data) {
     }
     return std::move(shuffle);
 }
+```
 
+```cpp
 arma::Col<double> compute_column_means(const arma::Mat<double>& data) {
     const long n_cols = data.n_cols;
     arma::Col<double> means(n_cols);
@@ -646,14 +791,18 @@ arma::Col<double> compute_column_means(const arma::Mat<double>& data) {
         means(i) = arma::mean(data.col(i));
     return std::move(means);
 }
+```
 
+```cpp
 void remove_column_means(arma::Mat<double>& data, const arma::Col<double>& means) {
     if (data.n_cols != means.n_elem)
         throw std::range_error("Number of elements of means is not equal to the number of columns of data");
     for (long i=0; i<long(data.n_cols); ++i)
         data.col(i) -= means(i);
 }
+```
 
+```cpp
 arma::Col<double> compute_column_rms(const arma::Mat<double>& data) {
     const long n_cols = data.n_cols;
     arma::Col<double> rms(n_cols);
@@ -663,7 +812,9 @@ arma::Col<double> compute_column_rms(const arma::Mat<double>& data) {
     }
     return std::move(rms);
 }
+```
 
+```cpp
 void normalize_by_column(arma::Mat<double>& data, const arma::Col<double>& rms) {
     if (data.n_cols != rms.n_elem)
         throw std::range_error("Number of elements of rms is not equal to the number of columns of data");
@@ -673,7 +824,9 @@ void normalize_by_column(arma::Mat<double>& data, const arma::Col<double>& rms) 
         data.col(i) *= 1./rms(i);
     }
 }
+```
 
+```cpp
 void enforce_positive_sign_by_column(arma::Mat<double>& data) {
     for (long i=0; i<long(data.n_cols); ++i) {
         const double max = arma::max(data.col(i));
@@ -687,7 +840,9 @@ void enforce_positive_sign_by_column(arma::Mat<double>& data) {
         if (change_sign) data.col(i) *= -1;
     }
 }
+```
 
+```cpp
 std::vector<double> extract_column_vector(const arma::Mat<double>& data, long index) {
     if (index<0 || index >= long(data.n_cols))
         throw std::range_error(join("Index out of range: ", index));
@@ -696,7 +851,9 @@ std::vector<double> extract_column_vector(const arma::Mat<double>& data, long in
     std::vector<double> result(memptr, memptr + n_rows);
     return std::move(result);
 }
+```
 
+```cpp
 std::vector<double> extract_row_vector(const arma::Mat<double>& data, long index) {
     if (index<0 || index >= long(data.n_rows))
         throw std::range_error(join("Index out of range: ", index));
@@ -705,17 +862,23 @@ std::vector<double> extract_row_vector(const arma::Mat<double>& data, long index
     std::vector<double> result(memptr, memptr + row.n_elem);
     return std::move(result);
 }
+```
 
+```cpp
 void assert_file_good(const bool& is_file_good, const std::string& filename) {
     if (!is_file_good)
         throw std::ios_base::failure(join("Cannot open file: ", filename));
 }
+```
 
+```cpp
 double get_mean(const std::vector<double>& iter) {
     const double init = 0;
     return std::accumulate(iter.begin(), iter.end(), init) / iter.size();
 }
+```
 
+```cpp
 double get_sigma(const std::vector<double>& iter) {
     const double mean = get_mean(iter);
     double sum = 0;
@@ -723,9 +886,9 @@ double get_sigma(const std::vector<double>& iter) {
         sum += std::pow(*v - mean, 2.);
     return std::sqrt(sum/(iter.size()-1));
 }
+```
 
 } //utils
-
 
 最后，我们来编写pca.i接口文件，也就是代码清单9的内容。
 
@@ -733,30 +896,39 @@ double get_sigma(const std::vector<double>& iter) {
 
 %module pca
 
+```text
 %include "std_string.i"
 %include "std_vector.i"
+```
 
+```html
 namespace std {
   %template(DoubleVector) vector<double>;
 }
+```
 
 %{
-#include "pca.h"
-#include "utils.h"
+
+# include "pca.h"
+
+# include "utils.h"
+
 %}
 
+```text
 %include "pca.h"
 %include "utils.h"
-
+```
 
 这里需要注意的是，我们在C++代码中使用了熟悉的顺序容器std::vector，但由于模板类比较特殊，我们需要用%template声明一下。
 
 一切就绪后，我们执行下面的命令行，生成_pca.so库供Python使用：
 
-$ swig -c++ -python pca.i # 解释接口定义生成包SWIG装器代码
-$ g++ -fPIC -c pca.h pca.cpp utils.h utils.cpp pca_wrap.cxx -I/usr/include/python3.7 # 编译源代码
-$ g++ -shared pca.o pca_wrap.o utils.o -o _pca.so -O2 -Wall -std=c++11 -pthread -shared -fPIC -larmadillo # 链接
-
+```bash
+swig -c++ -python pca.i # 解释接口定义生成包SWIG装器代码
+g++ -fPIC -c pca.h pca.cpp utils.h utils.cpp pca_wrap.cxx -I/usr/include/python3.7 # 编译源代码
+g++ -shared pca.o pca_wrap.o utils.o -o _pca.so -O2 -Wall -std=c++11 -pthread -shared -fPIC -larmadillo # 链接
+```
 
 接着，我们使用Python脚本，导入我们创建好的so动态库；然后，调用相应的类的函数。这部分内容，我写在了代码清单10中。
 
@@ -764,23 +936,26 @@ $ g++ -shared pca.o pca_wrap.o utils.o -o _pca.so -O2 -Wall -std=c++11 -pthread 
 
 import pca
 
+```text
 pca_inst = pca.pca(2)
 pca_inst.add_record([1.0, 1.0])
 pca_inst.add_record([2.0, 2.0])
 pca_inst.add_record([4.0, 1.0])
+```
 
 pca_inst.solve()
 
+```text
 energy = pca_inst.get_energy()
 eigenvalues = pca_inst.get_eigenvalues()
+```
 
+```python
 print(energy)
 print(eigenvalues)
-
+```
 
 最后，我们分别对纯Python实现的代码，和使用SWIG封装的版本来进行测试，各自都执行1,000,000次，然后对比执行时间。我用一张图表示了我的机器上得到的结果，你可以对比看看。
-
-
 
 虽然这样粗略的比较并不够严谨，比如我们没有认真考虑SWIG接口类型转换的耗时，也没有考虑在不同编程语言下实现算法的逻辑等等。但是，通过这个粗略的结果，你仍然可以看出执行类似运算时，两者性能的巨大差异。
 
@@ -796,27 +971,31 @@ SWIG C++常用工具
 
 代码清单11，sample.h：
 
-#include <cstdint>
+```text
+# include <cstdint>
 int32_t score = 100;
-
+```
 
 代码清单12，sample.i：
 
+```text
 %module sample
 %{
-#include "sample.h"
+
+# include "sample.h"
 %}
 
 %include "sample.h"
-
+```
 
 这样，我们就可以直接在Python脚本中，通过cvar来访问对应的全局变量，如代码清单13所示，输出结果为100。
 
 代码清单13，sample.py：
 
+```python
 import sample
 print sample.cvar.score
-
+```
 
 2.常量
 
@@ -824,9 +1003,10 @@ print sample.cvar.score
 
 代码清单14，sample.i：
 
+```text
 %constant int foo = 100;
 %constant const char* bar = "foobar2000";
-
+```
 
 3.Enumeration
 
@@ -840,30 +1020,37 @@ SWIG对指针有着较为不错的支持，对智能指针也有一定的支持�
 
 代码清单15，sample.h：
 
-#include <cstdint>
+```cpp
+# include <cstdint>
+
 
 void passPointer(ClassA* ptr) {
    printf("result= %d", ptr->result);
 }
+```
 
+```text
 void passReference(const ClassA& ref) {
    printf("result= %d", ref.result);
 }
+```
 
+```text
 void passValue(ClassA obj) {
    printf("result= %d", obj.result);
 }
-
+```
 
 代码清单16，sample.py：
 
 import sample
 
+```text
 a = ClassA() # 创建 ClassA实例
 passPointer(a)
 passReference(a)
 passValue(a)
-
+```
 
 5.字符串
 
@@ -875,8 +1062,6 @@ passValue(a)
 
 %include "std_string.i"
 
-
-
 6.向量
 
 std::vector是STL中最常见也是使用最频繁的顺序容器，模板类比较特殊，因此，它的使用也比字符串稍微复杂一些，需要使用%template进行声明。详细内容我放在了代码清单18中。
@@ -885,14 +1070,16 @@ std::vector是STL中最常见也是使用最频繁的顺序容器，模板类比
 
 %module sample
 
+```text
 %include "std_string.i"
 %include "std_vector.i"
+```
 
+```html
 namespace std {
  %template(DoubleVector) vector<double>;
 }
-
-
+```
 
 7. 映射
 
@@ -902,15 +1089,17 @@ std::map 同样是STL中最常见也是使用最频繁的容器。同样的，�
 
 %module sample
 
+```text
 %include "std_string.i"
 %include "std_map.i"
+```
 
+```css
 namespace std {
  %template(Int2strMap) map<int, string>;
  %template(Str2intMap) map<string, int>;
 }
-
-
+```
 
 学习路径
 
@@ -924,18 +1113,14 @@ namespace std {
 
 第一便是SWIG文档。
 
-
+```text
 a. http://www.swig.org/doc.html
 b. http://www.swig.org/Doc4.0/SWIGPlus.html
 c. PDF版本：http://www.swig.org/Doc4.0/SWIGDocumentation.pdf
-
+```
 
 第二是《C++ Primer》这本书。作为C++领域的经典书籍，这本书对你全面了解C++有极大帮助。
 
 第三则是《高级C/C++编译技术》这本书。这本书的内容更为进阶，你可以把它作为学习C++的提高和了解。
 
 好了，今天的内容就到此结束了。关于SWIG，你有哪些收获，或者还有哪些问题，都欢迎你留言和我分享讨论。也欢迎你把这篇文章分享给你的同事、朋友，我们一起学习和进步。
-
-                        
-                        
-                            

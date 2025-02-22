@@ -1,10 +1,12 @@
 ---
 title: 47基于HTTP协议的网络服务
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             47 基于HTTP协议的网络服务
                             我们在上一篇文章中简单地讨论了网络编程和socket，并由此提及了Go语言标准库中的syscall代码包和net代码包。
+```
 
 我还重点讲述了net.Dial函数和syscall.Socket函数的参数含义。前者间接地调用了后者，所以正确理解后者，会对用好前者有很大裨益。
 
@@ -18,6 +20,7 @@ categories: [Go核心36讲]
 
 其中，最便捷的是使用http.Get函数。我们在调用它的时候只需要传给它一个URL就可以了，比如像下面这样：
 
+```css
 url1 := "http://google.cn"
 fmt.Printf("Send request to %q with method GET ...\n", url1)
 resp1, err := http.Get(url1)
@@ -27,6 +30,7 @@ if err != nil {
 defer resp1.Body.Close()
 line1 := resp1.Proto + " " + resp1.Status
 fmt.Printf("The first line of response:\n%s\n", line1)
+```
 
 
 http.Get函数会返回两个结果值。第一个结果值的类型是*http.Response，它是网络服务给我们传回来的响应内容的结构化表示。
@@ -35,8 +39,10 @@ http.Get函数会返回两个结果值。第一个结果值的类型是*http.Res
 
 http.Get函数会在内部使用缺省的HTTP客户端，并且调用它的Get方法以完成功能。这个缺省的HTTP客户端是由net/http包中的公开变量DefaultClient代表的，其类型是*http.Client。它的基本类型也是可以被拿来使用的，甚至它还是开箱即用的。下面的这两行代码：
 
+```text
 var httpClient1 http.Client
 resp2, err := httpClient1.Get(url1)
+```
 
 
 与前面的这一行代码
@@ -73,11 +79,13 @@ http.Transport类型，会在内部使用一个net.Dialer类型的值（以下�
 http.Transport类型还包含了很多其他的字段，其中有一些字段是关于操作超时的。
 
 
+```text
 IdleConnTimeout：含义是空闲的连接在多久之后就应该被关闭。
 DefaultTransport会把该字段的值设定为90秒。如果该值为0，那么就表示不关闭空闲的连接。注意，这样很可能会造成资源的泄露。
 ResponseHeaderTimeout：含义是，从客户端把请求完全递交给操作系统到从操作系统那里接收到响应报文头的最大时长。DefaultTransport并没有设定该字段的值。
 ExpectContinueTimeout：含义是，在客户端递交了请求报文头之后，等待接收第一个响应报文头的最长时间。在客户端想要使用HTTP的“POST”方法把一个很大的报文体发送给服务端的时候，它可以先通过发送一个包含了“Expect: 100-continue”的请求报文头，来询问服务端是否愿意接收这个大报文体。这个字段就是用于设定在这种情况下的超时时间的。注意，如果该字段的值不大于0，那么无论多大的请求报文体都将会被立即发送出去。这样可能会造成网络资源的浪费。DefaultTransport把该字段的值设定为了1秒。
 TLSHandshakeTimeout：TLS是Transport Layer Security的缩写，可以被翻译为传输层安全。这个字段代表了基于TLS协议的连接在被建立时的握手阶段的超时时间。若该值为0，则表示对这个时间不设限。DefaultTransport把该字段的值设定为了10秒。
+```
 
 
 此外，还有一些与IdleConnTimeout相关的字段值得我们关注，即：MaxIdleConns、MaxIdleConnsPerHost以及MaxConnsPerHost。
@@ -127,9 +135,11 @@ http.Server类型的ListenAndServe方法的功能是：监听一个基于TCP协�
 这个ListenAndServe方法主要会做下面这几件事情。
 
 
+```text
 检查当前的http.Server类型的值（以下简称当前值）的Addr字段。该字段的值代表了当前的网络服务需要使用的网络地址，即：IP地址和端口号. 如果这个字段的值为空字符串，那么就用":http"代替。也就是说，使用任何可以代表本机的域名和IP地址，并且端口号为80。
 通过调用net.Listen函数在已确定的网络地址上启动基于TCP协议的监听。
 检查net.Listen函数返回的错误值。如果该错误值不为nil，那么就直接返回该值。否则，通过调用当前值的Serve方法准备接受和处理将要到来的HTTP请求。
+```
 
 
 可以从当前问题直接衍生出的问题一般有两个，一个是“net.Listen函数都做了哪些事情”，另一个是“http.Server类型的Serve方法是怎样接受和处理HTTP请求的”。
@@ -137,8 +147,10 @@ http.Server类型的ListenAndServe方法的功能是：监听一个基于TCP协�
 对于第一个直接的衍生问题，如果概括地说，回答可以是：
 
 
+```text
 解析参数值中包含的网络地址隐含的IP地址和端口号；
 根据给定的网络协议，确定监听的方法，并开始进行监听。
+```
 
 
 从这里的第二个步骤出发，我们还可以继续提出一些间接的衍生问题。这往往会涉及net.socket函数以及相关的socket知识。

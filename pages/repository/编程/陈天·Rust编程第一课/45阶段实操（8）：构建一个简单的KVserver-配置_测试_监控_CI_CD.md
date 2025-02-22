@@ -1,10 +1,12 @@
 ---
 title: 45阶段实操（8）：构建一个简单的KVserver-配置_测试_监控_CI_CD
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             45 阶段实操（8）：构建一个简单的KV server-配置_测试_监控_CI_CD
                             你好，我是陈天。
+```
 
 终于来到了我们这个 KV server 系列的终章。其实原本 KV server 我只计划了 4 讲，但现在 8 讲似乎都还有些意犹未尽。虽然这是一个“简单”的 KV server，它没有复杂的性能优化 —— 我们只用了一句 unsafe；也没有复杂的生命周期处理 —— 只有零星 ‘static 标注；更没有支持集群的处理。
 
@@ -16,59 +18,76 @@ categories: [陈天·Rust编程第一课]
 
 首先在 Cargo.toml 里添加 serde 和 toml。我们计划使用 toml 做配置文件，serde 用来处理配置的序列化和反序列化：
 
+```text
 [dependencies]
 ...
 serde = { version = "1", features = ["derive"] } # 序列化/反序列化
 ...
 toml = "0.5" # toml 支持
 ...
+```
 
 
 然后来创建一个 src/config.rs，构建 KV server 的配置：
 
+```cpp
 use crate::KvError;
 use serde::{Deserialize, Serialize};
 use std::fs;
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub struct ServerConfig {
     pub general: GeneralConfig,
     pub storage: StorageConfig,
     pub tls: ServerTlsConfig,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub struct ClientConfig {
     pub general: GeneralConfig,
     pub tls: ClientTlsConfig,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub struct GeneralConfig {
     pub addr: String,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "args")]
+```css
 pub enum StorageConfig {
     MemTable,
     SledDb(String),
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```html
 pub struct ServerTlsConfig {
     pub cert: String,
     pub key: String,
     pub ca: Option<String>,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```html
 pub struct ClientTlsConfig {
     pub domain: String,
     pub identity: Option<(String, String)>,
     pub ca: Option<String>,
 }
+```
 
+```javascript
 impl ServerConfig {
     pub fn load(path: &str) -> Result<Self, KvError> {
         let config = fs::read_to_string(path)?;
@@ -76,7 +95,9 @@ impl ServerConfig {
         Ok(config)
     }
 }
+```
 
+```javascript
 impl ClientConfig {
     pub fn load(path: &str) -> Result<Self, KvError> {
         let config = fs::read_to_string(path)?;
@@ -84,18 +105,24 @@ impl ClientConfig {
         Ok(config)
     }
 }
+```
 
 #[cfg(test)]
+```css
 mod tests {
     use super::*;
+```
 
+```cpp
     #[test]
     fn server_config_should_be_loaded() {
         let result: Result<ServerConfig, toml::de::Error> =
             toml::from_str(include_str!("../fixtures/server.conf"));
         assert!(result.is_ok());
     }
+```
 
+```cpp
     #[test]
     fn client_config_should_be_loaded() {
         let result: Result<ClientConfig, toml::de::Error> =
@@ -103,21 +130,24 @@ mod tests {
         assert!(result.is_ok());
     }
 }
+```
 
 
 你可以看到，在 Rust 下，有了 serde 的帮助，处理任何已知格式的配置文件，是多么容易的一件事情。我们只需要定义数据结构，并为数据结构使用 Serialize/Deserialize 派生宏，就可以处理任何支持 serde 的数据结构。
 
 我还写了个 examples/gen_config.rs（你可以自行去查阅它的代码），用来生成配置文件，下面是生成的服务端的配置：
 
+```text
 [general]
 addr = '127.0.0.1:9527'
+```
 
+```text
 [storage]
 type = 'SledDb'
 args = '/tmp/kv_server'
+```
 
-[tls]
-cert = """
 -----BEGIN CERTIFICATE-----\r
 MIIBdzCCASmgAwIBAgIICpy02U2yuPowBQYDK2VwMDMxCzAJBgNVBAYMAkNOMRIw\r
 EAYDVQQKDAlBY21lIEluYy4xEDAOBgNVBAMMB0FjbWUgQ0EwHhcNMjEwOTI2MDEy\r
@@ -128,67 +158,90 @@ cnZlci5hY21lLmluYzATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMEBTADAQEA\r
 MA8GA1UdDwEB/wQFAwMH4AAwBQYDK2VwA0EASGOmOWFPjbGhXNOmYNCa3lInbgRy\r
 iTNtB/5kElnbKkhKhRU7yQ8HTHWWkyU5WGWbOOIXEtYp+5ERUJC+mzP9Bw==\r
 -----END CERTIFICATE-----\r
-"""
-key = """
 -----BEGIN PRIVATE KEY-----\r
 MFMCAQEwBQYDK2VwBCIEIPMyINaewhXwuTPUufFO2mMt/MvQMHrGDGxgdgfy/kUu\r
 oSMDIQCtmdgIxQNLopbTbgr5ehFRZeraWkv8CWAeSHVk9iCEnQ==\r
 -----END PRIVATE KEY-----\r
+```text
+[tls]
+cert = """
 """
+key = """
+"""
+```
 
 
 有了配置文件的支持，就可以在 lib.rs 下写一些辅助函数，让我们创建服务端和客户端更加简单：
 
+```text
 mod config;
 mod error;
 mod network;
 mod pb;
 mod service;
 mod storage;
+```
 
+```cpp
 pub use config::*;
 pub use error::KvError;
 pub use network::*;
 pub use pb::abi::*;
 pub use service::*;
 pub use storage::*;
+```
 
+```cpp
 use anyhow::Result;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::client;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::info;
+```
 
+```javascript
 /// 通过配置创建 KV 服务器
 pub async fn start_server_with_config(config: &ServerConfig) -> Result<()> {
     let acceptor =
         TlsServerAcceptor::new(&config.tls.cert, &config.tls.key, config.tls.ca.as_deref())?;
+```
 
+```javascript
     let addr = &config.general.addr;
     match &config.storage {
         StorageConfig::MemTable => start_tls_server(addr, MemTable::new(), acceptor).await?,
         StorageConfig::SledDb(path) => start_tls_server(addr, SledDb::new(path), acceptor).await?,
     };
+```
 
+```text
     Ok(())
 }
+```
 
+```javascript
 /// 通过配置创建 KV 客户端
 pub async fn start_client_with_config(
     config: &ClientConfig,
 ) -> Result<YamuxCtrl<client::TlsStream<TcpStream>>> {
     let addr = &config.general.addr;
     let tls = &config.tls;
+```
 
+```javascript
     let identity = tls.identity.as_ref().map(|(c, k)| (c.as_str(), k.as_str()));
     let connector = TlsClientConnector::new(&tls.domain, identity, tls.ca.as_deref())?;
     let stream = TcpStream::connect(addr).await?;
     let stream = connector.connect(stream).await?;
+```
 
+```cpp
     // 打开一个 stream
     Ok(YamuxCtrl::new_client(stream, None))
 }
+```
 
+```javascript
 async fn start_tls_server<Store: Storage>(
     addr: &str,
     store: Store,
@@ -201,7 +254,9 @@ async fn start_tls_server<Store: Storage>(
         let tls = acceptor.clone();
         let (stream, addr) = listener.accept().await?;
         info!("Client {:?} connected", addr);
+```
 
+```javascript
         let svc = service.clone();
         tokio::spawn(async move {
             let stream = tls.accept(stream).await.unwrap();
@@ -216,22 +271,29 @@ async fn start_tls_server<Store: Storage>(
         });
     }
 }
+```
 
 
 有了 start_server_with_config 和 start_client_with_config 这两个辅助函数，我们就可以简化 src/server.rs 和 src/client.rs 了。下面是 src/server.rs 的新代码：
 
+```cpp
 use anyhow::Result;
 use kv6::{start_server_with_config, ServerConfig};
+```
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let config: ServerConfig = toml::from_str(include_str!("../fixtures/server.conf"))?;
+```
 
     start_server_with_config(&config).await?;
 
+```text
     Ok(())
 }
+```
 
 
 可以看到，整个代码简洁了很多。在这个重构的过程中，还有一些其它改动，你可以看 GitHub repo 下 45 讲的 diff_config。
@@ -242,6 +304,7 @@ async fn main() -> Result<()> {
 
 之前提到在 Rust 里，集成测试放在 tests 目录下，每个测试编成单独的二进制。所以首先，我们创建和 src 平行的 tests 目录。然后再创建 tests/server.rs，填入以下代码：
 
+```cpp
 use anyhow::Result;
 use kv6::{
     start_client_with_config, start_server_with_config, ClientConfig, CommandRequest,
@@ -249,41 +312,60 @@ use kv6::{
 };
 use std::time::Duration;
 use tokio::time;
+```
 
 #[tokio::test]
+```javascript
 async fn yamux_server_client_full_tests() -> Result<()> {
     let addr = "127.0.0.1:10086";
+```
 
+```cpp
     let mut config: ServerConfig = toml::from_str(include_str!("../fixtures/server.conf"))?;
     config.general.addr = addr.into();
     config.storage = StorageConfig::MemTable;
+```
 
+```cpp
     // 启动服务器
     tokio::spawn(async move {
         start_server_with_config(&config).await.unwrap();
     });
+```
 
+```cpp
     time::sleep(Duration::from_millis(10)).await;
     let mut config: ClientConfig = toml::from_str(include_str!("../fixtures/client.conf"))?;
     config.general.addr = addr.into();
+```
 
+```javascript
     let mut ctrl = start_client_with_config(&config).await.unwrap();
     let stream = ctrl.open_stream().await?;
     let mut client = ProstClientStream::new(stream);
+```
 
+```javascript
     // 生成一个 HSET 命令
     let cmd = CommandRequest::new_hset("table1", "hello", "world".to_string().into());
     client.execute_unary(&cmd).await?;
+```
 
+```javascript
     // 生成一个 HGET 命令
     let cmd = CommandRequest::new_hget("table1", "hello");
     let data = client.execute_unary(&cmd).await?;
+```
 
+```text
     assert_eq!(data.status, 200);
     assert_eq!(data.values, &["world".into()]);
+```
 
+```text
     Ok(())
 }
+```
 
 
 可以看到，集成测试的写法和单元测试其实很类似，只不过我们不需要再使用 #[cfg(test)] 来做条件编译。
@@ -300,6 +382,7 @@ async fn yamux_server_client_full_tests() -> Result<()> {
 
 为了确认这一点，我们在 start_tls_server() 函数中，在 process() 之前，再加个 100ms 的延时，人为减缓系统的处理速度：
 
+```javascript
 async move {
     let stream = ProstServerStream::new(stream.compat(), svc1.clone());
     // 延迟 100ms 处理
@@ -307,28 +390,34 @@ async move {
     stream.process().await.unwrap();
     Ok(())
 }
+```
 
 
 好，现在可以写性能测试了。
 
 在 Rust 下，我们可以用 criterion 库。它可以处理基本的性能测试，并生成漂亮的报告。所以在 Cargo.toml 中加入：
 
+```text
 [dev-dependencies]
 ...
 criterion = { version = "0.3", features = ["async_futures", "async_tokio", "html_reports"] } # benchmark
 ...
 rand = "0.8" # 随机数处理
 ...
+```
 
+```text
 [[bench]]
 name = "pubsub"
 harness = false
+```
 
 
 最后这个 bench section，描述了性能测试的名字，它对应 benches 目录下的同名文件。
 
 我们创建和 src 平级的 benches，然后再创建 benches/pubsub.rs，添入如下代码：
 
+```cpp
 use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::StreamExt;
@@ -343,28 +432,40 @@ use tokio::runtime::Builder;
 use tokio::time;
 use tokio_rustls::client::TlsStream;
 use tracing::info;
+```
 
+```javascript
 async fn start_server() -> Result<()> {
     let addr = "127.0.0.1:9999";
     let mut config: ServerConfig = toml::from_str(include_str!("../fixtures/server.conf"))?;
     config.general.addr = addr.into();
     config.storage = StorageConfig::MemTable;
+```
 
+```cpp
     tokio::spawn(async move {
         start_server_with_config(&config).await.unwrap();
     });
+```
 
+```text
     Ok(())
 }
+```
 
+```javascript
 async fn connect() -> Result<YamuxCtrl<TlsStream<TcpStream>>> {
     let addr = "127.0.0.1:9999";
     let mut config: ClientConfig = toml::from_str(include_str!("../fixtures/client.conf"))?;
     config.general.addr = addr.into();
+```
 
+```text
     Ok(start_client_with_config(&config).await?)
 }
+```
 
+```javascript
 async fn start_subscribers(topic: &'static str) -> Result<()> {
     let mut ctrl = connect().await?;
     let stream = ctrl.open_stream().await?;
@@ -376,24 +477,36 @@ async fn start_subscribers(topic: &'static str) -> Result<()> {
             drop(data);
         }
     });
+```
 
+```text
     Ok(())
 }
+```
 
+```javascript
 async fn start_publishers(topic: &'static str, values: &'static [&'static str]) -> Result<()> {
     let mut rng = rand::thread_rng();
     let v = values.choose(&mut rng).unwrap();
+```
 
+```text
     let mut ctrl = connect().await.unwrap();
     let mut stream = ctrl.open_stream().await.unwrap();
     info!("C(publisher): stream opened");
+```
 
+```javascript
     let cmd = CommandRequest::new_publish(topic.to_string(), vec![(*v).into()]);
     stream.execute_unary(&cmd).await.unwrap();
+```
 
+```text
     Ok(())
 }
+```
 
+```javascript
 fn pubsub(c: &mut Criterion) {
     // tracing_subscriber::fmt::init();
     // 创建 Tokio runtime
@@ -405,7 +518,9 @@ fn pubsub(c: &mut Criterion) {
         .unwrap();
     let values = &["Hello", "Tyr", "Goodbye", "World"];
     let topic = "lobby";
+```
 
+```cpp
     // 运行服务器和 100 个 subscriber，为测试准备
     runtime.block_on(async {
         eprint!("preparing server and subscribers");
@@ -417,46 +532,57 @@ fn pubsub(c: &mut Criterion) {
         }
         eprintln!("Done!");
     });
+```
 
+```css
     // 进行 benchmark
     c.bench_function("publishing", move |b| {
         b.to_async(&runtime)
             .iter(|| async { start_publishers(topic, values).await })
     });
 }
+```
 
+```cpp
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(10);
     targets = pubsub
 }
 criterion_main!(benches);
+```
 
 
 大部分的代码都很好理解，就是创建服务器和客户端，为测试做准备。说一下这里面核心的 benchmark 代码：
 
+```css
 c.bench_function("publishing", move |b| {
     b.to_async(&runtime)
         .iter(|| async { start_publishers(topic, values).await })
 });
+```
 
 
 对于要测试的代码，我们可以封装成一个函数进行测试。这里因为要做 async 函数的测试，需要使用 runtime。普通的函数不需要调用 to_async。对于更多有关 criterion 的用法，可以参考它的文档。
 
 运行 cargo bench 后，会见到如下打印（如果你的代码无法通过，可以参考 repo 里的 diff_benchmark，我顺便做了一点小重构）：
 
+```text
 preparing server and subscribers....................................................................................................Done!
 publishing              time:   [419.73 ms 426.84 ms 434.20 ms]                     
                         change: [-1.6712% +1.0499% +3.6586%] (p = 0.48 > 0.05)
                         No change in performance detected.
+```
 
 
 可以看到，单个 publish 的处理速度要 426ms，好慢！我们把之前在 start_tls_server() 里加的延迟去掉，再次测试：
 
+```text
 preparing server and subscribers....................................................................................................Done!
 publishing              time:   [318.61 ms 324.48 ms 329.81 ms]                     
                         change: [-25.854% -23.980% -22.144%] (p = 0.00 < 0.05)
                         Performance has improved.
+```
 
 
 嗯，这下 324ms，正好是减去刚才加的 100ms。可是这个速度依旧不合理，凭直觉我们感觉一下这个速度，是 Python 这样的语言还正常，如果是 Rust 也太慢了吧？
@@ -471,6 +597,7 @@ publishing              time:   [318.61 ms 324.48 ms 329.81 ms]
 
 好，在 Cargo.toml 里添加新的依赖：
 
+```text
 [dependencies]
 ...
 opentelemetry-jaeger = "0.15" # opentelemetry jaeger 支持
@@ -478,27 +605,34 @@ opentelemetry-jaeger = "0.15" # opentelemetry jaeger 支持
 tracing-appender = "0.1" # 文件日志
 tracing-opentelemetry = "0.15" # opentelemetry 支持
 tracing-subscriber = { version = "0.2", features = ["json", "chrono"] } # 日志处理
+```
 
 
 有了这些依赖后，在 benches/pubsub.rs 里，我们可以在初始化 tracing_subscriber 时，使用 jaeger 和 opentelemetry tracer：
 
+```javascript
 fn pubsub(c: &mut Criterion) {
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_service_name("kv-bench")
         .install_simple()
         .unwrap();
     let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+```
 
+```cpp
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
         .with(opentelemetry)
         .init();
+```
 
+```javascript
     let root = span!(tracing::Level::INFO, "app_start", work_units = 2);
     let _enter = root.enter();
     // 创建 Tokio runtime
 		...
 }
+```
 
 
 设置好 tracing 后，就在系统的主流程上添加相应的 instrument：-
@@ -518,11 +652,13 @@ RUST_LOG=info cargo bench
 
 由于我的 OS X 上没装 docker（docker 不支持 Mac，需要 Linux VM 中转），我就在一个 Ubuntu 虚拟机里运行这两条命令：
 
+```text
 preparing server and subscribers....................................................................................................Done!
 publishing              time:   [1.7464 ms 1.9556 ms 2.2343 ms]                       
 Found 2 outliers among 10 measurements (20.00%)
   1 (10.00%) high mild
   1 (10.00%) high severe
+```
 
 
 并没有做任何事情，似乎只是换了个系统，性能就提升了很多，这给我们一个 tip：也许问题出在 OS X 和 Linux 系统相关的部分。
@@ -540,38 +676,48 @@ Found 2 outliers among 10 measurements (20.00%)
 仔细阅读 TlsClientConnector::new() 的代码，你可以对照注释看：
 
 #[instrument(name = "tls_connector_new", skip_all)]
+```cpp
 pub fn new(
     domain: impl Into<String> + std::fmt::Debug,
     identity: Option<(&str, &str)>,
     server_ca: Option<&str>,
 ) -> Result<Self, KvError> {
     let mut config = ClientConfig::new();
+```
 
+```javascript
     // 如果有客户端证书，加载之
     if let Some((cert, key)) = identity {
         let certs = load_certs(cert)?;
         let key = load_key(key)?;
         config.set_single_client_cert(certs, key)?;
     }
+```
 
+```javascript
     // 加载本地信任的根证书链
     config.root_store = match rustls_native_certs::load_native_certs() {
         Ok(store) | Err((Some(store), _)) => store,
         Err((None, error)) => return Err(error.into()),
     };
+```
 
+```cpp
     // 如果有签署服务器的 CA 证书，则加载它，这样服务器证书不在根证书链
     // 但是这个 CA 证书能验证它，也可以
     if let Some(cert) = server_ca {
         let mut buf = Cursor::new(cert);
         config.root_store.add_pem_file(&mut buf).unwrap();
     }
+```
 
+```cpp
     Ok(Self {
         config: Arc::new(config),
         domain: Arc::new(domain.into()),
     })
 }
+```
 
 
 可以发现，它的代码唯一可能影响性能的就是加载本地信任的根证书链的部分。这个代码会和操作系统交互，获取信任的根证书链。也许，这就是影响性能的原因之一？
@@ -579,20 +725,25 @@ pub fn new(
 那我们将其简单重构一下。因为根证书链，只有在客户端没有提供用于验证服务器证书的 CA 证书时，才需要，所以可以在没有 CA 证书时，才加载本地的根证书链：
 
 #[instrument(name = "tls_connector_new", skip_all)]
+```cpp
 pub fn new(
     domain: impl Into<String> + std::fmt::Debug,
     identity: Option<(&str, &str)>,
     server_ca: Option<&str>,
 ) -> Result<Self, KvError> {
     let mut config = ClientConfig::new();
+```
 
+```javascript
     // 如果有客户端证书，加载之
     if let Some((cert, key)) = identity {
         let certs = load_certs(cert)?;
         let key = load_key(key)?;
         config.set_single_client_cert(certs, key)?;
     }
+```
 
+```javascript
     // 如果有签署服务器的 CA 证书，则加载它，这样服务器证书不在根证书链
     // 但是这个 CA 证书能验证它，也可以
     if let Some(cert) = server_ca {
@@ -605,12 +756,15 @@ pub fn new(
             Err((None, error)) => return Err(error.into()),
         };
     }
+```
 
+```cpp
     Ok(Self {
         config: Arc::new(config),
         domain: Arc::new(domain.into()),
     })
 }
+```
 
 
 完成这个修改后，我们再运行 RUST_LOG=info cargo bench，现在的性能达到了 1.64ms，相比之前的 1.95ms，提升了 16%。
@@ -626,11 +780,13 @@ pub fn new(
 
 这是我们在 start_tls_server() 里额外添加的 tracing span：
 
+```javascript
 loop {
 		let root = span!(tracing::Level::INFO, "server_process");
 		let _enter = root.enter();
 		...
 }
+```
 
 
 把右上角的 trace timeline 改成 trace graph，然后点右侧的 time：-
@@ -640,36 +796,45 @@ loop {
 
 由于 tracing 本身也占用不少 CPU，所以我们直接 cargo bench 看看目前的结果：
 
+```text
 preparing server and subscribers....................................................................................................Done!
 publishing              time:   [1.3986 ms 1.4140 ms 1.4474 ms]                       
                         change: [-26.647% -19.977% -10.798%] (p = 0.00 < 0.05)
                         Performance has improved.
 Found 2 outliers among 10 measurements (20.00%)
   2 (20.00%) high severe
+```
 
 
 不加 RUST_LOG=info 后，整体性能到了 1.4ms。这是我在 Ubuntu 虚拟机下的结果。
 
 我们再回到 OS X 下测试，看看 TlsClientConnector::new() 的修改，对OS X 是否有效：
 
+```text
 preparing server and subscribers....................................................................................................Done!
 publishing              time:   [1.4086 ms 1.4229 ms 1.4315 ms]                       
                         change: [-99.570% -99.563% -99.554%] (p = 0.00 < 0.05)
                         Performance has improved.
+```
 
 
 嗯，在我的 OS X下，现在整体性能也到了 1.4ms 的水平。这也意味着，在有 100 个 subscribers 的情况下，我们的 KV server 每秒钟可以处理 714k publish 请求；而在 1000 个 subscribers 的情况下，性能在 11.1ms 的水平，也就是每秒可以处理 90k publish 请求：
 
+```text
 publishing              time:   [11.007 ms 11.095 ms 11.253 ms]                      
                         change: [-96.618% -96.556% -96.486%] (p = 0.00 < 0.05)
                         Performance has improved.
+```
 
 
 你也许会觉得目前 publish 的 value 太小，那换一些更加贴近实际的字符串大小：
 
+```javascript
 // let values = &["Hello", "Tyr", "Goodbye", "World"];
 let base_str = include_str!("../fixtures/server.conf"); // 891 bytes
+```
 
+```cpp
 let values: &'static [&'static str] = Box::leak(
     vec![
         &base_str[..64],
@@ -679,13 +844,16 @@ let values: &'static [&'static str] = Box::leak(
     ]
     .into_boxed_slice(),
 );
+```
 
 
 测试结果差不太多：
 
+```text
 publishing              time:   [10.917 ms 11.098 ms 11.428 ms]                      
                         change: [-0.4822% +2.3311% +4.9631%] (p = 0.12 > 0.05)
                         No change in performance detected.
+```
 
 
 criterion 还会生成漂亮的 report，你可以用浏览器打开 ./target/criterion/publishing/report/index.html 查看（名字是publishing ，因为 benchmark ID 是 publishing）：-
@@ -695,6 +863,7 @@ criterion 还会生成漂亮的 report，你可以用浏览器打开 ./target/cr
 
 use std::env;
 
+```cpp
 use anyhow::Result;
 use kv6::{start_server_with_config, RotationConfig, ServerConfig};
 use tokio::fs;
@@ -705,8 +874,10 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     // 如果有环境变量，使用环境变量中的 config
     let config = match env::var("KV_SERVER_CONFIG") {
@@ -714,12 +885,16 @@ async fn main() -> Result<()> {
         Err(_) => include_str!("../fixtures/server.conf").to_string(),
     };
     let config: ServerConfig = toml::from_str(&config)?;
+```
 
+```javascript
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_service_name("kv-server")
         .install_simple()?;
     let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+```
 
+```javascript
     // 添加
     let log = &config.log;
     let file_appender = match log.rotation {
@@ -727,53 +902,70 @@ async fn main() -> Result<()> {
         RotationConfig::Daily => tracing_appender::rolling::daily(&log.path, "server.log"),
         RotationConfig::Never => tracing_appender::rolling::never(&log.path, "server.log"),
     };
+```
 
+```javascript
     let (non_blocking, _guard1) = tracing_appender::non_blocking(file_appender);
     let fmt_layer = fmt::layer()
         .event_format(format().compact())
         .with_writer(non_blocking);
+```
 
+```cpp
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
         .with(fmt_layer)
         .with(opentelemetry)
         .init();
+```
 
+```javascript
     let root = span!(tracing::Level::INFO, "app_start", work_units = 2);
     let _enter = root.enter();
+```
 
     start_server_with_config(&config).await?;
 
+```text
     Ok(())
 }
+```
 
 
 为了让日志能在配置文件中配置，需要更新一下 src/config.rs：
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub struct ServerConfig {
     pub general: GeneralConfig,
     pub storage: StorageConfig,
     pub tls: ServerTlsConfig,
     pub log: LogConfig,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub struct LogConfig {
     pub path: String,
     pub rotation: RotationConfig,
 }
+```
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+```css
 pub enum RotationConfig {
     Hourly,
     Daily,
     Never,
 }
+```
 
 
+```text
 你还需要更新 examples/gen_config.rs。相关的改变可以看 repo 下的 diff_logging。-
 tracing 和 opentelemetry 还支持 prometheus，你可以使用 opentelemetry-prometheus 来和 prometheus 交互，如果有兴趣，你可以自己深入研究一下。
+```
 
 CI/CD
 
@@ -782,17 +974,20 @@ CI/CD
 先说CI吧。这个课程的 repo tyrchen/geektime-rust 在一开始就设置了 github action，每次 commit 都会运行：
 
 
+```text
 代码格式检查：cargo fmt
 依赖 license 检查：cargo deny
 linting：cargo check 和 cargo clippy
 单元测试和集成测试：cargo test
 生成文档：cargo doc
+```
 
 
 github action 配置如下，供你参考：
 
 name: build
 
+```markdown
 on:
   push:
     branches:
@@ -800,7 +995,9 @@ on:
   pull_request:
     branches:
       - master
+```
 
+```markdown
 jobs:
   build-rust:
     strategy:
@@ -845,17 +1042,21 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./target/doc
+```
 
 
 除此之外，我们还可以在每次 push tag 时做 release：
 
 name: release
 
+```text
 on:
   push:
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+```
 
+```bash
 jobs:
   build:
     name: Upload Release Asset
@@ -915,6 +1116,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./target/doc/simple_kv
           destination_dir: ${{ env.RELEASE_VERSION }}
+```
 
 
 这样，每次 push tag 时，都可以打包出来 Linux 的 kvs 版本：-
@@ -925,10 +1127,12 @@ jobs:
 在做 CI 的过程中，我们也可以触发 CD，比如：
 
 
+```text
 PR merge 到 master，在 build 完成后，触发 dev 服务器的部署，团队内部可以尝试；
 如果 release tag 包含 alpha，在 build 完成后，触发 staging 服务器的部署，公司内部可以使用；
 如果 release tag 包含 beta，在 build 完成后，触发 beta 服务器的部署，beta 用户可以使用；
 正式的 release tag 会触发生产环境的滚动升级，升级覆盖到的用户可以使用。
+```
 
 
 一般来说，每家企业都有自己的 CI/CD 的工具链，这里为了展示方便，我们演示了如何使用 github action 对 Rust 代码做 CI，你可以按照自己的需要来处理。
@@ -940,18 +1144,20 @@ PR merge 到 master，在 build 完成后，触发 dev 服务器的部署，团�
 
 我们的 KV server 之旅就到此为止了。在整整 7 堂课里，我们一点点从零构造了一个完整的 KV server，包括注释在内，撰写了近三千行代码：
 
-❯ tokei .
 -------------------------------------------------------------------------------
  Language            Files        Lines         Code     Comments       Blanks
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+ Total                  30         3784         2939          311          534
+-------------------------------------------------------------------------------
+```text
+❯ tokei .
  Makefile                1           24           16            1            7
  Markdown                1            7            7            0            0
  Protocol Buffers        1          119           79           23           17
  Rust                   25         3366         2730          145          491
  TOML                    2          268          107          142           19
--------------------------------------------------------------------------------
- Total                  30         3784         2939          311          534
--------------------------------------------------------------------------------
+```
 
 
 这是一个非常了不起的成就！我们应该为自己感到自豪！
@@ -973,12 +1179,14 @@ PR merge 到 master，在 build 完成后，触发 dev 服务器的部署，团�
 
 我们目前并未对日志做任何配置。一般来说，怎么做日志，会有相应的开关以及日志级别，如果希望能通过如下的配置记录日志，该怎么做？试试看：
 
+```text
 [log]
 enable_log_file = true
 enable_jaeger = false
 log_level = 'info'
 path = '/tmp/kv-log'
 rotation = 'Daily'
+```
 
 
 欢迎在留言区分享自己做 KV server 系列的想法和感悟。你已经完成了第45次打卡，我们下节课见。

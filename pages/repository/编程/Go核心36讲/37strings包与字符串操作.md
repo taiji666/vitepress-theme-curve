@@ -1,10 +1,12 @@
 ---
 title: 37strings包与字符串操作
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             37 strings包与字符串操作
                             在上一篇文章中，我介绍了Go语言与Unicode编码规范、UTF-8编码格式的渊源及运用。
+```
 
 Go语言不但拥有可以独立代表Unicode字符的类型rune，而且还有可以对字符串值进行Unicode字符拆分的for语句。
 
@@ -27,9 +29,11 @@ Go语言不但拥有可以独立代表Unicode字符的类型rune，而且还有�
 strings.Builder类型的值（以下简称Builder值）的优势有下面的三种：
 
 
+```text
 已存在的内容不可变，但可以拼接更多的内容；
 减少了内存分配和内容拷贝的次数；
 可将内容重置，可重用值。
+```
 
 
 问题解析
@@ -37,8 +41,10 @@ strings.Builder类型的值（以下简称Builder值）的优势有下面的三�
 先来说说string类型。 我们都知道，在Go语言中，string类型的值是不可变的。 如果我们想获得一个不一样的字符串，那么就只能基于原字符串进行裁剪、拼接等操作，从而生成一个新的字符串。
 
 
+```text
 裁剪操作可以使用切片表达式；
 拼接操作可以用操作符+实现。
+```
 
 
 在底层，一个string值的内容会被存储到一块连续的内存空间中。同时，这块内存容纳的字节数量也会被记录下来，并用于表示该string值的长度。
@@ -77,18 +83,22 @@ Builder值中有一个用于承载内容的容器（以下简称内容容器）�
 
 如有必要，Grow方法会把其所属值中内容容器的容量增加n个字节。更具体地讲，它会生成一个字节切片作为新的内容容器，该切片的容量会是原容器容量的二倍再加上n。之后，它会把原容器中的所有字节全部拷贝到新容器中。
 
+```text
 var builder1 strings.Builder
 // 省略若干代码。
 fmt.Println("Grow the builder ...")
 builder1.Grow(10)
 fmt.Printf("The length of contents in the builder is %d.\n", builder1.Len())
+```
 
 
 当然，Grow方法还可能什么都不做。这种情况的前提条件是：当前的内容容器中的未用容量已经够用了，即：未用容量大于或等于n。这里的前提条件与前面提到的自动扩容策略中的前提条件是类似的。
 
+```text
 fmt.Println("Reset the builder ...")
 builder1.Reset()
 fmt.Printf("The third output(%d):\n%q\n", builder1.Len(), builder1.String())
+```
 
 
 最后，Builder值是可以被重用的。通过调用它的Reset方法，我们可以让Builder值重新回到零值状态，就像它从未被使用过那样。
@@ -102,8 +112,10 @@ fmt.Printf("The third output(%d):\n%q\n", builder1.Len(), builder1.String())
 答案是：有约束，概括如下：
 
 
+```text
 在已被真正使用后就不可再被复制；
 由于其内容不是完全不可变的，所以需要使用方自行解决操作冲突和并发安全问题。
+```
 
 
 我们只要调用了Builder值的拼接方法或扩容方法，就意味着开始真正使用它了。显而易见，这些方法都会改变其所属值中的内容容器的状态。
@@ -112,11 +124,13 @@ fmt.Printf("The third output(%d):\n%q\n", builder1.Len(), builder1.String())
 
 这种panic会告诉我们，这样的使用方式是并不合法的，因为这里的Builder值是副本而不是原值。顺便说一句，这里所说的复制方式，包括但不限于在函数间传递值、通过通道传递值、把值赋予变量等等。
 
+```text
 var builder1 strings.Builder
 builder1.Grow(1)
 builder3 := builder1
 //builder3.Grow(1) // 这里会引发panic。
 _ = builder3
+```
 
 
 虽然这个约束非常严格，但是如果我们仔细思考一下的话，就会发现它还是有好处的。
@@ -125,6 +139,7 @@ _ = builder3
 
 不过，虽然已使用的Builder值不能再被复制，但是它的指针值却可以。无论什么时候，我们都可以通过任何方式复制这样的指针值。注意，这样的指针值指向的都会是同一个Builder值。
 
+```text
 f2 := func(bp *strings.Builder) {
  (*bp).Grow(1) // 这里虽然不会引发panic，但不是并发安全的。
  builder4 := *bp
@@ -132,6 +147,7 @@ f2 := func(bp *strings.Builder) {
  _ = builder4
 }
 f2(&builder1)
+```
 
 
 正因为如此，这里就产生了一个问题，即：如果Builder值被多方同时操作，那么其中的内容就很可能会产生混乱。这就是我们所说的操作冲突和并发安全问题。
@@ -140,9 +156,11 @@ Builder值自己是无法解决这些问题的。所以，我们在通过传递�
 
 我们可以在各处分别声明一个Builder值来使用，也可以先声明一个Builder值，然后在真正使用它之前，便将它的副本传到各处。另外，我们还可以先使用再传递，只要在传递之前调用它的Reset方法即可。
 
+```text
 builder1.Reset()
 builder5 := builder1
 builder5.Grow(1) // 这里不会引发panic。
+```
 
 
 总之，关于复制Builder值的约束是有意义的，也是很有必要的。虽然我们仍然可以通过某些方式共享Builder值，但最好还是不要以身犯险，“各自为政”是最好的解决方案。不过，对于处在零值状态的Builder值，复制不会有任何问题。
@@ -157,9 +175,11 @@ strings.Reader类型的值（以下简称Reader值）可以让我们很方便地
 
 此外，这个已读计数也是读取回退和位置设定时的重要依据。虽然它属于Reader值的内部结构，但我们还是可以通过该值的Len方法和Size把它计算出来的。代码如下：
 
+```text
 var reader1 strings.Reader
 // 省略若干代码。
 readingIndex := reader1.Size() - int64(reader1.Len()) // 计算出的已读计数。
+```
 
 
 Reader值拥有的大部分用于读取的方法都会及时地更新已读计数。比如，ReadByte方法会在读取成功后将这个计数的值加1。
@@ -174,12 +194,14 @@ Reader值拥有的大部分用于读取的方法都会及时地更新已读计�
 
 由于Seek方法会返回新的计数值，所以我们可以很容易地验证这一点。比如像下面这样：
 
+```text
 offset2 := int64(17)
 expectedIndex := reader1.Size() - int64(reader1.Len()) + offset2
 fmt.Printf("Seek with offset %d and whence %d ...\n", offset2, io.SeekCurrent)
 readingIndex, _ := reader1.Seek(offset2, io.SeekCurrent)
 fmt.Printf("The reading index in reader: %d (returned by Seek)\n", readingIndex)
 fmt.Printf("The reading index in reader: %d (computed by me)\n", expectedIndex)
+```
 
 
 综上所述，Reader值实现高效读取的关键就在于它内部的已读计数。计数的值就代表着下一次读取的起始索引位置。它可以很容易地被计算出来。Reader值的Seek方法可以直接设定该值中的已读计数值。

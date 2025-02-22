@@ -1,10 +1,12 @@
 ---
 title: 37Kafka&amp;ZMQ：自动化交易流水线
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             37 Kafka & ZMQ：自动化交易流水线
                             你好，我是景霄。
+```
 
 在进行这节课的学习前，我们先来回顾一下，前面三节课，我们学了些什么。
 
@@ -53,8 +55,10 @@ categories: [Python核心技术与实战]
 消息队列的模式是发布和订阅，一个或多个消息发布者可以发布消息，一个或多个消息接受者可以订阅消息。 从图中你可以看到，消息发布者和消息接受者之间没有直接耦合，其中，
 
 
+```text
 消息发布者将消息发送到分布式消息队列后，就结束了对消息的处理；
 消息接受者从分布式消息队列获取该消息后，即可进行后续处理，并不需要探寻这个消息从何而来。
+```
 
 
 至于新增业务的问题，只要你对这类消息感兴趣，即可订阅该消息，对原有系统和业务没有任何影响，所以也就实现了业务的可扩展性设计。
@@ -72,9 +76,11 @@ ZMQ
 ZMQ 是一个简单好用的传输层，它有三种使用模式：
 
 
+```text
 Request - Reply 模式；
 Publish - Subscribe 模式；
 Parallel Pipeline 模式。
+```
 
 
 第一种模式很简单，client 发消息给 server，server 处理后返回给 client，完成一次交互。这个场景你一定很熟悉吧，没错，和 HTTP 模式非常像，所以这里我就不重点介绍了。至于第三种模式，与今天内容无关，这里我也不做深入讲解。
@@ -85,89 +91,115 @@ Parallel Pipeline 模式。
 import zmq
 
 
+```python
 def run():
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
     socket.connect('tcp://127.0.0.1:6666')
     socket.setsockopt_string(zmq.SUBSCRIBE, '')
+```
 
+```python
     print('client 1')
     while True:
         msg = socket.recv()
         print("msg: %s" % msg)
+```
 
 
+```python
 if __name__ == '__main__':
     run()
+```
 
 ########## 输出 ##########
 
+```text
 client 1
 msg: b'server cnt 1'
 msg: b'server cnt 2'
 msg: b'server cnt 3'
 msg: b'server cnt 4'
 msg: b'server cnt 5'
+```
 
 
 # 订阅者 2
 import zmq
 
 
+```python
 def run():
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
     socket.connect('tcp://127.0.0.1:6666')
     socket.setsockopt_string(zmq.SUBSCRIBE, '')
+```
 
+```python
     print('client 2')
     while True:
         msg = socket.recv()
         print("msg: %s" % msg)
+```
 
 
+```python
 if __name__ == '__main__':
     run()
+```
 
 ########## 输出 ##########
 
+```text
 client 2
 msg: b'server cnt 1'
 msg: b'server cnt 2'
 msg: b'server cnt 3'
 msg: b'server cnt 4'
 msg: b'server cnt 5'
+```
 
 
 # 发布者
+```python
 import time
 import zmq
+```
 
 
+```python
 def run():
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
     socket.bind('tcp://*:6666')
+```
 
     cnt = 1
 
+```python
     while True:
         time.sleep(1)
         socket.send_string('server cnt {}'.format(cnt))
         print('send {}'.format(cnt))
         cnt += 1
+```
 
 
+```python
 if __name__ == '__main__':
     run()
+```
 
 ########## 输出 ##########
 
+```text
 send 1
 send 2
 send 3
 send 4
 send 5
+```
 
 
 这里要注意的一点是，如果你想要运行代码，请先运行两个订阅者，然后再打开发布者。
@@ -232,8 +264,10 @@ Kafka的代码实现，和ZMQ大同小异，这里我就不专门讲解了。关
 今天的思考题，文中我也提到过，这里再专门列出强调一下。在ZMQ 那里，我提出了两个问题：
 
 
+```text
 如果你试着把发布者的 time.sleep(1) 放在 while 循环的最后，会发生什么？为什么？
 如果有多个发布者，ZMQ 应该怎么做呢？
+```
 
 
 欢迎留言写下你的思考和疑惑，也欢迎你把这篇文章分享给更多的人一起学习。

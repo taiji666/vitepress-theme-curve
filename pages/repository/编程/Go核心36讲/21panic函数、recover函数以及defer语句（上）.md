@@ -1,10 +1,12 @@
 ---
 title: 21panic函数、recover函数以及defer语句（上）
-date: 1739706057.6533997
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             21 panic函数、recover函数以及defer语句 （上）
                             我在上两篇文章中，详细地讲述了Go语言中的错误处理，并从两个视角为你总结了错误类型、错误值的处理技巧和设计方式。
+```
 
 在本篇，我要给你展示Go语言的另外一种错误处理方式。不过，严格来说，它处理的不是错误，而是异常，并且是一种在我们意料之外的程序异常。
 
@@ -24,10 +26,12 @@ Go程序，确切地说是程序内嵌的Go语言运行时系统，会在执行�
 
 panic: runtime error: index out of range
 
+```text
 goroutine 1 [running]:
 main.main()
  /Users/haolin/GeekTime/Golang_Puzzlers/src/puzzlers/article19/q0/demo47.go:5 +0x3d
 exit status 2
+```
 
 
 这份详情的第一行是“panic: runtime error: index out of range”。其中的“runtime error”的含义是，这是一个runtime代码包中抛出的panic。在这个panic中，包含了一个runtime.Error接口类型的值。runtime.Error接口内嵌了error接口，并做了一点点扩展，runtime包中有不少它的实现类型。
@@ -78,6 +82,7 @@ Go语言的内建函数panic是专门用于引发panic的。panic函数使程序
 
 比如，main函数调用了caller1函数，而caller1函数又调用了caller2函数，那么caller2函数中代码的执行信息会先出现，然后是caller1函数中代码的执行信息，最后才是main函数的信息。
 
+```text
 goroutine 1 [running]:
 main.caller2()
  /Users/haolin/GeekTime/Golang_Puzzlers/src/puzzlers/article19/q1/demo48.go:22 +0x91
@@ -86,6 +91,7 @@ main.caller1()
 main.main()
  /Users/haolin/GeekTime/Golang_Puzzlers/src/puzzlers/article19/q1/demo48.go:9 +0x66
 exit status 2
+```
 
 
 

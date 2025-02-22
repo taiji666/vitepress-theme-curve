@@ -1,10 +1,12 @@
 ---
 title: 23结构型：通过jQuery看结构型模式
-date: 1739706057.6064274
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             23 结构型：通过jQuery看结构型模式
                             你好，我是石川。
+```
 
 今天，我带你顺着上一节的内容，再来看看在GoF（四人组）的《设计模式：可复用面向对象软件的基础》这本书中介绍的另外几种经典的结构型设计模式。我们可以通过jQuery来看看结构型的设计，说到这里，你可能会说jQuery可以算是被吐槽比较多的一个框架了，它有什么参考价值呢？但是我认为用户是用脚投票的，虽然很多人在骂着jQuery，但是同时也在用着。这也证明了它从开发上提供给人们的便捷，作为优点要大于它的缺点。其实，它的很多让人们“恨不释手”的设计背后都能看到结构型的设计模式。今天，我们就一起来看看吧。
 
@@ -30,6 +32,7 @@ categories: [JavaScript进阶实战课]
 
 我们用一个租车的例子来解释，在租车行里，同一款车（car）可能有好几辆，这几款车的车型（model）、制造商（maker）、识别码（vin） 都是一样的，那我们可以说这些就是内在数据，可以通过单个共享对象 cars 存储。但是每个车目前出租的状态（availability）、租金 （sales） 是不同的，这些我们就可以作为外在数据存储。当通过 addCar 加进来新车时，createCar 可以判断是创建新的车型，还是基于vin返回已有的车型就可以了。所以下面我们虽然创建了5条车辆记录，但只有3个车型的实例。
 
+```css
 // 储存车型的独立对象
 class Car {
   constructor(model, maker, vin) {
@@ -38,27 +41,41 @@ class Car {
     this.vin = vin;
   }
 }
+```
 
+```javascript
 // 储存具体车型对象的容器
 var cars = new Map();
+```
 
+```javascript
 // 如果车型已知，就返回vin；未知就创建
 var createCar = (model, maker, isbn) => {
   var existingCar = cars.has(vin);
+```
 
+```text
   if (existingCar) {
     return cars.get(vin);
   }
+```
 
+```javascript
   var car = new Car(model, maker, vin);
   cars.set(vin, car);
+```
 
+```text
   return car;
 };
+```
 
+```javascript
 // 存储租赁车的容器
 var carList = [];
+```
 
+```javascript
 // 登记租赁车到列表
 var addCar = (model, maker, vin, availability, sales) => {
   var car = {
@@ -67,16 +84,21 @@ var addCar = (model, maker, vin, availability, sales) => {
     availability,
     vin
   };
+```
 
+```text
   carList.push(car);
   return car;
 };
+```
 
+```text
 addCar("911", "Porsche", "FR345", true, 2300);
 addCar("911", "Porsche", "FR345", false, 2400);
 addCar("Togun", "VW", "AZ567", false, 800);
 addCar("C-Class", "Mercedes-Benz", "AS356", false, 1200);
 addCar("C-Class", "Mercedes-Benz", "AS356", true, 1100);
+```
 
 
 随着硬件的发展，现在的内存RAM的大小基本都是GB级别的了，所以享元模式现如今已经不是那么重要了。但是如果创建的对象数量特别巨大，即使微小的差别也可能在规模化的过程中变得明显，因此这种设计模式我们依然需要关注。
@@ -89,6 +111,7 @@ addCar("C-Class", "Mercedes-Benz", "AS356", true, 1100);
 
 下面的例子是用享元构建一个非常基本的accordion。在这里，jQuery用于将初始点击绑定到container div上，把许多独立的行为转化为共享的行为。
 
+```javascript
 var stateManager = {
   flyweight() {
     var self = this;
@@ -101,10 +124,12 @@ var stateManager = {
         });
   }
 };
+```
 
 
 Facebook的詹姆斯·帕德奥尔西（James Padolsey）提出过另外一个jQuery中用到享元的概念。他说到在用jQuery的一些工具方法时，最好使用内部的jQuery.methodName底层方法，例如jQuery.text；而不是用对外暴露的jQuery.fn.methodName外部方法，例如jQuery.fn.text。jQuery.methodName是jQuery库本身在内部用来支持 jQuery.fn.methodName的底层方法。使用它，也就是等于在函数方法调用时，减少一层抽象或避免创建新的jQuery对象。因此詹姆斯提出了一个jQuery.single的想法，每次调用jQuery.single ，意味着多个对象的数据被整合到一个中心化共享的数据结构中，所以它也算是一种享元。
 
+```javascript
 jQuery.single = (o => {
 var collection = jQuery([1]);
     return element => {
@@ -114,7 +139,9 @@ var collection = jQuery([1]);
         return collection;
     };
 })();
+```
 
+```javascript
 $('div').on('click', function() {
   var html = jQuery
     .single(this)
@@ -122,6 +149,7 @@ $('div').on('click', function() {
     .html();
   console.log(html);
 });
+```
 
 
 门面模式（facade）
@@ -138,6 +166,7 @@ $('div').on('click', function() {
 
 下面我们可以看一个 $(document).ready(…) 的例子，在背后，它是基于一个bindReady的函数来实现的。
 
+```javascript
 function bindReady() { 
 	// ... 
 	if (document.addEventListener) { 
@@ -152,6 +181,7 @@ function bindReady() {
 		window.attachEvent('onload', jQuery.ready); 
 	} 
 } 
+```
 
 
 门面模式对于jQuery的使用者来说提供了很多方便，但这也不是没有代价的。它虽然降低了开发成本，但在一定程度上牺牲了性能。对于一些简单的页面开发，很多开发者还是会选择使用它，原因呢就是因为这些应用中页面开发的要求远不到工业级，但是通过jQuery能节省的开发成本确是指数级的，这也从一个侧面体现了为什么jQuery还这么流行的原因。所以在开发的时候，我们除了要关注设计模式能带来什么好处以外，更要注意使用的场景，在开发效率和性能之间做出平衡。
@@ -164,12 +194,14 @@ function bindReady() {
 
 在jQuery中，可以用统一的方式处理单个元素以及一个元素的合集，因为它们返回的都是一个 jQuery对象。下面的选择器的代码示例演示了这一点。在这里，可以为单个元素，比如具有唯一ID的元素，或具有相同标签名称元素类型或类属性的一组元素的两个选择添加同一个展示类类的属性。
 
+```text
 // 单个元素
 $( "#specialNote" ).addClass( "show" );
 $( "#mainContainer" ).addClass( "show" );
 // 一组元素
 $( "div" ).addClass( "show" );
 $( ".item" ).addClass( "show" );
+```
 
 
 延伸：什么是包装器模式
@@ -184,62 +216,82 @@ $( ".item" ).addClass( "show" );
 
 如果我们从一个非自研的、不想，或不能直接操作的组件中提取类，那么就可以用到装饰器。而且，装饰器可以让我们的程序中减少大量的子类。装饰器模式可以提供方便的一个特点呢，就是对预期行为的定制和配置。下面我们可以看看它的一个比较基础的实现。在这个例子中，我们给一个车装饰成了限量升级版。
 
+```css
 class Car {
   constructor(model, maker, price) {
     this.model = model;
     this.maker = maker;
     this.price = price;
   }
+```
 
+```text
   getDetails() {
     return `${this.model} by ${this.maker}`;
   }
 }
+```
 
+```javascript
 // decorator 1
 function specialEdition(car) {
   car.isSpecial = false;
   car.specialEdition = function() {
     return `special edition ${car.getDetails()}`;
   };
+```
 
+```text
   return car;
 }
+```
 
+```javascript
 // decorator 2
 function upgrade(car) {
   car.isUpgraded = true;
   car.price += 5000;
   return car;
 }
+```
 
+```javascript
 // usage
 var car1 = specialEdition(new Car('Camry', 'Toyota', 10000));
+```
 
+```javascript
 console.log(car1.isSpecial); // false
 console.log(car1.specialEdition()); // 'special edition Camry by Toyota'
+```
 
 var car2 = upgrade(new Car('Crown', 'Toyota', 15000));
 
+```javascript
 console.log(car2.isUpgraded); // true
 console.log(car2.price); // 20000
+```
 
 
 在 jQuery当中，装饰者可以用extend() 来实现。比如在下面例子中，假设我们有一个车载OS系统，具有默认的选项和一些功能选项，我们可以通过extend的方式，把它们加进去。并且在这个过程中，不改变defaults和options的对象本身。
 
+```text
 // define the objects we're going to use
 vehicleOS = {
     defaults: {},
     options: {},
     settings: {},
 };
+```
 
+```text
 // merge defaults and options, without modifying defaults explicitly
 vehicleOS.settings = $.extend(
     {},
     decoratorApp.defaults,
     decoratorApp.options
 );
+```
 
 
 适配器（adaptor）
@@ -250,6 +302,7 @@ vehicleOS.settings = $.extend(
 
 适配器的例子在jQuery中也是无处不见，比如CSS中关于透明度的get和set，只需要通过以下方式就可以使用了，看起来是不是很方便呢：
 
+```javascript
 // Cross browser opacity:
 // opacity: 0.9; Chrome 4+, FF2+, Saf3.1+, Opera 9+, IE9, iOS 3.2+, Android 2.1+
 // filter: alpha(opacity=90); IE6-IE8
@@ -257,10 +310,12 @@ vehicleOS.settings = $.extend(
 $( ".container" ).css( { opacity: .5 } );
 // Getting opacity
 var currentOpacity = $( ".container" ).css('opacity');
+```
 
 
 但其实在背后，jQuery做了很多的工作。
 
+```javascript
 get: function( elem, computed ) {
   // IE uses filters for opacity
   return ropacity.test( (
@@ -297,6 +352,7 @@ set: function( elem, value ) {
     filter + " " + opacity;
 }
 };
+```
 
 
 装饰器还是适配器？

@@ -1,10 +1,12 @@
 ---
 title: 17如何通过链表做LRU_LFU缓存？
-date: 1739706057.6064274
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             17 如何通过链表做LRU_LFU缓存？
                             你好，我是石川。
+```
 
 前面我们在第10-13讲讲过了数组这种数据类型，以及通过它衍生出的栈和队列的数据结构。之后，我们在讲到散列表的时候，曾经提到过一种链表的数据结构。今天，我们就来深入了解下链表和它所支持的相关的缓存算法。链表有很多使用场景，最火的例子当属目前热门的区块链了。它就是用了链表的思想，每一个区块儿之间都是通过链表的方式相连的。在链表结构里，每一个元素都是节点，每个节点有自己的内容和相连的下一个元素的地址参考。
 
@@ -20,16 +22,19 @@ categories: [JavaScript进阶实战课]
 
 在实现上，我们可以先创建一个节点的函数类，里面包含存储数据和下一节点两个属性。
 
+```css
 class Node {
   constructor(data){
     this.data = data;
     this.next = null;
   }
 }
+```
 
 
 之后，我们再创建一个链表的函数类。在链表里，最常见的方法就是头尾的插入和删除，这几项操作的复杂度都是\(O(1)\)。应用在缓存当中的时候呢，通常是头部的插入，尾部删除。但倘若你想从前往后遍历的话，或是在任意位置做删除或插入的操作，那么相应的复杂度就会是\(O(n)\)。这里的重点不是实现，而是要了解链表里面的主要功能。因此我没有把所有代码都贴在这里，但是我们可以看到它核心的结构。
 
+```css
 class LinkedList {
   constructor(){
     this.head = null;
@@ -46,6 +51,7 @@ class LinkedList {
   getElementAt(index) { /*根据某个位置获取元素*/ }
   removeAtHead(){ /*在表头位置删除元素*/ }
 }
+```
 
 
 注意观察的你，可能会发现，最后一个节点是null或undefined的，那它是做什么的呢？这个是一个哨兵节点，它的目的啊，是对插入和删除性能的优化。因为在这种情况下，插入和删除首尾节点的操作就可以和处理中间节点用同样的代码来实现。在小规模的数据中，这种区别可能显得微不足道。可是在处理缓存等需要大量频繁的增删改查的操作中，就会有很大的影响。
@@ -58,18 +64,22 @@ class LinkedList {
 
 所以在双链表节点的实现上，我们可以在单链表基础上增加一个上一节点指针的属性。同样的，双链表也可以基于单链表扩展，在里面加一个表尾节点。对于从后往前的遍历，和从前往后的遍历一样，复杂度都是\(O(n)\)。
 
+```css
 class DoublyNode extends Node { 
   constructor(data, next, prev) {
     super(data, next); 
     this.prev = prev; 
   }
 }
+```
 
+```css
 class DoublyLinkedList extends LinkedList {
   constructor() {
     this.tail = undefined;
   }
 }
+```
 
 
 循环链表
@@ -98,16 +108,20 @@ LFU 缓存
 
 在这里，我们看一个LFU关键的代码实现部分的说明。LFU双链表节点，可以通过继承双链表的节点类，在里面增加需要用到的键值，除此之外还有一个计数器来计算一个元素被获取和设置的频率。
 
+```css
 class LFUNode extends DoublyNode { 
   constructor(key) {
     this.key = key; 
     this.freqCount = 1;
   }
 }
+```
 
+```css
 class LFUDoublyLinkedList extends LinkedList {
   constructor() {/* LFU 双链表 */ }
 }
+```
 
 
 前面说到一个LFU缓存里面有两个散列表，一个是键值散列表，一个是频率散列表。这两个散列表都可以通过对象来创建。键值散列表保存着每个节点的实例。频率散列表里有从1到n的频率的键名，被访问和设置次数最多的内容，就是n。频率散列表里每一个键值都是一个双向链表。
@@ -120,6 +134,7 @@ class LFUDoublyLinkedList extends LinkedList {
 
 对于读取场景，也就是获取节点的动作，缓存可以返回节点，并且增加它的调用频率的计数，同时将这个元素移动到双链表的头部。同样与插入场景类似，最后一步，最低频率minFreq的值会被调整，用来计算下次操作中会被取代的元素。
 
+```css
 class LFUCache {
   constructor() {
     this.keys = {}; // 用来存储LFU节点的键值散列表
@@ -131,6 +146,7 @@ class LFUCache {
   set() {/* 插入一个节点 */}
   get() {/* 读取一个节点 */}
 }
+```
 
 
 LRU 缓存
@@ -143,12 +159,15 @@ LRU 缓存
 
 从实现的角度看，LRU当中的节点和LFU没有特别大的差别，也需要一个键值散列表，但是不需要频率散列表。LRU缓存可以通过传入承载量capacity参数来定义可以允许缓存的量。同样和LFU类似的，LRU也需要在链表头部删除节点和链表尾部增加节点的功能。在此基础之上，有着获取和设置的两个对外使用的方法。所以总体看来，LRU的实现和LFU相比是简化了的。
 
+```css
 class LRUNode extends DoublyNode { 
   constructor(key) {
     this.key = key; 
   }
 }
+```
 
+```css
 class LRUCache {
   constructor() {
     this.keys = {}; // 用来存储LFU节点的键值散列表
@@ -158,6 +177,7 @@ class LRUCache {
   set() {/* 插入一个节点 */}
   get() {/* 读取一个节点 */}
 }
+```
 
 
 总结

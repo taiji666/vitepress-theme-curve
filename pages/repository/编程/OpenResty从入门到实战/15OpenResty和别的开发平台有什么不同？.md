@@ -1,10 +1,12 @@
 ---
 title: 15OpenResty和别的开发平台有什么不同？
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             15 OpenResty 和别的开发平台有什么不同？
                             你好，我是温铭。
+```
 
 上一模块中， 你已经学习了 OpenResty 的两个基石：NGINX 和 LuaJIT，相信你已经摩拳擦掌，准备开始学习 OpenResty 提供的 API 了吧？
 
@@ -36,30 +38,36 @@ OpenResty 的 master 和 worker 进程中，都包含一个 LuaJIT VM。在同�
 
 在ngx_http_lua_sleep.c 中，我们可以看到 sleep 函数的具体实现。你需要先通过 C 函数 ngx_http_lua_ngx_sleep，来注册 ngx.sleep 这个 Lua API：
 
+```text
 void
 ngx_http_lua_inject_sleep_api(lua_State *L)
 {
      lua_pushcfunction(L, ngx_http_lua_ngx_sleep);
      lua_setfield(L, -2, "sleep");
 }
+```
 
 
 下面便是 sleep 的主函数，这里我只摘取了几行主要的代码：
 
+```text
 static int ngx_http_lua_ngx_sleep(lua_State *L)
 {
     coctx->sleep.handler = ngx_http_lua_sleep_handler;
     ngx_add_timer(&coctx->sleep, (ngx_msec_t) delay);
     return lua_yield(L, 0);
 }
+```
 
 
 你可以看到：
 
 
+```text
 这里先增加了 ngx_http_lua_sleep_handler 这个回调函数；
 然后调用 ngx_add_timer 这个 NGINX 提供的接口，向 NGINX 的事件循环中增加一个定时器；
 最后使用 lua_yield 把 Lua 协程挂起，把控制权交给 NGINX 的事件循环。
+```
 
 
 当 sleep 操作完成后， ngx_http_lua_sleep_handler 这个回调函数就被触发了。它里面调用了 ngx_http_lua_sleep_resume, 并最终使用 lua_resume 唤醒了 Lua 协程。更具体的调用过程，你可以自己去代码里面检索，这里我就不展开描述了。
@@ -73,6 +81,7 @@ ngx.sleep 只是最简单的一个示例，不过通过对它的剖析，你可�
 OpenResty 和 NGINX 一样，都有阶段的概念，并且每个阶段都有自己不同的作用：
 
 
+```text
 set_by_lua，用于设置变量；
 rewrite_by_lua，用于转发、重定向等；
 access_by_lua，用于准入、权限等；
@@ -80,6 +89,7 @@ content_by_lua，用于生成返回内容；
 header_filter_by_lua，用于应答头过滤处理；
 body_filter_by_lua，用于应答体过滤处理；
 log_by_lua，用于日志记录。
+```
 
 
 当然，如果你的代码逻辑并不复杂，都放在 rewrite 或者 content 阶段执行，也是可以的。
@@ -93,18 +103,22 @@ context: rewrite_by_lua*, access_by_lua*, content_by_lua*, ngx.timer.*, ssl_cert
 
 而如果你不知道这一点，在它不支持的 log 阶段使用 sleep 的话:
 
+```css
 location / {
     log_by_lua_block {
         ngx.sleep(1)
      }
 }
+```
 
 
 在 NGINX 的错误日志中，就会出现 error 级别的提示：
 
+```text
 [error] 62666#0: *6 failed to run log_by_lua*: log_by_lua(nginx.conf:14):2: API disabled in the context of log_by_lua*
 stack traceback:
     [C]: in function 'sleep'
+```
 
 
 所以，在你使用 API 之前，一定记得要先查阅文档，确定其能否在代码的上下文中使用。
@@ -113,10 +127,12 @@ stack traceback:
 
 我继续以 sleep 1 秒这个需求为例来说明。如果你要在 Lua 中实现它，你需要这样做：
 
+```javascript
 function sleep(s)
    local ntime = os.time() + s
    repeat until os.time() > ntime
 end
+```
 
 
 因为标准 Lua 没有直接的 sleep 函数，所以这里我用一个循环，来不停地判断是否达到指定的时间。这个实现就是阻塞的，在 sleep 的这一秒钟时间内，Lua 正在做无用功，而其他需要处理的请求，只能在一边傻傻地等待。
@@ -138,23 +154,27 @@ local ngx_re = require "ngx.re"
 
 local _M = {}
 
+```text
 _M.color = {
       red = 1,
       blue = 2,
       green = 3
   }
+```
 
   return _M
 
 
 我在一个名为 hello.lua 的文件中定义了一个模块，模块包含了 color 这个 table。然后，我又在 nginx.conf 中增加了对应的配置：
 
+```css
 location / {
     content_by_lua_block {
         local hello = require "hello"
         ngx.say(hello.color.green)
      }
 }
+```
 
 
 这段配置会在 content 阶段中 require 这个模块，并把 green 的值作为 http 请求返回体打印出来。
@@ -173,16 +193,19 @@ location / {
 
 有些情况下，我们需要的是跨越阶段的、可以读写的变量。而像我们熟悉的 NGINX 中 $host、$scheme 等变量，虽然满足跨越阶段的条件，但却无法做到动态创建，你必须先在配置文件中定义才能使用它们。比如下面这样的写法：
 
+```css
 location /foo {
       set $my_var ; # 需要先创建 $my_var 变量
       content_by_lua_block {
           ngx.var.my_var = 123
       }
   }
+```
 
 
 OpenResty 提供了 ngx.ctx，来解决这类问题。它是一个 Lua table，可以用来存储基于请求的 Lua 数据，且生存周期与当前请求相同。我们来看下官方文档中的这个示例：
 
+```css
 location /test {
       rewrite_by_lua_block {
           ngx.ctx.foo = 76
@@ -194,6 +217,7 @@ location /test {
           ngx.say(ngx.ctx.foo)
       }
   }
+```
 
 
 你可以看到，我们定义了一个变量 foo，存放在 ngx.ctx 中。这个变量跨越了 rewrite、access 和 content 三个阶段，最终在 content 阶段打印出了值，并且是我们预期的 79。
@@ -201,8 +225,10 @@ location /test {
 当然，ngx.ctx 也有自己的局限性：
 
 
+```text
 比如说，使用 ngx.location.capture 创建的子请求，会有自己独立的 ngx.ctx 数据，和父请求的 ngx.ctx 互不影响；
 再如，使用 ngx.exec 创建的内部重定向，会销毁原始请求的 ngx.ctx，重新生成空白的 ngx.ctx。
+```
 
 
 这两个局限，在官方文档中都有详细的代码示例，如果你有兴趣可以自行查阅。

@@ -1,10 +1,12 @@
 ---
 title: 33我应该迁移到HTTP2吗？
-date: 1739706057.3526535
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             33  我应该迁移到HTTP2吗？
                             这一讲是“飞翔篇”的最后一讲，而 HTTP 的所有知识也差不多快学完了。
+```
 
 前面你已经看到了新的 HTTP/2 和 HTTP/3 协议，了解了它们的特点和工作原理，如果再联系上前几天“安全篇”的 HTTPS，你可能又会发出疑问：
 
@@ -80,23 +82,29 @@ HTTP/2 的缺点
 
 因为 HTTP/2“事实上”是加密的，所以如果你已经在“安全篇”里成功迁移到了 HTTPS，那么在 Nginx 里启用 HTTP/2 简直可以说是“不费吹灰之力”，只需要在 server 配置里再多加一个参数就可以搞定了。
 
+```css
 server {
     listen       443 ssl http2;
+```
  
  
     server_name  www.xxx.net;
  
  
+```text
     ssl_certificate         xxx.crt;
     ssl_certificate_key     xxx.key;
+```
 
 
 注意“listen”指令，在“ssl”后面多了一个“http2”，这就表示在 443 端口上开启了 SSL 加密，然后再启用 HTTP/2。
 
 配置服务器推送特性可以使用指令“http2_push”和“http2_push_preload”：
 
+```text
 http2_push         /style/xxx.css;
 http2_push_preload on;
+```
 
 
 不过如何合理地配置推送是个难题，如果推送给浏览器不需要的资源，反而浪费了带宽。
@@ -134,18 +142,22 @@ http2_push_preload on;
 今天我们讨论了是否应该迁移到 HTTP/2，还有应该如何迁移到 HTTP/2。
 
 
+```text
 HTTP/2 完全兼容 HTTP/1，是“更安全的 HTTP、更快的 HTTPS”，头部压缩、多路复用等技术可以充分利用带宽，降低延迟，从而大幅度提高上网体验；
 TCP 协议存在“队头阻塞”，所以 HTTP/2 在弱网或者移动网络下的性能表现会不如 HTTP/1；
 迁移到 HTTP/2 肯定会有性能提升，但高流量网站效果会更显著；
 如果已经升级到了 HTTPS，那么再升级到 HTTP/2 会很简单；
 TLS 协议提供“ALPN”扩展，让客户端和服务器协商使用的应用层协议，“发现”HTTP/2 服务。
+```
 
 
 课下作业
 
 
+```text
 和“安全篇”的第 29 讲类似，结合自己的实际情况，分析一下是否应该迁移到 HTTP/2，有没有难点？
 精灵图（Spriting）、资源内联（inlining）、域名分片（Sharding）这些手段为什么会对 HTTP/2 的性能优化造成反效果呢？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

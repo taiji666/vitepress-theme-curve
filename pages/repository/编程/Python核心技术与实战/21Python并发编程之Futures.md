@@ -1,10 +1,12 @@
 ---
 title: 21Python并发编程之Futures
-date: 1739706057.5437288
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             21 Python并发编程之Futures
                             你好，我是景霄。
+```
 
 无论对于哪门语言，并发编程都是一项很常用很重要的技巧。比如我们上节课所讲的很常见的爬虫，就被广泛应用在工业界的各个领域。我们每天在各个网站、各个App上获取的新闻信息，很大一部分便是通过并发编程版的爬虫获得。
 
@@ -31,8 +33,10 @@ categories: [Python核心技术与实战]
 对比来看，
 
 
+```text
 并发通常应用于I/O操作频繁的场景，比如你要从网站上下载多个文件，I/O操作的时间可能会比CPU运行处理的时间长得多。
 而并行则更多应用于CPU heavy的场景，比如MapReduce中的并行计算，为了加快运行速度，一般会用多台机器、多个处理器来完成。
+```
 
 
 并发编程之Futures
@@ -43,17 +47,24 @@ categories: [Python核心技术与实战]
 
 假设我们有一个任务，是下载一些网站的内容并打印。如果用单线程的方式，它的代码实现如下所示（为了简化代码，突出主题，此处我忽略了异常处理）：
 
+```python
 import requests
 import time
+```
 
+```python
 def download_one(url):
     resp = requests.get(url)
     print('Read {} from {}'.format(len(resp.content), url))
+```
     
+```python
 def download_all(sites):
     for site in sites:
         download_one(site)
+```
 
+```python
 def main():
     sites = [
         'https://en.wikipedia.org/wiki/Portal:Arts',
@@ -76,11 +87,15 @@ def main():
     download_all(sites)
     end_time = time.perf_counter()
     print('Download {} sites in {} seconds'.format(len(sites), end_time - start_time))
+```
     
+```python
 if __name__ == '__main__':
     main()
+```
 
 # 输出
+```text
 Read 129886 from https://en.wikipedia.org/wiki/Portal:Arts
 Read 184343 from https://en.wikipedia.org/wiki/Portal:History
 Read 224118 from https://en.wikipedia.org/wiki/Portal:Society
@@ -97,34 +112,44 @@ Read 180298 from https://en.wikipedia.org/wiki/Node.js
 Read 56765 from https://en.wikipedia.org/wiki/The_C_Programming_Language
 Read 324039 from https://en.wikipedia.org/wiki/Go_(programming_language)
 Download 15 sites in 2.464231112999869 seconds
+```
 
 
 这种方式应该是最直接也最简单的：
 
 
+```text
 先是遍历存储网站的列表；
 然后对当前网站执行下载操作；
 等到当前操作完成后，再对下一个网站进行同样的操作，一直到结束。
+```
 
 
 我们可以看到总共耗时约2.4s。单线程的优点是简单明了，但是明显效率低下，因为上述程序的绝大多数时间，都浪费在了I/O等待上。程序每次对一个网站执行下载操作，都必须等到前一个网站下载完成后才能开始。如果放在实际生产环境中，我们需要下载的网站数量至少是以万为单位的，不难想象，这种方案根本行不通。
 
 接着我们再来看，多线程版本的代码实现：
 
+```python
 import concurrent.futures
 import requests
 import threading
 import time
+```
 
+```python
 def download_one(url):
     resp = requests.get(url)
     print('Read {} from {}'.format(len(resp.content), url))
+```
 
 
+```python
 def download_all(sites):
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(download_one, sites)
+```
 
+```python
 def main():
     sites = [
         'https://en.wikipedia.org/wiki/Portal:Arts',
@@ -147,11 +172,15 @@ def main():
     download_all(sites)
     end_time = time.perf_counter()
     print('Download {} sites in {} seconds'.format(len(sites), end_time - start_time))
+```
 
+```python
 if __name__ == '__main__':
     main()
+```
 
 ## 输出
+```text
 Read 151021 from https://en.wikipedia.org/wiki/Portal:Mathematics
 Read 129886 from https://en.wikipedia.org/wiki/Portal:Arts
 Read 107637 from https://en.wikipedia.org/wiki/Portal:Biography
@@ -168,14 +197,17 @@ Read 468461 from https://en.wikipedia.org/wiki/PHP
 Read 321417 from https://en.wikipedia.org/wiki/Java_(programming_language)
 Read 324039 from https://en.wikipedia.org/wiki/Go_(programming_language)
 Download 15 sites in 0.19936635800002023 seconds
+```
 
 
 非常明显，总耗时是0.2s左右，效率一下子提升了10倍多。
 
 我们具体来看这段代码，它是多线程版本和单线程版的主要区别所在：
 
+```text
    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(download_one, sites)
+```
 
 
 这里我们创建了一个线程池，总共有5个线程可以分配使用。executer.map()与前面所讲的Python内置的map()函数类似，表示对sites中的每一个元素，并发地调用函数download_one()。
@@ -186,9 +218,11 @@ Download 15 sites in 0.19936635800002023 seconds
 
 当然，我们也可以用并行的方式去提高程序运行效率。你只需要在download_all()函数中，做出下面的变化即可：
 
+```javascript
 with futures.ThreadPoolExecutor(workers) as executor
 =>
 with futures.ProcessPoolExecutor() as executor: 
+```
 
 
 在需要修改的这部分代码中，函数ProcessPoolExecutor()表示创建进程池，使用多个进程并行的执行程序。不过，这里我们通常省略参数workers，因为系统会自动返回CPU的数量作为可以调用的进程数。
@@ -209,21 +243,28 @@ Futures中还有一个重要的函数result()，它表示当future完成后，�
 
 所以，上述例子也可以写成下面的形式：
 
+```python
 import concurrent.futures
 import requests
 import time
+```
 
+```python
 def download_one(url):
     resp = requests.get(url)
     print('Read {} from {}'.format(len(resp.content), url))
+```
 
+```python
 def download_all(sites):
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         to_do = []
         for site in sites:
             future = executor.submit(download_one, site)
             to_do.append(future)
+```
             
+```python
         for future in concurrent.futures.as_completed(to_do):
             future.result()
 def main():
@@ -248,11 +289,15 @@ def main():
     download_all(sites)
     end_time = time.perf_counter()
     print('Download {} sites in {} seconds'.format(len(sites), end_time - start_time))
+```
 
+```python
 if __name__ == '__main__':
     main()
+```
 
 # 输出
+```text
 Read 129886 from https://en.wikipedia.org/wiki/Portal:Arts
 Read 107634 from https://en.wikipedia.org/wiki/Portal:Biography
 Read 224118 from https://en.wikipedia.org/wiki/Portal:Society
@@ -269,6 +314,7 @@ Read 468421 from https://en.wikipedia.org/wiki/PHP
 Read 56765 from https://en.wikipedia.org/wiki/The_C_Programming_Language
 Read 324039 from https://en.wikipedia.org/wiki/Go_(programming_language)
 Download 15 sites in 0.21698231499976828 seconds
+```
 
 
 这里，我们首先调用executor.submit()，将下载每一个网站的内容都放进future队列to_do，等待执行。然后是as_completed()函数，在future完成后，便输出结果。
@@ -288,8 +334,10 @@ Download 15 sites in 0.21698231499976828 seconds
 这节课，我们首先学习了Python中并发和并行的概念与区别。
 
 
+```text
 并发，通过线程和任务之间互相切换的方式实现，但同一时刻，只允许有一个线程或任务执行。
 而并行，则是指多个进程同时执行。
+```
 
 
 并发通常用于I/O操作频繁的场景，而并行则适用于CPU heavy的场景。

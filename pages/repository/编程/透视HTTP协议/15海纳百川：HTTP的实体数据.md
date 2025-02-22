@@ -1,10 +1,12 @@
 ---
 title: 15海纳百川：HTTP的实体数据
-date: 1739706057.321385
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             15  海纳百川：HTTP的实体数据
                             你好，我是 Chrono。
+```
 
 今天我要与你分享的话题是“海纳百川：HTTP 的实体数据”。
 
@@ -31,10 +33,12 @@ MIME 把数据分成了八大类，每个大类下再细分出多个子类，形
 这里简单列举一下在 HTTP 里经常遇到的几个类别：
 
 
+```text
 text：即文本格式的可读数据，我们最熟悉的应该就是 text/html 了，表示超文本文档，此外还有纯文本 text/plain、样式表 text/css 等。
 image：即图像文件，有 image/gif、image/jpeg、image/png 等。
 audio/video：音频和视频数据，例如 audio/mpeg、video/mp4 等。
 application：数据格式不固定，可能是文本也可能是二进制，必须由上层应用程序来解释。常见的有 application/json，application/javascript、application/pdf 等，另外，如果实在是不知道数据是什么类型，像刚才说的“黑盒”，就会是 application/octet-stream，即不透明的二进制数据。
+```
 
 
 但仅有 MIME type 还不够，因为 HTTP 在传输时为了节约带宽，有时候还会压缩数据，为了不要让浏览器继续“猜”，还需要有一个“Encoding type”，告诉数据是用的什么编码格式，这样对方才能正确解压缩，还原出原始的数据。
@@ -42,9 +46,11 @@ application：数据格式不固定，可能是文本也可能是二进制，必
 比起 MIME type 来说，Encoding type 就少了很多，常用的只有下面三种：
 
 
+```text
 gzip：GNU zip 压缩格式，也是互联网上最流行的压缩格式；
 deflate：zlib（deflate）压缩格式，流行程度仅次于 gzip；
 br：一种专门为 HTTP 优化的新压缩算法（Brotli）。
+```
 
 
 数据类型使用的头字段
@@ -64,16 +70,20 @@ Accept: text/html,application/xml,image/webp,image/png
 
 相应的，服务器会在响应报文里用头字段Content-Type告诉实体数据的真实类型：
 
+```text
 Content-Type: text/html
 Content-Type: image/png
+```
 
 
 这样浏览器看到报文里的类型是“text/html”就知道是 HTML 文件，会调用排版引擎渲染出页面，看到“image/png”就知道是一个 PNG 文件，就会在页面上显示出图像。
 
 Accept-Encoding字段标记的是客户端支持的压缩格式，例如上面说的 gzip、deflate 等，同样也可以用“,”列出多个，服务器可以选择其中一种来压缩数据，实际使用的压缩格式放在响应头字段Content-Encoding里。
 
+```text
 Accept-Encoding: gzip, deflate, br
 Content-Encoding: gzip
+```
 
 
 不过这两个字段是可以省略的，如果请求报文里没有 Accept-Encoding 字段，就表示客户端不支持压缩数据；如果响应报文里没有 Content-Encoding 字段，就表示响应数据没有被压缩。
@@ -114,8 +124,10 @@ Content-Language: zh-CN
 
 例如，浏览器请求 GBK 或 UTF-8 的字符集，然后服务器返回的是 UTF-8 编码，就是下面这样：
 
+```text
 Accept-Charset: gbk, utf-8
 Content-Type: text/html; charset=utf-8
+```
 
 
 不过现在的浏览器都支持多种字符集，通常不会发送 Accept-Charset，而服务器也不会发送 Content-Language，因为使用的语言完全可以由字符集推断出来，所以在请求头里一般只会有 Accept-Language 字段，响应头里只会有 Content-Type 字段。
@@ -152,8 +164,10 @@ Vary 字段可以认为是响应报文的一个特殊的“版本标记”。每
 
 上面讲完了理论部分，接下来就是实际动手操作了。可以用我们的实验环境，在 www 目录下有一个 mime 目录，里面预先存放了几个文件，可以用 URI“/15-1?name=file”的形式访问，例如：
 
+```text
 http://www.chrono.com/15-1?name=a.json
 http://www.chrono.com/15-1?name=a.xml
+```
 
 
 在 Chrome 里打开开发者工具，就能够看到 Accept 和 Content 头：
@@ -171,12 +185,14 @@ http://www.chrono.com/15-1?name=a.xml
 
 
 
+```text
 数据类型表示实体数据的内容是什么，使用的是 MIME type，相关的头字段是 Accept 和 Content-Type；
 数据编码表示实体数据的压缩方式，相关的头字段是 Accept-Encoding 和 Content-Encoding；
 语言类型表示实体数据的自然语言，相关的头字段是 Accept-Language 和 Content-Language；
 字符集表示实体数据的编码方式，相关的头字段是 Accept-Charset 和 Content-Type；
 客户端需要在请求头里使用 Accept 等头字段与服务器进行“内容协商”，要求服务器返回最合适的数据；
 Accept 等头字段可以用“,”顺序列出多个可能的选项，还可以用“;q=”参数来精确指定权重。
+```
 
 
                         

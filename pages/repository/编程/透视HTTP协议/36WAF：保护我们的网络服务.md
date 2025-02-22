@@ -1,10 +1,12 @@
 ---
 title: 36WAF：保护我们的网络服务
-date: 1739706057.3526535
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             36  WAF：保护我们的网络服务
                             在前些天的“安全篇”里，我谈到了 HTTPS，它使用了 SSL/TLS 协议，加密整个通信过程，能够防止恶意窃听和窜改，保护我们的数据安全。
+```
 
 但 HTTPS 只是网络安全中很小的一部分，仅仅保证了“通信链路安全”，让第三方无法得知传输的内容。在通信链路的两端，也就是客户端和服务器，它是无法提供保护的。
 
@@ -51,12 +53,14 @@ WAF 都能干什么呢？
 通常一款产品能够称为 WAF，要具备下面的一些功能：
 
 
+```text
 IP 黑名单和白名单，拒绝黑名单上地址的访问，或者只允许白名单上的用户访问；
 URI 黑名单和白名单，与 IP 黑白名单类似，允许或禁止对某些 URI 的访问；
 防护 DDoS 攻击，对特定的 IP 地址限连限速；
 过滤请求报文，防御“代码注入”攻击；
 过滤响应报文，防御敏感信息外泄；
 审计日志，记录所有检测到的入侵操作。
+```
 
 
 听起来 WAF 好像很高深，但如果你理解了它的工作原理，其实也不难。
@@ -67,26 +71,32 @@ URI 黑名单和白名单，与 IP 黑白名单类似，允许或禁止对某些
 
 比如说，在 Nginx 里实现 IP 地址黑名单，可以利用“map”指令，从变量 $remote_addr 获取 IP 地址，在黑名单上就映射为值 1，然后在“if”指令里判断：
 
+```css
 map $remote_addr $blocked {
     default       0;
     "1.2.3.4"     1;
     "5.6.7.8"     1;
 }
+```
  
  
+```text
 if ($blocked) {
     return 403 "you are blocked.";  
 }
+```
 
 
 Nginx 的配置文件只能静态加载，改名单必须重启，比较麻烦。如果换成 OpenResty 就会非常方便，在 access 阶段进行判断，IP 地址列表可以使用 cosocket 连接外部的 Redis、MySQL 等数据库，实现动态更新：
 
 local ip_addr = ngx.var.remote_addr
  
+```text
 local rds = redis:new()
 if rds:get(ip_addr) == 1 then 
     ngx.exit(403) 
 end
+```
 
 
 看了上面的两个例子，你是不是有种“跃跃欲试”的冲动了，想自己动手开发一个 WAF？
@@ -118,8 +128,10 @@ ModSecurity 源码提供一个基本的规则配置文件“modsecurity.conf-rec
 
 有了规则集，就可以在 Nginx 配置文件里加载，然后启动规则引擎：
 
+```text
 modsecurity on;
 modsecurity_rules_file /path/to/modsecurity.conf;
+```
 
 
 “modsecurity.conf”文件默认只有检测功能，不提供入侵阻断，这是为了防止误杀误报，把“SecRuleEngine”后面改成“On”就可以开启完全的防护：
@@ -137,16 +149,20 @@ git clone https://github.com/SpiderLabs/owasp-modsecurity-crs.git
 
 其中有一个“crs-setup.conf.example”的文件，它是 CRS 的基本配置，可以用“Include”命令添加到“modsecurity.conf”里，然后再添加“rules”里的各种规则。
 
+```text
 Include /path/to/crs-setup.conf
 Include /path/to/rules/*.conf
+```
 
 
 你如果有兴趣可以看一下这些配置文件，里面用“SecRule”定义了很多的规则，基本的形式是“SecRule 变量 运算符 动作”。不过 ModSecurity 的这套语法“自成一体”，比较复杂，要完全掌握不是一朝一夕的事情，我就不详细解释了。
 
 另外，ModSecurity 还有强大的审计日志（Audit Log）功能，记录任何可疑的数据，供事后离线分析。但在生产环境中会遇到大量的攻击，日志会快速增长，消耗磁盘空间，而且写磁盘也会影响 Nginx 的性能，所以一般建议把它关闭：
 
+```text
 SecAuditEngine off  #RelevantOnly
 SecAuditLog /var/log/modsec_audit.log
+```
 
 
 小结
@@ -154,17 +170,21 @@ SecAuditLog /var/log/modsec_audit.log
 今天我们一起学习了“网络应用防火墙”，也就是 WAF，使用它可以加固 Web 服务。
 
 
+```text
 Web 服务通常都运行在公网上，容易受到“DDoS”、“代码注入”等各种黑客攻击，影响正常的服务，所以必须要采取措施加以保护；
 WAF 是一种“HTTP 入侵检测和防御系统”，工作在七层，为 Web 服务提供全面的防护；
 ModSecurity 是一个开源的、生产级的 WAF 产品，核心组成部分是“规则引擎”和“规则集”，两者的关系有点像杀毒引擎和病毒特征库；
 WAF 实质上是模式匹配与数据过滤，所以会消耗 CPU，增加一些计算成本，降低服务能力，使用时需要在安全与性能之间找到一个“平衡点”。
+```
 
 
 课下作业
 
 
+```text
 HTTPS 为什么不能防御 DDoS、代码注入等攻击呢？
 你还知道有哪些手段能够抵御网络攻击吗？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

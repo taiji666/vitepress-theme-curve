@@ -1,10 +1,12 @@
 ---
 title: 34RESTful&amp;Socket：搭建交易执行层核心
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             34 RESTful & Socket：搭建交易执行层核心
                             你好，我是景霄。
+```
 
 上一节，我们简单介绍了量化交易的历史、严谨的定义和它的基本组成结构。有了这些高层次的基本知识，接下来我们就分模块，开始讲解量化交易系统中具体的部分。
 
@@ -12,10 +14,10 @@ categories: [Python核心技术与实战]
 
 一个量化交易系统，可以说是一个黑箱。这个黑箱连接交易所获取到的数据，通过策略运算，然后再连接交易所进行下单操作。正如我们在输入输出那节课说的那样，黑箱的特性是输入和输出。每一个设计网络交互的同学，都需要在大脑中形成清晰的交互状态图：
 
-
+```text
 知道包是怎样在网络间传递的；
 知道每一个节点是如何处理不同的输入包，然后输出并分发给下一级的。
-
+```
 
 在你搞不明白的时候，可以先在草稿纸上画出交互拓扑图，标注清楚每个节点的输入和输出格式，然后想清楚网络是怎么流动的。这一点，对网络编程至关重要。
 
@@ -29,22 +31,18 @@ REST的全称是表征层状态转移（REpresentational State Transfer），本
 
 为了方便你更容易理解这些概念，这里我举个例子来类比。小明同学不是很聪明但很懂事，每天会在他的妈妈下班回来后给妈妈泡茶。刚开始，他的妈妈会发出这样的要求：
 
-
 用红色杯子，去厨房泡一杯放了糖的37.5度的普洱茶。
-
 
 可是小明同学不够聪明，很难理解这个定语很多的句子。于是，他妈妈为了让他更简单明白需要做的事情，把这个指令设计成了更简洁的样子：
 
-
 泡厨房的茶，要求如下：
 
-
+```text
 类型=普洱；
 杯子=红色；
 放糖=True；
 温度=37.5度。
-
-
+```
 
 这里的“茶”就是资源，“厨房的茶”就是资源的地址（URI）；“泡”是动词；后面的要求，都是接口参数。这样的一个接口，就是小明提供的一个REST接口。
 
@@ -54,35 +52,29 @@ REST的全称是表征层状态转移（REpresentational State Transfer），本
 
 这话可能有些拗口，我们举个例子来看。上节课中，我们获取了Gemini交易所中，BTC对USD价格的ticker接口：
 
-GET https://api.gemini.com/v1/pubticker/btcusd
-
+GET <https://api.gemini.com/v1/pubticker/btcusd>
 
 这里的“GET”是动词，后边的URI是“Ticker”这个资源的地址。所以，这是一个RESTful的接口。
 
 但下面这样的接口，就不是一个严格的RESTful接口：
 
-POST https://api.restful.cn/accounts/delete/:username
-
+POST <https://api.restful.cn/accounts/delete/:username>
 
 因为URI中包含动词“delete”（删除），所以这个URI并不是指向一个资源。如果要修改成严格的RESTful接口，我们可以把它改成下面这样：
 
-DELETE https://api.rest.cn/accounts/:username
-
+DELETE <https://api.rest.cn/accounts/:username>
 
 然后，我们带着这个观念去看Gemini的取消订单接口：
 
-POST https://api.gemini.com/v1/order/cancel
-
-
-
+POST <https://api.gemini.com/v1/order/cancel>
 
 你会发现，这个接口不够“RESTful”的地方有：
 
-
+```text
 动词设计不准确，接口使用“POST”而不是重用HTTP动词“DELETE”；
 URI里包含动词cancel；
 ID代表的订单是资源，但订单ID是放在参数列表而不是URI里的，因此URI并没有指向资源。
-
+```
 
 所以严格来说，这不是一个RESTful的接口。
 
@@ -114,12 +106,12 @@ Gemini 的界面清晰，API 完整而易用，更重要的是，还提供了完
 
 在进入正题之前，我们最后再以比特币和美元之间的交易为例，介绍四个基本概念（orderbook 的概念这里就不介绍了，你也不用深究，你只需要知道比特币的价格是什么就行了）。
 
-
+```text
 买（buy）：用美元买入比特币的行为。
 卖（sell）：用比特币换取美元的行为。
 市价单（market order）：给交易所一个方向（买或者卖）和一个数量，交易所把给定数量的美元（或者比特币）换成比特币（或者美元）的单子。
 限价单（limit order）：给交易所一个价格、一个方向（买或者卖）和一个数量，交易所在价格达到给定价格的时候，把给定数量的美元（或者比特币）换成比特币（或者美元）的单子。
-
+```
 
 这几个概念都不难懂。其中，市价单和限价单，最大的区别在于，限价单多了一个给定价格。如何理解这一点呢？我们可以来看下面这个例子。
 
@@ -149,6 +141,7 @@ Gemini 的界面清晰，API 完整而易用，更重要的是，还提供了完
 
 不过，因为涉及到的知识点较多，带你一步一步从零来写代码显然不太现实。所以，我们采用“先读懂后记忆并使用”的方法来学，下面即为这段代码：
 
+```python
 import requests
 import json
 import base64
@@ -156,17 +149,25 @@ import hmac
 import hashlib
 import datetime
 import time
+```
 
+```text
 base_url = "https://api.sandbox.gemini.com"
 endpoint = "/v1/order/new"
 url = base_url + endpoint
+```
 
+```text
 gemini_api_key = "account-zmidXEwP72yLSSybXVvn"
 gemini_api_secret = "375b97HfE7E4tL8YaP3SJ239Pky9".encode()
+```
 
+```text
 t = datetime.datetime.now()
 payload_nonce = str(int(time.mktime(t.timetuple())*1000))
+```
 
+```text
 payload = {
    "request": "/v1/order/new",
    "nonce": payload_nonce,
@@ -177,11 +178,15 @@ payload = {
    "type": "exchange limit",
    "options": ["maker-or-cancel"]
 }
+```
 
+```text
 encoded_payload = json.dumps(payload).encode()
 b64 = base64.b64encode(encoded_payload)
 signature = hmac.new(gemini_api_secret, b64, hashlib.sha384).hexdigest()
+```
 
+```text
 request_headers = {
     'Content-Type': "text/plain",
     'Content-Length': "0",
@@ -190,25 +195,28 @@ request_headers = {
     'X-GEMINI-SIGNATURE': signature,
     'Cache-Control': "no-cache"
 }
+```
 
+```text
 response = requests.post(url,
                          data=None,
                          headers=request_headers)
+```
 
+```python
 new_order = response.json()
-print(new_order)
-
+```
 
 ########## 输出 ##########
 
 {'order_id': '239088767', 'id': '239088767', 'symbol': 'btcusd', 'exchange': 'gemini', 'avg_execution_price': '0.00', 'side': 'buy', 'type': 'exchange limit', 'timestamp': '1561956976', 'timestampms': 1561956976535, 'is_live': True, 'is_cancelled': False, 'is_hidden': False, 'was_forced': False, 'executed_amount': '0', 'remaining_amount': '5', 'options': ['maker-or-cancel'], 'price': '3633.00', 'original_amount': '5'}
-
+print(new_order)
 
 我们来深入看一下这段代码。
 
 RESTful 的 POST 请求，通过 requests.post 来实现。post 接受三个参数，url、data 和 headers。
 
-这里的 url 等价于 https://api.sandbox.gemini.com/v1/order/new，但是在代码中分两部分写。第一部分是交易所 API 地址；第二部分，以斜杠开头，用来表示统一的 API endpoint。我们也可以在其他交易所的 API 中看到类似的写法，两者连接在一起，就构成了最终的 url。
+这里的 url 等价于 <https://api.sandbox.gemini.com/v1/order/new，但是在代码中分两部分写。第一部分是交易所> API 地址；第二部分，以斜杠开头，用来表示统一的 API endpoint。我们也可以在其他交易所的 API 中看到类似的写法，两者连接在一起，就构成了最终的 url。
 
 而接下来大段命令的目的，是为了构造 request_headers。
 
@@ -232,10 +240,10 @@ HTTP 发送需要一个请求头（request header），也就是代码中的 req
 
 nonce 是个单调递增的整数。当某个后来的请求的 nonce，比上一个成功收到的请求的 nouce 小或者相等的时候，Gemini 便会拒绝这次请求。这样一来，重复的包就不会被执行两次了。另一方面，这样也可以在一定程度上防止中间人攻击：
 
-
+```text
 一则是因为 nonce 的加入，使得加密后的同样订单的加密文本完全混乱；
 二则是因为，这会使得中间人无法通过“发送同样的包来构造重复订单”进行攻击。
-
+```
 
 这样的设计思路是不是很巧妙呢？这就相当于每个包都增加了一个身份识别，可以极大地提高安全性。希望你也可以多注意，多思考一下这些巧妙的用法。
 
@@ -250,7 +258,3 @@ nonce 是个单调递增的整数。当某个后来的请求的 nonce，比上�
 思考题
 
 最后留一个思考题。今天的内容里，能不能使用 timestamp 代替 nonce？为什么？欢迎留言写下你的思考，也欢迎你把这篇文章分享出去。
-
-                        
-                        
-                            

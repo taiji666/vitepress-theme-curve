@@ -1,10 +1,12 @@
 ---
 title: 24实战：处理四层流量，实现MemcachedServer
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             24 实战：处理四层流量，实现Memcached Server
                             你好，我是温铭。
+```
 
 在前面几节课中，我们介绍了不少处理请求的 Lua API ，不过它们都是和七层相关的。除此之外，OpenResty 其实还提供了 stream-lua-nginx-module 模块来处理四层的流量。它提供的指令和 API ，与 lua-nginx-module 基本一致。
 
@@ -21,37 +23,49 @@ categories: [OpenResty从入门到实战]
 这时候，直接引入 memcached ，应该是最简单直接的方案。但出于以下几个方面的考虑，我还是选择使用 OpenResty 来造一个轮子：
 
 
+```text
 第一，直接引入会多引入一个进程，增加部署和维护成本；
 第二，这个需求足够简单，只需要 get 和 set 操作，并且支持过期即可；
 第三，OpenResty 有 stream 模块，可以很快地实现这个需求。
+```
 
 
 既然要实现 memcached server，我们就需要先弄明白它的协议。memcached 的协议可以支持 TCP 和 UDP，这里我选择 TCP，下面是 get 和 set 命令的具体协议：
 
+```html
 Get
 根据 key 获取 value
 Telnet command: get <key>*\r\n
+```
 
+```text
 示例：
 get key
 VALUE key 0 4 data END
+```
 
 
 
+```html
 Set
 存储键值对到 memcached 中
 Telnet command：set <key> <flags> <exptime> <bytes> [noreply]\r\n<value>\r\n
+```
 
+```text
 示例：
 set key 0 900 4 data
 STORED
+```
 
 
 除了 get 和 set 外，我们还需要知道 memcached 的协议的“错误处理”是怎么样做的。“错误处理”对于服务端的程序是非常重要的，我们在编写程序时，除了要处理正常的请求，也要考虑到各种异常。比如下面这样的场景：
 
 
+```text
 memcached 发送了一个get、set 之外的请求，我要怎么处理呢？
 服务端出错，我要给 memcached 的客户端一个什么样的反馈呢？
+```
 
 
 同时，我们希望写出能够兼容 memcached 的客户端程序。这样，使用者就不用区分这是 memcached 官方的版本，还是 OpenResty 实现的版本了。
@@ -66,9 +80,12 @@ memcached 发送了一个get、set 之外的请求，我要怎么处理呢？
 
 接下来就要开始动工了。不过，基于测试驱动开发的思想，在写具体的代码之前，让我们先来构造一个最简单的测试案例。这里我们不用 test::nginx 框架，毕竟它的上手难度也不低，我们不妨先用熟悉的 resty 来手动测试下：
 
+```bash
 $ resty -e 'local memcached = require "resty.memcached"
     local memc, err = memcached:new()
+```
 
+```text
     memc:set_timeout(1000) -- 1 sec
     local ok, err = memc:connect("127.0.0.1", 11212)
     local ok, err = memc:set("dog", 32)
@@ -76,9 +93,12 @@ $ resty -e 'local memcached = require "resty.memcached"
         ngx.say("failed to set dog: ", err)
         return
     end
+```
 
+```text
     local res, flags, err = memc:get("dog")
     ngx.say("dog: ", res)'
+```
 
 
 这段测试代码，使用 lua-rety-memcached 客户端库发起 connect 和 set 操作，并假设 memcached 的服务端监听本机的 11212 端口。
@@ -97,6 +117,7 @@ $ resty -e 'local memcached = require "resty.memcached"
 
 让我们先来设置好 Nginx 的配置文件，因为stream 和 shared dict 要在其中预设。下面是我设置的配置文件：
 
+```css
 stream {
     lua_shared_dict memcached 100m;
     lua_package_path 'lib/?.lua;;';
@@ -108,41 +129,57 @@ stream {
         }
     }
 }
+```
 
 
 你可以看到，这段配置文件中有几个关键的信息：
 
 
+```text
 首先，代码运行在 Nginx 的 stream 上下文中，而非 HTTP 上下文中，并且监听了 11212 端口；
 其次，shared dict 的名字为 memcached，大小是 100M，这些在运行期是不可以修改的；
 另外，代码所在目录为 lib/resty/memcached, 文件名为 server.lua, 入口函数为 run()，这些信息你都可以从lua_package_path 和 content_by_lua_block 中找到。
+```
 
 
 接着，就该搭建代码框架了。你可以自己先动手试试，然后我们一起来看下我的框架代码：
 
+```text
 local new_tab = require "table.new"
 local str_sub = string.sub
 local re_find = ngx.re.find
 local mc_shdict = ngx.shared.memcached
+```
 
 local _M = { _VERSION = '0.01' }
 
+```javascript
 local function parse_args(s, start)
 end
+```
 
+```text
 function _M.get(tcpsock, keys)
 end
+```
 
+```text
 function _M.set(tcpsock, res)
 end
+```
 
+```text
 function _M.run()
     local tcpsock = assert(ngx.req.socket(true))
+```
 
+```text
     while true do
         tcpsock:settimeout(60000) -- 60 seconds
         local data, err = tcpsock:receive("*l")
+```
 
+```text
         local command, args
         if data then
             local from, to, err = re_find(data, [[(\S+)]], "jo")
@@ -151,7 +188,9 @@ function _M.run()
                 args = parse_args(data, to + 1)
             end
         end
+```
 
+```text
         if args then
             local args_len = #args
             if command == 'get' and args_len > 0 then
@@ -162,6 +201,7 @@ function _M.run()
         end
     end
 end
+```
 
 return _M
 
@@ -174,31 +214,42 @@ return _M
 
 首先，我们可以根据 memcached 的协议文档，解析 memcached 命令的参数：
 
+```javascript
 local function parse_args(s, start)
     local arr = {}
+```
 
+```text
     while true do
         local from, to = re_find(s, [[\S+]], "jo", {pos = start})
         if not from then
             break
         end
+```
 
         table.insert(arr, str_sub(s, from, to))
 
+```text
         start = to + 1
     end
+```
 
+```text
     return arr
 end
+```
 
 
 这里，我的建议是，先用最直观的方式来实现一个版本，不用考虑任何性能的优化。毕竟，完成总是比完美更重要，而且，基于完成的逐步优化才可以趋近完美。
 
 接下来，我们就来实现下 get 函数。它可以一次查询多个键，所以下面代码中我用了一个 for 循环：
 
+```text
 function _M.get(tcpsock, keys)
     local reply = ""
+```
 
+```text
     for i = 1, #keys do
         local key = keys[i]
         local value, flags = mc_shdict:get(key)
@@ -208,26 +259,34 @@ function _M.get(tcpsock, keys)
         end
     end
     reply = reply ..  "END\r\n"
+```
 
+```text
     tcpsock:settimeout(1000)  -- one second timeout
     local bytes, err = tcpsock:send(reply)
 end
+```
 
 
 其实，这里最核心的代码只有一行：local value, flags = mc_shdict:get(key)，也就是从 shared dict 中查询到数据；至于其余的代码，都在按照 memcached 的协议拼接字符串，并最终 send 到客户端。
 
 最后，我们再来看下 set 函数。它将接收到的参数转换为 shared dict API 的格式，把数据储存了起来；并在出错的时候，按照 memcached 的协议做出处理：
 
+```text
 function _M.set(tcpsock, res)
     local reply =  ""
+```
 
+```text
     local key = res[1]
     local flags = res[2]
     local exptime = res[3]
     local bytes = res[4]
+```
 
     local value, err = tcpsock:receive(tonumber(bytes) + 2)
 
+```text
     if str_sub(value, -2, -1) == "\r\n" then
         local succ, err, forcible = mc_shdict:set(key, str_sub(value, 1, bytes), exptime, flags)
         if succ then
@@ -238,10 +297,13 @@ function _M.set(tcpsock, res)
     else
         reply = reply .. "ERROR\r\n"
     end
+```
 
+```text
     tcpsock:settimeout(1000)  -- one second timeout
     local bytes, err = tcpsock:send(reply)
 end
+```
 
 
 另外，在填充上面这几个函数的过程中，你可以用测试案例来做检验，并用 ngx.log 来做 debug。比较遗憾的是，OpenResty 中并没有断点调试的工具，所以我们都是使用 ngx.say 和 ngx.log 来调试的，在这方面可以说是还处于刀耕火种的时代。

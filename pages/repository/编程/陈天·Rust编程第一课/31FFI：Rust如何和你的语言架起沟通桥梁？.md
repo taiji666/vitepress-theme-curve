@@ -1,10 +1,12 @@
 ---
 title: 31FFI：Rust如何和你的语言架起沟通桥梁？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             31 FFI：Rust如何和你的语言架起沟通桥梁？
                             你好，我是陈天。
+```
 
 FFI（Foreign Function Interface），也就是外部函数接口，或者说语言交互接口，对于大部分开发者来说，是一个神秘的存在，平时可能几乎不会接触到它，更别说撰写 FFI 代码了。
 
@@ -30,66 +32,76 @@ bindgen 会生成低层的 Rust API，Rust 下约定俗成的方式是将使用 
 
 比如，围绕着低层的数据结构和函数，提供 Rust 自己的 struct/enum/trait 接口。-
 
-
 我们以使用 bindgen 来封装用于压缩/解压缩的 bz2 为例，看看 Rust 如何调用 C 的库（以下代码请在 OS X/Linux 下测试，使用 Windows 的同学可以参考 bzip2-sys）。
 
 首先 cargo new bzlib-sys –lib 创建一个项目，然后在 Cargo.toml 中添入：
 
+```text
 [dependencies]
 anyhow = "1"
+```
 
+```text
 [build-dependencies]
 bindgen = "0.59"
-
+```
 
 其中 bindgen 需要在编译期使用， 所以我们在根目录下创建一个 build.rs 使其在编译期运行：
 
+```text
 fn main() {
     // 告诉 rustc 需要 link bzip2
     println!("cargo:rustc-link-lib=bz2");
+```
 
+```text
     // 告诉 cargo 当 wrapper.h 变化时重新运行
     println!("cargo:rerun-if-changed=wrapper.h");
+```
 
+```javascript
     // 配置 bindgen，并生成 Bindings 结构
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
+```
 
+```text
     // 生成 Rust 代码
     bindings
         .write_to_file("src/bindings.rs")
         .expect("Failed to write bindings");
 }
-
+```
 
 在 build.rs 里，引入了一个 wrapper.h，我们在根目录创建它，并引用 bzlib.h：
 
-#include <bzlib.h>
-
+# include <bzlib.h>
 
 此时运行 cargo build，会在 src 目录下生成 src/bindings.rs，里面大概有两千行代码，是 bindgen 根据 bzlib.h 中暴露的常量定义、数据结构和函数等生成的 Rust 代码。感兴趣的话，你可以看看。
 
 有了生成好的代码，我们在 src/lib.rs 中引用它：
 
 // 生成的 bindings 代码根据 C/C++ 代码生成，里面有一些不符合 Rust 约定，我们不让编译期报警
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(deref_nullptr)]
+# ![allow(non_upper_case_globals)]
+# ![allow(non_camel_case_types)]
+# ![allow(non_snake_case)]
+# ![allow(deref_nullptr)]
 
+```cpp
 use anyhow::{anyhow, Result};
 use std::mem;
+```
 
 mod bindings;
 
 pub use bindings::*;
 
-
 接下来就可以撰写两个高阶的接口 compress/decompress，正常情况下应该创建另一个 crate 来撰写这样的接口，之前讲这是 Rust 处理 FFI 的惯例，有助于把高阶接口和低阶接口分离。在这里，我们就直接写在 src/lib.rs 中：
 
+```javascript
 // 高层的 API，处理压缩，一般应该出现在另一个 crate
 pub fn compress(input: &[u8]) -> Result<Vec<u8>> {
     let output = vec![0u8; input.len()];
@@ -99,7 +111,9 @@ pub fn compress(input: &[u8]) -> Result<Vec<u8>> {
         if result != BZ_OK as _ {
             return Err(anyhow!("Failed to initialize"));
         }
+```
 
+```javascript
         // 传入 input/output 进行压缩
         stream.next_in = input.as_ptr() as *mut _;
         stream.avail_in = input.len() as _;
@@ -109,17 +123,23 @@ pub fn compress(input: &[u8]) -> Result<Vec<u8>> {
         if result != BZ_STREAM_END as _ {
             return Err(anyhow!("Failed to compress"));
         }
+```
 
+```javascript
         // 结束压缩
         let result = BZ2_bzCompressEnd(&mut stream as *mut _);
         if result != BZ_OK as _ {
             return Err(anyhow!("Failed to end compression"));
         }
     }
+```
 
+```text
     Ok(output)
 }
+```
 
+```javascript
 // 高层的 API，处理解压缩，一般应该出现在另一个 crate
 pub fn decompress(input: &[u8]) -> Result<Vec<u8>> {
     let output = vec![0u8; input.len()];
@@ -129,7 +149,9 @@ pub fn decompress(input: &[u8]) -> Result<Vec<u8>> {
         if result != BZ_OK as _ {
             return Err(anyhow!("Failed to initialize"));
         }
+```
 
+```javascript
         // 传入 input/output 进行解压缩
         stream.next_in = input.as_ptr() as *mut _;
         stream.avail_in = input.len() as _;
@@ -139,34 +161,44 @@ pub fn decompress(input: &[u8]) -> Result<Vec<u8>> {
         if result != BZ_STREAM_END as _ {
             return Err(anyhow!("Failed to compress"));
         }
+```
 
+```javascript
         // 结束解压缩
         let result = BZ2_bzDecompressEnd(&mut stream as *mut _);
         if result != BZ_OK as _ {
             return Err(anyhow!("Failed to end compression"));
         }
     }
+```
 
+```text
     Ok(output)
 }
-
+```
 
 最后，不要忘记了我们的好习惯，写个测试确保工作正常：
 
-#[cfg(test)]
+# [cfg(test)]
+
+```css
 mod tests {
     use super::*;
+```
 
+```javascript
     #[test]
     fn compression_decompression_should_work() {
         let input = include_str!("bindings.rs").as_bytes();
         let compressed = compress(input).unwrap();
         let decompressed = decompress(&compressed).unwrap();
+```
 
+```text
         assert_eq!(input, &decompressed);
     }
 }
-
+```
 
 运行 cargo test，测试能够正常通过。你可以看到，生成的 bindings.rs 里也有不少测试，cargo test 总共执行了 16 个测试。
 
@@ -178,21 +210,15 @@ mod tests {
 
 bindgen 这样的工具，帮我们干了很多脏活累活，虽然大部分时候我们不太需要关心生成的 FFI 代码，但在使用它们构建更高层的 API 时，还是要注意三个关键问题。
 
-
 如何处理数据结构的差异？
-
 
 比如 C string 是 NULL 结尾，而 Rust String 是完全不同的结构。我们要清楚数据结构在内存中组织的差异，才能妥善地处理它们。Rust 提供了 std::ffi 来处理这样的问题，比如 CStr 和 CString 来处理字符串。
 
-
 谁来释放内存？
-
 
 没有特殊的情况，谁分配的内存，谁要负责释放。Rust 的内存分配器和其它语言的可能不一样，所以，Rust 分配的内存在 C 的上下文中释放，可能会导致未定义的行为。
 
-
 如何进行错误处理？
-
 
 在上面的代码里我们也看到了，C 通过返回的 error code 来报告执行过程中的错误，我们使用了 anyhow! 宏来随手生成了错误，这是不好的示例。在正式的代码中，应该使用 thiserror 或者类似的机制来定义所有 error code 对应的错误情况，然后相应地生成错误。
 
@@ -210,51 +236,52 @@ Rust 调用其它语言
 
 这里的处理逻辑和上面的 Rust 调用 C 是类似的，只不过角色对调了一下：-
 
-
 要把 Rust 代码和数据结构提供给 C 使用，我们首先要构造相应的 Rust shim 层，把原有的、正常的 Rust 实现封装一下，便于 C 调用。
 
 Rust shim 主要做四件事情：
 
-
+```text
 提供 Rust 方法、trait 方法等公开接口的独立函数。注意 C 是不支持泛型的，所以对于泛型函数，需要提供具体的用于某个类型的 shim 函数。
 所有要暴露给 C 的独立函数，都要声明成 #[no_mangle]，不做函数名称的改写。
-
+```
 
 如果不用 #[no_mangle]，Rust 编译器会为函数生成很复杂的名字，我们很难在 C 中得到正确的改写后的名字。同时，这些函数的接口要使用 C 兼容的数据结构。
 
-
 数据结构需要处理成和 C 兼容的结构。
-
 
 如果是你自己定义的结构体，需要使用 #[repr©]，对于要暴露给 C 的函数，不能使用 String/Vec/Result 这些 C 无法正确操作的数据结构。
 
-
 要使用 catch_unwind 把所有可能产生 panic! 的代码包裹起来。
-
 
 切记，其它语言调用 Rust 时，遇到 Rust 的 panic!()，会导致未定义的行为，所以在 FFI 的边界处，要 catch_unwind，阻止 Rust 栈回溯跑出 Rust 的世界。
 
 来看个例子：
 
 // 使用 no_mangle 禁止函数名改编，这样其它语言可以通过 C ABI 调用这个函数
-#[no_mangle]
+# [no_mangle]
+
+```css
 pub extern "C" fn hello_world() -> *const c_char {
     // C String 以 "\\0" 结尾，你可以把 "\\0" 去掉看看会发生什么
     "hello world!\\0".as_ptr() as *const c_char
 }
-
+```
 
 这段代码使用了 #[no_mangle] ，在传回去字符串时使用 “\0” 结尾的字符串。由于这个字符串在 RODATA 段，是 ‘static 的生命周期，所以将其转换成裸指针返回，没有问题。如果要把这段代码编译为一个可用的 C 库，在 Cargo.toml 中，crate 类型要设置为 crate-type = [“cdylib”]。
 
 刚才那个例子太简单，我们再来看一个进阶的例子。在这个例子里，C 语言那端会传过来一个字符串指针， format!() 一下后，返回一个字符串指针：
 
-#[no_mangle]
+# [no_mangle]
+
+```javascript
 pub extern "C" fn hello_bad(name: *const c_char) -> *const c_char {
     let s = unsafe { CStr::from_ptr(name).to_str().unwrap() };
+```
 
+```css
     format!("hello {}!\\0", s).as_ptr() as *const c_char
 }
-
+```
 
 你能发现这段代码的问题么？它犯了初学者几乎会犯的所有问题。
 
@@ -266,17 +293,23 @@ pub extern "C" fn hello_bad(name: *const c_char) -> *const c_char {
 
 所以，正确的写法应该是：
 
-#[no_mangle]
+# [no_mangle]
+
+```cpp
 pub extern "C" fn hello(name: *const c_char) -> *const c_char {
     if name.is_null() {
         return ptr::null();
     }
+```
 
+```javascript
     if let Ok(s) = unsafe { CStr::from_ptr(name).to_str() } {
         let result = format!("hello {}!", s);
         // 可以使用 unwrap，因为 result 不包含 \\0
         let s = CString::new(result).unwrap();
+```
 
+```cpp
         s.into_raw()
         // 相当于：
         // let p = s.as_ptr();
@@ -286,19 +319,21 @@ pub extern "C" fn hello(name: *const c_char) -> *const c_char {
         ptr::null()
     }
 }
-
+```
 
 在这段代码里，我们检查了 NULL 指针，进行了错误处理，还用 into_raw() 来让 Rust 侧放弃对内存的所有权。
 
 注意前面的三个关键问题说过，谁分配的内存，谁来释放，所以，我们还需要提供另一个函数，供 C 语言侧使用，来释放 Rust 分配的字符串：
 
-#[no_mangle]
+# [no_mangle]
+
+```cpp
 pub extern "C" fn free_str(s: *mut c_char) {
     if !s.is_null() {
         unsafe { CString::from_raw(s) };
     }
 }
-
+```
 
 C 代码必须要调用这个接口安全释放 Rust 创建的 CString。如果不调用，会有内存泄漏；如果使用 C 自己的 free()，会导致未定义的错误。
 
@@ -308,54 +343,61 @@ C 代码必须要调用这个接口安全释放 Rust 创建的 CString。如果�
 
 上面的 hello 代码，其实还不够安全。因为虽然看上去没有使用任何会导致直接或者间接 panic! 的代码，但难保代码复杂后，隐式地调用了 panic!()。比如，如果以后我们新加一些逻辑，使用了 copy_from_slice()，这个函数内部会调用 panic!()，就会导致问题。所以，最好的方法是把主要的逻辑封装在 catch_unwind 里：
 
-#[no_mangle]
+# [no_mangle]
+
+```cpp
 pub extern "C" fn hello(name: *const c_char) -> *const c_char {
     if name.is_null() {
         return ptr::null();
     }
+```
 
+```javascript
     let result = catch_unwind(|| {
         if let Ok(s) = unsafe { CStr::from_ptr(name).to_str() } {
             let result = format!("hello {}!", s);
             // 可以使用 unwrap，因为 result 不包含 \\0
             let s = CString::new(result).unwrap();
+```
 
+```cpp
             s.into_raw()
         } else {
             ptr::null()
         }
     });
+```
 
+```javascript
     match result {
         Ok(s) => s,
         Err(_) => ptr::null(),
     }
 }
-
+```
 
 这几段代码你可以多多体会，完整例子放在 playground。
 
 写好 Rust shim 代码后，接下来就是生成 C 的 FFI 接口了。一般来说，这个环节可以用工具来自动生成。我们可以使用 cbindgen。如果使用 cbindgen，上述的代码会生成类似这样的 bindings.h：
-
-#include <cstdarg>
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
-#include <new>
+```
+# include <cstdarg>
+# include <cstdint>
+# include <cstdlib>
+# include <ostream>
+# include <new>
 
 extern "C" {
 
 const char *hello_world();
 
-const char *hello_bad(const char *name);
+const char *hello_bad(const char*name);
 
-const char *hello(const char *name);
+const char *hello(const char*name);
 
 void free_str(char *s);
 
 } // extern "C"
-
-
+```
 有了编译好的库代码以及头文件后，在其他语言中，就可以用该语言的工具进一步生成那门语言的 FFI 绑定，然后正常使用。
 
 和其它语言的互操作
@@ -366,13 +408,15 @@ void free_str(char *s);
 
 对于 Erlang/Elixir，可以使用非常不错的 rustler。如果你对此感兴趣，可以看这个 repo 中的演示文稿和例子。下面是一个把 Rust 代码安全地给 Erlang/Elixir 使用的简单例子：
 
-#[rustler::nif]
+# [rustler::nif]
+
+```css
 fn add(a: i64, b: i64) -> i64 {
     a + b
 }
+```
 
 rustler::init!("Elixir.Math", [add]);
-
 
 对于 C++，虽然 cbindgen 就足够，但社区里还有 cxx，它可以帮助我们很方便地对 Rust 和 C++ 进行互操作。
 
@@ -380,75 +424,91 @@ rustler::init!("Elixir.Math", [add]);
 
 具体怎么用可以看这门课的 GitHub repo 下这一讲的 ffi-math crate 的完整代码。这里就讲一下重点，我写了个简单的 uniffi 接口（math.udl）：
 
+```css
 namespace math {
     u32 add(u32 a, u32 b);
     string hello([ByRef]string name);
 };
-
+```
 
 并提供了 Rust 实现：
 
 uniffi_macros::include_scaffolding!("math");
 
+```css
 pub fn add(a: u32, b: u32) -> u32 {
     a + b
 }
+```
 
+```css
 pub fn hello(name: &str) -> String {
     format!("hello {}!", name)
 }
-
+```
 
 之后就可以用：
 
+```text
 uniffi-bindgen generate src/math.udl --language swift
 uniffi-bindgen generate src/math.udl --language kotlin
-
+```
 
 生成对应的 Swift 和 Kotlin 代码。
 
 我们看生成的 hello() 函数的代码。比如 Kotlin 代码：
 
+```css
 fun hello(name: String): String {
-	val _retval =
-		rustCall() { status ->
-			_UniFFILib.INSTANCE.math_6c3d_hello(name.lower(), status)
-		}
-	return String.lift(_retval)
+ val _retval =
+  rustCall() { status ->
+   _UniFFILib.INSTANCE.math_6c3d_hello(name.lower(), status)
+  }
+ return String.lift(_retval)
 }
-
+```
 
 再比如 Swift 代码：
 
+```javascript
 public func hello(name: String) -> String {
     let _retval = try!
+```
 
+```css
         rustCall {
             math_6c3d_hello(name.lower(), $0)
         }
     return try! String.lift(_retval)
 }
-
+```
 
 你也许注意到了这个 RustCall，它是用来调用 Rust FFI 代码的，看源码：
 
+```java
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
     try makeRustCall(callback, errorHandler: {
         $0.deallocate()
         return UniffiInternalError.unexpectedRustCallError
     })
 }
+```
 
+```javascript
 private func makeRustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T, errorHandler: (RustBuffer) throws -> Error) throws -> T {
     var callStatus = RustCallStatus()
     let returnedVal = callback(&callStatus)
     switch callStatus.code {
     case CALL_SUCCESS:
         return returnedVal
+```
 
+```text
     case CALL_ERROR:
         throw try errorHandler(callStatus.errorBuf)
+```
 
+```css
     case CALL_PANIC:
         // When the rust code sees a panic, it tries to construct a RustBuffer
         // with the message.  But if that code panics, then it just sends back
@@ -459,20 +519,25 @@ private func makeRustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) 
             callStatus.errorBuf.deallocate()
             throw UniffiInternalError.rustPanic("Rust panic")
         }
+```
 
+```text
     default:
         throw UniffiInternalError.unexpectedRustCallStatusCode
     }
 }
-
+```
 
 你可以看到，它还考虑了如果 Rust 代码 panic! 后的处理。那么 Rust 申请的内存会被 Rust 释放么？
 
 会的。hello() 里的 String.lift() 就在做这个事情，我们看生成的代码：
 
+```java
 extension String: ViaFfi {
     fileprivate typealias FfiType = RustBuffer
+```
 
+```javascript
     fileprivate static func lift(_ v: FfiType) throws -> Self {
         defer {
             v.deallocate()
@@ -485,7 +550,9 @@ extension String: ViaFfi {
     }
     ...
 }
+```
 
+```java
 private extension RustBuffer {
     ...
     // Frees the buffer in place.
@@ -494,7 +561,7 @@ private extension RustBuffer {
         try! rustCall { ffi_math_6c3d_rustbuffer_free(self, $0) }
     }
 }
-
+```
 
 在 lift 时，它会分配一个 swift String，然后在函数退出时调用 deallocate()，此时会发送一个 rustCall 给 ffi_math_rustbuffer_free()。
 
@@ -505,7 +572,6 @@ FFI 的其它方式
 最后，我们来简单聊一聊处理 FFI 的其它方式。其实代码的跨语言共享并非只有 FFI 一条路子。你也可以使用 REST API、gRPC 来达到代码跨语言使用的目的。不过，这样要额外走一圈网络，即便是本地网络，也效率太低，且不够安全。有没有更高效一些的方法？
 
 有！我们可以在两个语言中使用 protobuf 来序列化/反序列化要传递的数据。在 Mozilla 的一篇博文 Crossing the Rust FFI frontier with Protocol Buffers，提到了这种方法：-
-
 
 感兴趣的同学，可以读读这篇文章。也可以看看我之前写的文章深度探索：前端中的后端，详细探讨了把 Rust 用在客户端项目中的可能性以及如何做 Rust bridge。
 
@@ -523,14 +589,10 @@ FFI 是 Rust 又一个处于领先地位的领域。
 
 思考题
 
-
+```cpp
 阅读 std::ffi 的文档，想想 Vec 如何传递给 C？再想想 HashMap 该如何传递？有必要传递一个 HashMap 到 C 那一侧么？
 阅读 rocksdb 的代码，看看 Rust 如何提供 rocksDB 的绑定。
 如果你是个 iOS/Android 开发者，尝试使用 Rust 的 reqwest 构建 REST API 客户端，然后把得到的数据通过 FFI 传递给 Swift/Kotlin 侧。
-
+```
 
 感谢你的收听，今天完成了第31次Rust学习打卡啦。如果你觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论。我们下节课见～
-
-                        
-                        
-                            

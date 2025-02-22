@@ -1,18 +1,22 @@
 ---
 title: 33性能提升10倍的秘诀：必须用好table
-date: 1739706057.1933618
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             33 性能提升10倍的秘诀：必须用好 table
                             你好，我是温铭。
+```
 
 在 OpenResty 中，除了字符串经常出现性能问题外，table 也是性能的拦路虎。在之前的章节中，我们零零散散地介绍过 table 相关的函数，但并没有专门提到它对性能方面的提升。今天，我就带你专门来聊聊，table 操作对性能的影响。
 
 不同于对字符串的熟悉，开发者对于 table 相关的性能优化知之甚少，这主要有两个方面的原因。
 
 
+```text
 其一，OpenResty 中使用的是 Lua ，是自己的 LuaJIT 分支，不是标准的 LuaJIT，也不是标准的 Lua。而大部分开发者并不知道它们之间的区别，倾向于使用标准 Lua 的 table 库来写 OpenResty 代码。
 其二，在标准 LuaJIT 和 OpenResty 自己的 LuaJIT 分支中，table 操作相关的文档都藏得非常深，开发者很难找到；而且文档中也没有示例代码，需要开发者自己去开源项目中寻找示例。
+```
 
 
 这就形成了比较高的认知壁垒，导致了两极分化的结果——资深的 OpenResty 开发者能够写出很高性能的代码，而刚入门的则会怀疑 OpenResty 的高性能是不是一个泡沫。当然，等你学习完这节课的内容，你就可以轻松地戳破这层窗户纸，让性能提升 10 倍不是梦。
@@ -45,54 +49,67 @@ local color = {first = "red", "blue", third = "green", "yellow"}
 
 下面我们通过一个简单的例子，来看下具体的使用。因为这个函数是 LuaJIT 扩展出来的，所以，在使用它之前，我们需要先 require 一下：
 
+```text
 local new_tab = require "table.new"
  local t = new_tab(100, 0)
  for i = 1, 100 do
    t[i] = i
  end
+```
 
 
 另外，因为之前的 OpenResty 并没有完全绑定 LuaJIT，还支持标准 Lua，所以有些旧的代码会做这方面的兼容。如果没有找到 table.new 这个函数，就会模拟出来一个空的函数，来保证调用方的统一。
 
+```css
 local ok, new_tab = pcall(require, "table.new")
   if not ok then
     new_tab = function (narr, nrec) return {} end
   end
+```
 
 
 自己计算 table 下标
 
 有了 table 对象之后，下一步就是向它里面增加元素了。最直接的方法，就是调用 table.insert 这个函数来插入元素：
 
+```text
 local new_tab = require "table.new"
  local t = new_tab(100, 0)
  for i = 1, 100 do
    table.insert(t, i)
  end
+```
 
 
 或者是先获取当前数组的长度，通过下标的方式来插入元素：
 
+```text
 local new_tab = require "table.new"
  local t = new_tab(100, 0)
  for i = 1, 100 do
    t[#t + 1] = i
  end
+```
 
 
 不过，这两种方式都需要先计算数组的长度，然后再新增元素。显然，这个操作是 O(n) 的时间复杂度。就拿上面代码的例子来说，for 循环会计算 100 次数组的长度，这样下来性能自然不乐观，并且数组越大时，性能也会越低。
 
 这一点又该如何解决呢？让我们看下 lua-resty-redis 这个官方的库是如何做的吧：
 
+```javascript
 local function _gen_req(args)
     local nargs = #args
+```
 
 
+```text
     local req = new_tab(nargs * 5 + 1, 0)
     req[1] = "*" .. nargs .. "\r\n"
     local nbits = 2
+```
 
 
+```text
     for i = 1, nargs do
         local arg = args[i]
         req[nbits] = "$"
@@ -104,6 +121,7 @@ local function _gen_req(args)
     end
     return req
 en
+```
 
 
 这个函数预先生成了数组 req，它的大小由函数的入参来决定，这样就可以保证尽量不浪费空间。
@@ -120,6 +138,7 @@ en
 
 为了让你能够更清楚它的实现，下面我给出了一个代码示例，它兼容了标准 Lua：
 
+```text
 local ok, clear_tab = pcall(require, "table.clear")
   if not ok then
     clear_tab = function (tab)
@@ -128,6 +147,7 @@ local ok, clear_tab = pcall(require, "table.clear")
       end
     end
   end
+```
 
 
 可以看到，clear 函数实际上就是把每一个元素都置为了nil。
@@ -139,14 +159,19 @@ local ok, clear_tab = pcall(require, "table.clear")
 local local_plugins = {}
 
 
+```javascript
 function load()
     core.table.clear(local_plugins)
+```
 
 
+```text
     local local_conf = core.config.local_conf()
     local plugin_names = local_conf.plugins
+```
 
 
+```text
     local processed = {}
     for _, name in ipairs(plugin_names) do
         if processed[name] == nil then
@@ -154,6 +179,7 @@ function load()
             insert_tab(local_plugins, name)
         end
     end
+```
 
 
     return local_plugins
@@ -167,17 +193,21 @@ table 池
 
 下面这段代码，展示了 table 池的基本使用方法。我们可以从指定的池子中获取一个 table，使用完以后再释放回去：
 
+```text
 local tablepool = require "tablepool"
  local tablepool_fetch = tablepool.fetch
  local tablepool_release = tablepool.release
+```
 
 
+```javascript
 local pool_name = "some_tag" 
 local function do_sth()
      local t = tablepool_fetch(pool_name, 10, 0)
      -- -- using t for some purposes
     tablepool_release(pool_name, t) 
 end
+```
 
 
 显然，tablepool 中会用到前面我们介绍过的几个方法，而且它的代码只有不到一百行，所以，如果你学有余力，我十分推荐你可以自己搜索并研究一下。这里，我主要介绍下它的两个 API。

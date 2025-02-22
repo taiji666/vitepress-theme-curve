@@ -1,10 +1,12 @@
 ---
 title: 01初探OpenResty的三大特性
-date: 1739706057.145951
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             01 初探OpenResty的三大特性
                             你好，我是温铭。
+```
 
 开篇词里我们说过，OpenResty的优势显而易见。不过，在具体学习之前，让我们先简单回顾下 OpenResty 的发展过程，这有助于你对后面内容有更好的理解。
 
@@ -44,8 +46,10 @@ OpenResty 则没有历史包袱，在诞生之初就支持了协程，并基于�
 
 这里我解释一下，什么是同步非阻塞。先说同步，这个很简单，就是按照代码来顺序执行。比如下面这段伪码：
 
+```text
 local res, err  = query-mysql(sql)
 local value, err = query-redis(key)
+```
 
 
 在同一请求连接中，如果要等 MySQL 的查询结果返回后，才能继续去查询 Redis，那就是同步；如果不用等 MySQL 的返回，就能继续往下走，去查询 Redis，那就是异步。对于 OpenResty 来说，绝大部分都是同步操作，只有 ngx.timer 这种后台定时器相关的 API，才是异步操作。

@@ -1,10 +1,12 @@
 ---
 title: 35静态类型检查：ESLint语法规则和代码风格的检查
-date: 1739706057.6210232
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             35 静态类型检查：ESLint语法规则和代码风格的检查
                             你好，我是石川。
+```
 
 前面几讲中，我们介绍了JS中的测试，其中包括了单元、UI自动化类的功能性测试，还有性能、安全以及辅助工具等非功能性的测试。通常这些测试都是我们产品上线前的软件工程流水线中重要的环节，因为这些测试所发现的问题会直接影响我们的程序能不能正常运行。
 
@@ -27,9 +29,11 @@ lint 并不是 JavaScript 的专有名词。它来源于 C 语言，当 C 语言
 首先，我们可以简单了解下它的组成。ESLint 最核心的模块是 Linter、CLIEngine 和 RuleTester。
 
 
+```text
 Linter 是核心中的核心，它没有文件I/O，也不与控制台直接交互。它的主要工作就是根据配置的选项来进行代码验证。
 CLIEngine 的主要作用是找到源代码文件和配置文件，它包含了配置文件、解析器、插件和格式器的加载逻辑。ESLint使用的是Espree的解析器。
 RuleTester 的作用是对每一条检查规则做单元测试，RuleTester 内部包装的是 Mocha，对，你没看错，ESLint 用 Mocha 作为内部的单元测试工具。RuleTester 效仿 Mocha 的接口，可以与 Mocha 的全局测试方法一起使用。当然除了 Mocha 以外，RuleTester 也可以和其它的单元测试工具结合使用。
+```
 
 
 
@@ -59,32 +63,42 @@ npx eslint yourfile.js
 那么在检查中，通常会有哪些类型的报错呢？这里，我们先了解下代码规范的目的。因为按照测试驱动的设计思想，如果没有相关的测试目的，那么检查和报错也就无从谈起了。总结来说，代码规范通常有这样两个目的：
 
 
+```text
 提高代码的质量；
 统一代码的风格。
+```
 
 
 我们可以通过下面的示例代码来看两个例子。第一个例子，使用 constructor 来构建函数，同 eval() 类似，会使得字符串的内容可能被执行。所以这个例子不仅是代码质量问题，甚至会有安全隐患。
 
+```javascript
 // bad
 const add = new Function('a', 'b', 'return a + b');
+```
 
+```javascript
 // still bad
 const subtract = Function('a', 'b', 'return a - b');
+```
 
 
 在下面的例子中，第一行的对象字面量的表达非常长。虽然代码本身的质量没问题，但是这么长的句子会影响代码的可读性。而第二种写法则更加可读。所以通常 linter 工具会要求一行代码的长度不要超过80个字符。这样，可以提高代码的可读性。
 
 这里，你可能会问，难道写在一行就没有优点吗？其实也不是，如果我们把代码写在一行的话，按说在没有换行的情况下占用的空间会更小，可以压缩文件的大小。但是这个问题通常不是在写代码的时候解决的，而是在程序写完后，可以通过压缩器 JS minifier 来处理。在编写代码的环节，我们始终更重视的问题是我们的代码对于自己和同事是否易读。
 
+```javascript
 // Bad 
 const foo = { "bar": "This is a bar.", "baz": { "qux": "This is a qux" }, "difficult": "to read" }; 
+```
 
+```javascript
 // Good
 const foo = {
   "bar": "This is a bar.", 
   "baz": { "qux": "This is a qux" }, 
   "difficult": "to read" 
 }; 
+```
 
 
 从上面的例子中，我们可以看到 linter 是一种可以让我们的代码变得更好的方式。但是类似这样的问题，在JavaScript 中有很多。同时在有些时候，大家对“好”的定义可能还不一样。那么遇到这么庞大的规则数量，以及大家对代码风格的不同定义，应该怎么处理呢？
@@ -101,18 +115,22 @@ const foo = {
 
 除了 linter 这种代码检查类的工具外，还有一种代码规范化的工具，其中一个例子就是 Prettier。它的工作原理也是对代码进行解析和格式化。例如我们编写了下面的函数，从功能层面讲，它是有效的，但格式不符合常规。
 
+```javascript
 function HelloWorld({greeting = "hello", greeted = '"World"', silent = false, onMouseOver,}) {
 }
+```
 
 
 在此代码上运行 Prettier 可以修复缩进，添加缺少的换行，让代码更加可读。
 
+```javascript
 function HelloWorld({
   greeting = "hello",
   greeted = '"World"',
   silent = false,
   onMouseOver,
 }) {}
+```
 
 
 在使用 Prettier 的时候，如果使用 --write 选项调用，会就地格式化指定的文件，而不是复制后格式化。如果你是用 Git 来管理源代码的话，则可以在代码提交的 hook 中使用 --write 选项来调用 Prettier，它可以让我们在代码提交前自动格式化代码。如果将代码编辑器配置为在每次保存文件时自动运行，则会更加方便。

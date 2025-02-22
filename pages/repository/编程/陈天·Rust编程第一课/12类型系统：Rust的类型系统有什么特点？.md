@@ -1,10 +1,12 @@
 ---
 title: 12类型系统：Rust的类型系统有什么特点？
-date: 1739706057.3685184
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             12 类型系统：Rust的类型系统有什么特点？
                             你好，我是陈天。今天我们就开始类型系统的学习。
+```
 
 如果你用 C/Golang 这样不支持泛型的静态语言，或者用 Python/Ruby/JavaScript 这样的动态语言，这个部分可能是个难点，希望你做好要转换思维的准备；如果你用 C++/Java/Swift 等支持泛型的静态语言，可以比较一下 Rust 和它们的异同。
 
@@ -34,11 +36,11 @@ categories: [陈天·Rust编程第一课]
 
 对于动态类型系统，多态通过鸭子类型（duck typing）实现；而对于静态类型系统，多态可以通过参数多态（parametric polymorphism）、特设多态（adhoc polymorphism）和子类型多态（subtype polymorphism）实现。
 
-
+```text
 参数多态是指，代码操作的类型是一个满足某些约束的参数，而非具体的类型。
 特设多态是指同一种行为有多个不同实现的多态。比如加法，可以 1+1，也可以是 “abc” + “cde”、matrix1 + matrix2、甚至 matrix1 + vector1。在面向对象编程语言中，特设多态一般指函数的重载。
 子类型多态是指，在运行时，子类型可以被当成父类型使用。
-
+```
 
 在 Rust 中，参数多态通过泛型来支持、特设多态通过 trait 来支持、子类型多态可以用 trait object 来支持，我们待会讲参数多态，下节课再详细讲另外两个。
 
@@ -64,21 +66,23 @@ Rust 类型系统
 
 你也许会有疑问，那类似这样的代码，它的类型是什么？
 
+```css
 if has_work {
     do_something();
 }
-
+```
 
 在Rust中，对于一个作用域，无论是 if/else/for 循环，还是函数，最后一个表达式的返回值就是作用域的返回值，如果表达式或者函数不返回任何值，那么它返回一个 unit() 。unit 是只有一个值的类型，它的值和类型都是 () 。
 
 像上面这个 if 块，它的类型和返回值是() ，所以当它被放在一个没有返回值的函数中，如下所示：
 
+```css
 fn work(has_work: bool) {
     if has_work {
         do_something();
     }
 }
-
+```
 
 Rust 类型无处不在这个逻辑还是自洽的。
 
@@ -98,9 +102,7 @@ unit 的应用非常广泛，除了作为返回值，它还被大量使用在数
 
 Rust 的原生类型包括字符、整数、浮点数、布尔值、数组（array）、元组（tuple）、切片（slice）、指针、引用、函数等，见下表（参考链接）：-
 
-
 在原生类型的基础上，Rust 标准库还支持非常丰富的组合类型，看看已经遇到的：-
-
 
 之后我们不断会遇到新的数据类型，推荐你有意识地记录一下，相信到最后，你的这个列表会积累得很长很长。
 
@@ -114,28 +116,34 @@ Rust 的原生类型包括字符、整数、浮点数、布尔值、数组（arr
 
 use std::collections::BTreeMap;
 
+```cpp
 fn main() {
     let mut map = BTreeMap::new();
     map.insert("hello", "world");
     println!("map: {:?}", map);
 }
-
+```
 
 此时， Rust 编译器可以从上下文中推导出， BTreeMap 的类型 K 和 V 都是字符串引用 &str，所以这段代码可以编译通过，然而，如果你把第 5 行这个作用域内的 insert 语句注释去掉，Rust 编译器就会报错：“cannot infer type for type parameter K”。
 
 很明显，Rust 编译器需要足够的上下文来进行类型推导，所以有些情况下，编译器无法推导出合适的类型，比如下面的代码尝试把一个列表中的偶数过滤出来，生成一个新的列表（代码）：
 
+```javascript
 fn main() {
     let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+```
 
+```javascript
     let even_numbers = numbers
         .into_iter()
         .filter(|n| n % 2 == 0)
         .collect();
+```
 
+```text
     println!("{:?}", even_numbers);
 }
-
+```
 
 collect 是 Iterator trait 的方法，它把一个 iterator 转换成一个集合。因为很多集合类型，如 Vec、HashMap 等都实现了 Iterator，所以这里的 collect 究竟要返回什么类型，编译器是无法从上下文中推断的。
 
@@ -143,65 +151,80 @@ collect 是 Iterator trait 的方法，它把一个 iterator 转换成一个集�
 
 这种情况，就无法依赖类型推导来简化代码了，必须让 even_numbers 有一个明确的类型。所以，我们可以使用类型声明（代码）：
 
+```javascript
 fn main() {
     let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+```
 
+```text
     let even_numbers: Vec<_> = numbers
         .into_iter()
         .filter(|n| n % 2 == 0)
         .collect();
+```
 
+```text
     println!("{:?}", even_numbers);
 }
-
+```
 
 注意这里编译器只是无法推断出集合类型，但集合类型内部元素的类型，还是可以根据上下文得出，所以我们可以简写成 Vec<_> 。
 
 除了给变量一个显式的类型外，我们也可以让 collect 返回一个明确的类型（代码）：
 
+```javascript
 fn main() {
     let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+```
 
+```javascript
     let even_numbers = numbers
         .into_iter()
         .filter(|n| n % 2 == 0)
         .collect::<Vec<_>>();
+```
 
+```text
     println!("{:?}", even_numbers);
 }
+```
 
-
-你可以看到，在泛型函数后使用 ::<T> 来强制使用类型 T，这种写法被称为 turbofish。我们再看一个对 IP 地址和端口转换的例子（代码）：
+你可以看到，在泛型函数后使用``` ::<T> ```来强制使用类型 T，这种写法被称为 turbofish。我们再看一个对 IP 地址和端口转换的例子（代码）：
 
 use std::net::SocketAddr;
 
+```javascript
 fn main() {
     let addr = "127.0.0.1:8080".parse::<SocketAddr>().unwrap();
     println!("addr: {:?}, port: {:?}", addr.ip(), addr.port());
 }
-
+```
 
 turbofish 的写法在很多场景都有优势，因为在某些上下文中，你想直接把一个表达式传递给一个函数或者当成一个作用域的返回值，比如：
 
+```javascript
 match data {
     Some(s) => v.parse::<User>()?,
     _ => return Err(...),
 }
-
+```
 
 如果 User 类型在上下文无法被推导出来，又没有 turbofish 的写法，我们就不得不先给一个局部变量赋值时声明类型，然后再返回，这样代码就变得冗余了。
 
 有些情况下，即使上下文中含有类型的信息，也需要开发者为变量提供类型，比如常量和静态变量的定义。看一个例子（代码）：
 
+```text
 const PI: f64 = 3.1415926;
 static E: f32 = 2.71828;
+```
 
+```css
 fn main() {
     const V: u32 = 10;
     static V1: &str = "hello";
     println!("PI: {}, E: {}, V {}, V1: {}", PI, E, V, V1);
 }
-
+```
 
 这可能是因为 const/static 主要用于定义全局变量，它们可以在不同的上下文中使用，所以为了代码的可读性，需要明确的类型声明。
 
@@ -219,34 +242,38 @@ Rust 对数据结构的泛型，或者说参数化类型，有着完整的支持
 
 我们从一个最简单的泛型例子 Option开始回顾：
 
+```html
 enum Option<T> {
   Some(T),
   None,
 }
-
+```
 
 这个数据结构你应该很熟悉了，T 代表任意类型，当 Option 有值时是 Some(T)，否则是 None。
 
 在定义刚才这个泛型数据结构的时候，你有没有这样的感觉，有点像在定义函数：
 
-
+```text
 函数，是把重复代码中的参数抽取出来，使其更加通用，调用函数的时候，根据参数的不同，我们得到不同的结果；
 而泛型，是把重复数据结构中的参数抽取出来，在使用泛型类型时，根据不同的参数，我们会得到不同的具体类型。
-
+```
 
 再来看一个复杂一点的泛型结构 Vec 的例子，验证一下这个想法：
 
+```text
 pub struct Vec<T, A: Allocator = Global> {
     buf: RawVec<T, A>,
     len: usize,
 }
+```
 
+```html
 pub struct RawVec<T, A: Allocator = Global> {
     ptr: Unique<T>,
     cap: usize,
     alloc: A,
 }
-
+```
 
 Vec 有两个参数，一个是 T，是列表里的每个数据的类型，另一个是 A，它有进一步的限制 A: Allocator ，也就是说 A 需要满足 Allocator trait。
 
@@ -256,6 +283,7 @@ A 这个参数有默认值 Global，它是 Rust 默认的全局分配器，这�
 
 来看一个枚举类型 Cow 的例子：
 
+```cpp
 pub enum Cow<'a, B: ?Sized + 'a> where B: ToOwned,
 {
     // 借用的数据
@@ -263,7 +291,7 @@ pub enum Cow<'a, B: ?Sized + 'a> where B: ToOwned,
     // 拥有的数据
     Owned(<B as ToOwned>::Owned),
 }
-
+```
 
 Cow（Clone-on-Write）是Rust中一个很有意思且很重要的数据结构。它就像 Option 一样，在返回数据的时候，提供了一种可能：要么返回一个借用的数据（只读），要么返回一个拥有所有权的数据（可写）。
 
@@ -281,27 +309,32 @@ ToOwned 是一个 trait，它可以把借用的数据克隆出一个拥有所有
 
 所以这里对 B 的三个约束分别是：
 
-
+```text
 生命周期 ‘a
 长度可变 ?Sized
 符合 ToOwned trait
+```
 
-
-最后我解释一下 Cow 这个 enum 里 <B as ToOwned>::Owned 的含义：它对 B 做了一个强制类型转换，转成 ToOwned trait，然后访问 ToOwned trait 内部的 Owned 类型。
+最后我解释一下 Cow 这个 enum 里``` <B as ToOwned>::Owned ```的含义：它对 B 做了一个强制类型转换，转成 ToOwned trait，然后访问 ToOwned trait 内部的 Owned 类型。
 
 因为在 Rust 里，子类型可以强制转换成父类型，B 可以用 ToOwned 约束，所以它是 ToOwned trait 的子类型，因而 B 可以安全地强制转换成 ToOwned。这里 B as ToOwned 是成立的。
 
 上面 Vec 和 Cow 的例子中，泛型参数的约束都发生在开头 struct 或者 enum 的定义中，其实，很多时候，我们也可以在不同的实现下逐步添加约束，比如下面这个例子（代码）：
 
+```cpp
 use std::fs::File;
 use std::io::{BufReader, Read, Result};
+```
 
+```html
 // 定义一个带有泛型参数 R 的 reader，此处我们不限制 R
 struct MyReader<R> {
     reader: R,
     buf: String,
 }
+```
 
+```cpp
 // 实现 new 函数时，我们不需要限制 R
 impl<R> MyReader<R> {
     pub fn new(reader: R) -> Self {
@@ -311,7 +344,9 @@ impl<R> MyReader<R> {
         }
     }
 }
+```
 
+```html
 // 定义 process 时，我们需要用到 R 的方法，此时我们限制 R 必须实现 Read trait
 impl<R> MyReader<R>
 where
@@ -321,16 +356,20 @@ where
         self.reader.read_to_string(&mut self.buf)
     }
 }
+```
 
+```javascript
 fn main() {
     // 在 windows 下，你需要换个文件读取，否则会出错
     let f = File::open("/etc/hosts").unwrap();
     let mut reader = MyReader::new(BufReader::new(f));
+```
 
+```javascript
     let size = reader.process().unwrap();
     println!("total size read: {}", size);
 }
-
+```
 
 逐步添加约束，可以让约束只出现在它不得不出现的地方，这样代码的灵活性最大。
 
@@ -340,21 +379,25 @@ fn main() {
 
 一个简单的例子（代码）：
 
+```html
 fn id<T>(x: T) -> T {
     return x;
 }
+```
 
+```javascript
 fn main() {
     let int = id(10);
     let string = id("Tyr");
     println!("{}, {}", int, string);
 }
-
+```
 
 这里，id() 是一个泛型函数，它接受一个带有泛型类型的参数，返回一个泛型类型。
 
 对于泛型函数，Rust 会进行单态化（Monomorphization）处理，也就是在编译时，把所有用到的泛型函数的泛型参数展开，生成若干个函数。所以，刚才的 id() 编译后会得到一个处理后的多个版本（代码）：
 
+```javascript
 fn id_i32(x: i32) -> i32 {
     return x;
 }
@@ -366,7 +409,7 @@ fn main() {
     let string = id_str("Tyr");
     println!("{}, {}", int, string);
 }
-
+```
 
 单态化的好处是，泛型函数的调用是静态分派（static dispatch），在编译时就一一对应，既保有多态的灵活性，又没有任何效率的损失，和普通函数调用一样高效。
 
@@ -381,7 +424,6 @@ fn main() {
 今天我们介绍了类型系统的一些基本概念以及 Rust 的类型系统。
 
 用一张图描述了 Rust 类型系统的主要特征，包括其属性、数据结构、类型推导和泛型编程：-
-
 
 按类型定义、检查以及检查时能否被推导出来，Rust 是强类型+静态类型+显式类型。
 
@@ -399,14 +441,20 @@ fn main() {
 
 下面这段代码为什么不能编译通过？你可以修改它使其正常工作么？
 
+```cpp
 use std::io::{BufWriter, Write};
 use std::net::TcpStream;
+```
 
-#[derive(Debug)]
+# [derive(Debug)]
+
+```html
 struct MyWriter<W> {
     writer: W,
 }
+```
 
+```javascript
 impl<W: Write> MyWriter<W> {
     pub fn new(addr: &str) -> Self {
         let stream = TcpStream::connect("127.0.0.1:8080").unwrap();
@@ -414,17 +462,21 @@ impl<W: Write> MyWriter<W> {
             writer: BufWriter::new(stream),
         }
     }
+```
 
+```cpp
     pub fn write(&mut self, buf: &str) -> std::io::Result<()> {
         self.writer.write_all(buf.as_bytes())
     }
 }
+```
 
+```javascript
 fn main() {
     let writer = MyWriter::new("127.0.0.1:8080");
     writer.write("hello world!");
 }
-
+```
 
 欢迎在留言区答题交流，你已经完成Rust学习的第12次打卡，我们下节课见！
 
@@ -443,7 +495,3 @@ fn main() {
 4.当我们在堆上分配内存的时候，我们通过分配器来进行内存的分配，以及管理已分配的内存，包括增大（grow）、缩小（shrink）等。在处理某些情况下，默认的分配器也许不够高效，我们可以使用 jemalloc 来分配内存。
 
 5.如果你对各个语言是如何实现和处理泛型比较感兴趣的话，可以参考下图（来源）：
-
-                        
-                        
-                            

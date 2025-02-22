@@ -59,6 +59,7 @@ export default withPwa(
       config: (md) => markdownConfig(md, themeConfig),
     },
     // 构建排除
+    ignoreDeadLinks: true,
     srcExclude: ["**/README.md", "**/TODO.md"],
     // transformHead
     transformPageData: async (pageData) => {
@@ -74,10 +75,10 @@ export default withPwa(
       return jumpRedirect(html, themeConfig);
     },
     // buildEnd
-    buildEnd: async (config) => {
-      await createRssFile(config, themeConfig);
-    },
-    // vite
+    // buildEnd: async (config) => {
+    //   await createRssFile(config, themeConfig);
+    // },
+    // // vite
     vite: {
       plugins: [
         AutoImport({

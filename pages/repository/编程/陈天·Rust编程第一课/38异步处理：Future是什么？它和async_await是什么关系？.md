@@ -1,10 +1,12 @@
 ---
 title: 38异步处理：Future是什么？它和async_await是什么关系？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             38 异步处理：Future是什么？它和async_await是什么关系？
                             你好，我是陈天。
+```
 
 通过前几讲的学习，我们对并发处理，尤其是常用的并发原语，有了一个比较清晰的认识。并发原语是并发任务之间同步的手段，今天我们要学习的 Future 以及在更高层次上处理 Future 的 async/await，是产生和运行并发任务的手段。
 
@@ -20,9 +22,11 @@ categories: [陈天·Rust编程第一课]
 如果你熟悉 JavaScript，应该熟悉 Promise 的概念，[02]也简单讲过，它代表了在未来的某个时刻才能得到的结果的值，Promise 一般存在三个状态；
 
 
+```text
 初始状态，Promise 还未运行；
 等待（pending）状态，Promise 已运行，但还未结束；
 结束状态，Promise 成功解析出一个值，或者执行失败。
+```
 
 
 只不过 JavaScript 的 Promise 和线程类似，一旦创建就开始执行，对 Promise await 只是为了“等待”并获取解析出来的值；而 Rust 的 Future，只有在主动 await 后才开始执行。
@@ -43,36 +47,50 @@ categories: [陈天·Rust编程第一课]
 
 我们来看一个例子（代码）：
 
+```cpp
 use anyhow::Result;
 use serde_yaml::Value;
 use std::fs;
+```
 
+```javascript
 fn main() -> Result<()> {
     // 读取 Cargo.toml，IO 操作 1
     let content1 = fs::read_to_string("./Cargo.toml")?;
     // 读取 Cargo.lock，IO 操作 2
     let content2 = fs::read_to_string("./Cargo.lock")?;
+```
 
+```javascript
     // 计算
     let yaml1 = toml2yaml(&content1)?;
     let yaml2 = toml2yaml(&content2)?;
+```
 
+```cpp
     // 写入 /tmp/Cargo.yml，IO 操作 3
     fs::write("/tmp/Cargo.yml", &yaml1)?;
     // 写入 /tmp/Cargo.lock，IO 操作 4
     fs::write("/tmp/Cargo.lock", &yaml2)?;
+```
 
+```text
     // 打印
     println!("{}", yaml1);
     println!("{}", yaml2);
+```
 
+```text
     Ok(())
 }
+```
 
+```cpp
 fn toml2yaml(content: &str) -> Result<String> {
     let value: Value = toml::from_str(&content)?;
     Ok(serde_yaml::to_string(&value)?)
 }
+```
 
 
 这段代码读取 Cargo.toml 和 Cargo.lock 将其转换成 yaml，再分别写入到 /tmp 下。
@@ -84,54 +102,77 @@ fn toml2yaml(content: &str) -> Result<String> {
 
 这并不难，我们可以把文件读取和写入的操作放入单独的线程中执行，比如（代码）：
 
+```cpp
 use anyhow::{anyhow, Result};
 use serde_yaml::Value;
 use std::{
     fs,
     thread::{self, JoinHandle},
 };
+```
 
+```html
 /// 包装一下 JoinHandle，这样可以提供额外的方法
 struct MyJoinHandle<T>(JoinHandle<Result<T>>);
+```
 
+```html
 impl<T> MyJoinHandle<T> {
     /// 等待 thread 执行完（类似 await）
     pub fn thread_await(self) -> Result<T> {
         self.0.join().map_err(|_| anyhow!("failed"))?
     }
 }
+```
 
+```javascript
 fn main() -> Result<()> {
     // 读取 Cargo.toml，IO 操作 1
     let t1 = thread_read("./Cargo.toml");
     // 读取 Cargo.lock，IO 操作 2
     let t2 = thread_read("./Cargo.lock");
+```
 
+```javascript
     let content1 = t1.thread_await()?;
     let content2 = t2.thread_await()?;
+```
 
+```javascript
     // 计算
     let yaml1 = toml2yaml(&content1)?;
     let yaml2 = toml2yaml(&content2)?;
+```
 
+```javascript
     // 写入 /tmp/Cargo.yml，IO 操作 3
     let t3 = thread_write("/tmp/Cargo.yml", yaml1);
     // 写入 /tmp/Cargo.lock，IO 操作 4
     let t4 = thread_write("/tmp/Cargo.lock", yaml2);
+```
 
+```javascript
     let yaml1 = t3.thread_await()?;
     let yaml2 = t4.thread_await()?;
+```
 
+```cpp
     fs::write("/tmp/Cargo.yml", &yaml1)?;
     fs::write("/tmp/Cargo.lock", &yaml2)?;
+```
 
+```text
     // 打印
     println!("{}", yaml1);
     println!("{}", yaml2);
+```
 
+```text
     Ok(())
 }
+```
 
+```javascript
 fn thread_read(filename: &'static str) -> MyJoinHandle<String> {
     let handle = thread::spawn(move || {
         let s = fs::read_to_string(filename)?;
@@ -139,7 +180,9 @@ fn thread_read(filename: &'static str) -> MyJoinHandle<String> {
     });
     MyJoinHandle(handle)
 }
+```
 
+```javascript
 fn thread_write(filename: &'static str, content: String) -> MyJoinHandle<String> {
     let handle = thread::spawn(move || {
         fs::write(filename, &content)?;
@@ -147,11 +190,14 @@ fn thread_write(filename: &'static str, content: String) -> MyJoinHandle<String>
     });
     MyJoinHandle(handle)
 }
+```
 
+```cpp
 fn toml2yaml(content: &str) -> Result<String> {
     let value: Value = toml::from_str(&content)?;
     Ok(serde_yaml::to_string(&value)?)
 }
+```
 
 
 这样，读取或者写入多个文件的过程并发执行，使等待的时间大大缩短。
@@ -166,39 +212,53 @@ fn toml2yaml(content: &str) -> Result<String> {
 
 我们看看，同样的任务，如何用 async/await 更高效地处理（代码）：
 
+```cpp
 use anyhow::Result;
 use serde_yaml::Value;
 use tokio::{fs, try_join};
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     // 读取 Cargo.toml，IO 操作 1
     let f1 = fs::read_to_string("./Cargo.toml");
     // 读取 Cargo.lock，IO 操作 2
     let f2 = fs::read_to_string("./Cargo.lock");
     let (content1, content2) = try_join!(f1, f2)?;
+```
 
+```javascript
     // 计算
     let yaml1 = toml2yaml(&content1)?;
     let yaml2 = toml2yaml(&content2)?;
+```
 
+```javascript
     // 写入 /tmp/Cargo.yml，IO 操作 3
     let f3 = fs::write("/tmp/Cargo.yml", &yaml1);
     // 写入 /tmp/Cargo.lock，IO 操作 4
     let f4 = fs::write("/tmp/Cargo.lock", &yaml2);
     try_join!(f3, f4)?;
+```
 
+```text
     // 打印
     println!("{}", yaml1);
     println!("{}", yaml2);
+```
 
+```text
     Ok(())
 }
+```
 
+```cpp
 fn toml2yaml(content: &str) -> Result<String> {
     let value: Value = toml::from_str(&content)?;
     Ok(serde_yaml::to_string(&value)?)
 }
+```
 
 
 在这段代码里，我们使用了 tokio::fs，而不是 std::fs，tokio::fs 的文件操作都会返回一个 Future，然后可以 join 这些 Future，得到它们运行后的结果。join/try_join 是用来轮询多个 Future 的宏，它会依次处理每个 Future，遇到阻塞就处理下一个，直到所有 Future 产生结果。
@@ -207,10 +267,12 @@ fn toml2yaml(content: &str) -> Result<String> {
 
 建议你好好对比这三个版本的代码，写一写，运行一下，感受它们的处理逻辑。注意在最后的 async/await 的版本中，我们不能把代码写成这样：
 
+```javascript
 // 读取 Cargo.toml，IO 操作 1
 let content1 = fs::read_to_string("./Cargo.toml").await?;
 // 读取 Cargo.lock，IO 操作 2
 let content1 = fs::read_to_string("./Cargo.lock").await?;
+```
 
 
 这样写的话，和第一版同步的版本没有区别，因为 await 会运行 Future 直到 Future 执行结束，所以依旧是先读取 Cargo.toml，再读取 Cargo.lock，并没有达到并发的效果。
@@ -226,15 +288,19 @@ let content1 = fs::read_to_string("./Cargo.lock").await?;
 
 来看 Future 的定义：
 
+```cpp
 pub trait Future {
     type Output;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
 }
+```
 
+```html
 pub enum Poll<T> {
     Ready(T),
     Pending,
 }
+```
 
 
 除了 Output 外，它还有一个 poll() 方法，这个方法返回 PollSelf::Output。而 Poll 是个 enum，包含 Ready 和 Pending 两个状态。显然，当 Future 返回 Pending 状态时，活还没干完，但干不下去了，需要阻塞一阵子，等某个事件将其唤醒；当 Future 返回 Ready 状态时，Future 对应的值已经得到，此时可以返回了。
@@ -243,27 +309,38 @@ pub enum Poll<T> {
 
 回到 async fn 的返回值我们接着说，显然它是一个 impl Future，那么如果我们给一个普通的函数返回 impl Future，它的行为和 async fn 是不是一致呢？来写个简单的实验（代码）：
 
+```cpp
 use futures::executor::block_on;
 use std::future::Future;
+```
 
 #[tokio::main]
+```javascript
 async fn main() {
     let name1 = "Tyr".to_string();
     let name2 = "Lindsey".to_string();
+```
 
+```text
     say_hello1(&name1).await;
     say_hello2(&name2).await;
+```
 
+```text
     // Future 除了可以用 await 来执行外，还可以直接用 executor 执行
     block_on(say_hello1(&name1));
     block_on(say_hello2(&name2));
 }
+```
 
+```css
 async fn say_hello1(name: &str) -> usize {
     println!("Hello {}", name);
     42
 }
+```
 
+```html
 // async fn 关键字相当于一个返回 impl Future<Output> 的语法糖
 fn say_hello2<'fut>(name: &'fut str) -> impl Future<Output = usize> + 'fut {
     async move {
@@ -271,6 +348,7 @@ fn say_hello2<'fut>(name: &'fut str) -> impl Future<Output = usize> + 'fut {
         42
     }
 }
+```
 
 
 运行这段代码你会发现，say_hello1 和 say_hello2 是等价的，二者都可以使用 await 来执行，也可以将其提供给一个 executor 来执行。
@@ -286,10 +364,12 @@ fn say_hello2<'fut>(name: &'fut str) -> impl Future<Output = usize> + 'fut {
 常见的 executor 有：
 
 
+```cpp
 futures 库自带的很简单的 executor，上面的代码就使用了它的 block_on 函数；
 tokio 提供的 executor，当使用 #[tokio::main] 时，就隐含引入了 tokio 的 executor；
 async-std 提供的 executor，和 tokio 类似；
 smol 提供的 async-executor，主要提供了 block_on。
+```
 
 
 注意，上面的代码我们混用了 #[tokio::main] 和 futures:executor::block_on，这只是为了展示 Future 使用的不同方式，在正式代码里，不建议混用不同的 executor，会降低程序的性能，还可能引发奇怪的问题。
@@ -297,9 +377,11 @@ smol 提供的 async-executor，主要提供了 block_on。
 当我们谈到 executor 时，就不得不提 reactor，它俩都是 Reactor Pattern 的组成部分，作为构建高性能事件驱动系统的一个很典型模式，Reactor pattern 它包含三部分：
 
 
+```text
 task，待处理的任务。任务可以被打断，并且把控制权交给 executor，等待之后的调度；
 executor，一个调度器。维护等待运行的任务（ready queue），以及被阻塞的任务（wait queue）；
 reactor，维护事件队列。当事件来临时，通知 executor 唤醒某个任务等待运行。
+```
 
 
 executor 会调度执行待处理的任务，当任务无法继续进行却又没有完成时，它会挂起任务，并设置好合适的唤醒条件。之后，如果 reactor 得到了满足条件的事件，它会唤醒之前挂起的任务，然后 executor 就有机会继续执行这个任务。这样一直循环下去，直到任务执行完毕。
@@ -317,12 +399,15 @@ tokio 的调度器（executor）会运行在多个线程上，运行线程自己
 
 我们以一个具体的代码示例来进一步理解这个过程（代码）：
 
+```cpp
 use anyhow::Result;
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio_util::codec::{Framed, LinesCodec};
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let addr = "0.0.0.0:8080";
     let listener = TcpListener::bind(addr).await?;
@@ -343,12 +428,14 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 这是一个简单的 TCP 服务器，服务器每收到一个客户端的请求，就会用 tokio::spawn 创建一个异步任务，放入 executor 中执行。这个异步任务接受客户端发来的按行分隔（分隔符是 “\r\n”）的数据帧，服务器每收到一行，就加个前缀把内容也按行发回给客户端。
 
 你可以用 telnet 和这个服务器交互：
 
+```text
 ❯ telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
@@ -356,6 +443,7 @@ Escape character is '^]'.
 hello
 I got: hello
 Connection closed by foreign host.
+```
 
 
 假设我们在客户端输入了很大的一行数据，服务器在做 r.next().await 在执行的时候，收不完一行的数据，因而这个 Future 返回 Poll::Pending，此时它被挂起。当后续客户端的数据到达时，reactor 会知道这个 socket 上又有数据了，于是找到 socket 对应的 Future，将其唤醒，继续接收数据。
@@ -376,11 +464,14 @@ Connection closed by foreign host.
 
 这是因为 Future 的调度是协作式多任务（Cooperative Multitasking），也就是说，除非 Future 主动放弃 CPU，不然它就会一直被执行，直到运行结束。我们看一个例子（代码）：
 
+```cpp
 use anyhow::Result;
 use std::time::Duration;
+```
 
 // 强制 tokio 只使用一个工作线程，这样 task 2 不会跑到其它线程执行
 #[tokio::main(worker_threads = 1)]
+```cpp
 async fn main() -> Result<()> {
     // 先开始执行 task 1 的话会阻塞，让 task 2 没有机会运行
     tokio::spawn(async move {
@@ -389,14 +480,19 @@ async fn main() -> Result<()> {
         // tokio::time::sleep(Duration::from_millis(1)).await;
         loop {}
     });
+```
 
+```cpp
     tokio::spawn(async move {
         eprintln!("task 2");
     });
+```
 
+```cpp
     tokio::time::sleep(Duration::from_millis(1)).await;
     Ok(())
 }
+```
 
 
 task 1 里有一个死循环，你可以把它想象成是执行时间很长又不包括 IO 处理的代码。运行这段代码，你会发现，task 2 没有机会得到执行。这是因为 task 1 不执行结束，或者不让出 CPU，task 2 没有机会被调度。
@@ -409,24 +505,31 @@ task 1 里有一个死循环，你可以把它想象成是执行时间很长又�
 
 然而，标准库的 MutexGuard 不能安全地跨越 await，所以，当我们需要获得锁之后执行异步操作，必须使用 tokio 自带的 Mutex，看下面的例子（代码）：
 
+```cpp
 use anyhow::Result;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
+```
 
 struct DB;
 
+```html
 impl DB {
     // 假装在 commit 数据
     async fn commit(&mut self) -> Result<usize> {
         Ok(42)
     }
 }
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let db1 = Arc::new(Mutex::new(DB));
     let db2 = Arc::clone(&db1);
+```
 
+```cpp
     tokio::spawn(async move {
         let mut db = db1.lock().await;
         // 因为拿到的 MutexGuard 要跨越 await，所以不能用 std::sync::Mutex
@@ -435,20 +538,29 @@ async fn main() -> Result<()> {
         println!("db1: Total affected rows: {}", affected);
         Ok::<_, anyhow::Error>(())
     });
+```
 
+```javascript
     tokio::spawn(async move {
         let mut db = db2.lock().await;
         let affected = db.commit().await?;
         println!("db2: Total affected rows: {}", affected);
+```
 
+```cpp
         Ok::<_, anyhow::Error>(())
     });
+```
 
+```cpp
     // 让两个 task 有机会执行完
     tokio::time::sleep(Duration::from_millis(1)).await;
+```
 
+```text
     Ok(())
 }
+```
 
 
 这个例子模拟了一个数据库的异步 commit() 操作。如果我们需要在多个 tokio task 中使用这个 DB，需要使用 Arc>。然而，db1.lock() 拿到锁后，我们需要运行 db.commit().await，这是一个异步操作。
@@ -467,6 +579,7 @@ async fn main() -> Result<()> {
 
 use std::thread;
 
+```cpp
 use anyhow::Result;
 use blake3::Hasher;
 use futures::{SinkExt, StreamExt};
@@ -476,18 +589,24 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 use tokio_util::codec::{Framed, LinesCodec};
+```
 
 pub const PREFIX_ZERO: &[u8] = &[0, 0, 0];
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     let addr = "0.0.0.0:8080";
     let listener = TcpListener::bind(addr).await?;
     println!("listen to: {}", addr);
+```
 
+```cpp
     // 创建 tokio task 和 thread 之间的 channel
     let (sender, mut receiver) = mpsc::unbounded_channel::<(String, oneshot::Sender<String>)>();
+```
 
+```javascript
     // 使用 thread 处理计算密集型任务
     thread::spawn(move || {
         // 读取从 tokio task 过来的 msg，注意这里用的是 blocking_recv，而非 await
@@ -503,7 +622,9 @@ async fn main() -> Result<()> {
             }
         }
     });
+```
 
+```javascript
     // 使用 tokio task 处理 IO 密集型任务
     loop {
         let (stream, addr) = listener.accept().await?;
@@ -518,7 +639,9 @@ async fn main() -> Result<()> {
                 // 为每个消息创建一个 oneshot channel，用于发送回复
                 let (reply, reply_receiver) = oneshot::channel();
                 sender1.send((line?, reply))?;
+```
 
+```cpp
                 // 接收 pow 计算完成后的 hash 和 nonce
                 if let Ok(v) = reply_receiver.await {
                     w.send(format!("Pow calculated: {}", v)).await?;
@@ -528,7 +651,9 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
+```javascript
 // 使用 rayon 并发计算 u32 空间下所有 nonce，直到找到有头 N 个 0 的哈希
 pub fn pow(s: &str) -> Option<(String, u32)> {
     let hasher = blake3_base_hash(s.as_bytes());
@@ -541,19 +666,24 @@ pub fn pow(s: &str) -> Option<(String, u32)> {
         (hash, n)
     })
 }
+```
 
+```cpp
 // 计算携带 nonce 后的哈希
 fn blake3_hash(mut hasher: blake3::Hasher, nonce: &u32) -> blake3::Hash {
     hasher.update(&nonce.to_be_bytes()[..]);
     hasher.finalize()
 }
+```
 
+```cpp
 // 计算数据的哈希
 fn blake3_base_hash(data: &[u8]) -> Hasher {
     let mut hasher = Hasher::new();
     hasher.update(data);
     hasher
 }
+```
 
 
 在这个例子里，我们使用了之前撰写的 TCP server，只不过这次，客户端输入过来的一行文字，会被计算出一个 POW（Proof of Work）的哈希：调整 nonce，不断计算哈希，直到哈希的头三个字节全是零为止。服务器要返回计算好的哈希和获得该哈希的 nonce。这是一个典型的计算密集型任务，所以我们需要使用线程来处理它。
@@ -562,6 +692,7 @@ fn blake3_base_hash(data: &[u8]) -> Hasher {
 
 建议你仔细读读这段代码，最好自己写一遍，感受一下使用 channel 在计算密集型和 IO 密集型任务同步的方式。如果你用 telnet 连接，发送 “hello world!”，会得到不同的哈希和 nonce，它们都是正确的结果：
 
+```text
 ❯ telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
@@ -569,7 +700,9 @@ Escape character is '^]'.
 hello world!
 Pow calculated: hash: 0000006e6e9370d0f60f06bdc288efafa203fd99b9af0480d040b2cc89c44df0, once: 403407307
 Connection closed by foreign host.
+```
 
+```text
 ❯ telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
@@ -577,6 +710,7 @@ Escape character is '^]'.
 hello world!
 Pow calculated: hash: 000000e23f0e9b7aeba9060a17ac676f3341284800a2db843e2f0e85f77f52dd, once: 36169623
 Connection closed by foreign host.
+```
 
 
 小结
@@ -585,27 +719,33 @@ Connection closed by foreign host.
 
 在学习 Future 的使用时，估计你也发现了，我们可以对比线程来学习，可以看到，下列代码的结构多么相似：
 
+```cpp
 fn thread_async() -> JoinHandle<usize> {
     thread::spawn(move || {
         println!("hello thread!");
         42
     })
 }
+```
 
+```html
 fn task_async() -> impl Future<Output = usize> {
     async move {
         println!("hello async!");
         42
     }
 }
+```
 
 
 在使用 Future 时，主要有3点注意事项：
 
 
+```cpp
 我们要避免在异步任务中处理大量计算密集型的工作；
 在使用 Mutex 等同步原语时，要注意标准库的 MutexGuard 无法跨越 .await，所以，此时要使用对异步友好的 Mutex，如 tokio::sync::Mutex；
 如果要在线程和异步任务间同步，可以使用 channel。
+```
 
 
 今天为了帮助你深入理解，我们写了很多代码，每一段你都可以再仔细阅读几遍，把它们搞懂，最好自己也能直接写出来，这样你对 Future 才会有更深的理解。

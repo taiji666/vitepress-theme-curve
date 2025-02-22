@@ -1,10 +1,12 @@
 ---
 title: 20揭秘Python协程
-date: 1739706057.5437288
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             20 揭秘 Python 协程
                             你好，我是景霄。
+```
 
 上一节课的最后，我们留下一个小小的悬念：生成器在 Python 2 中还扮演了一个重要角色，就是用来实现 Python 协程。
 
@@ -30,20 +32,25 @@ categories: [Python核心技术与实战]
 
 import time
 
+```python
 def crawl_page(url):
     print('crawling {}'.format(url))
     sleep_time = int(url.split('_')[-1])
     time.sleep(sleep_time)
     print('OK {}'.format(url))
+```
 
+```python
 def main(urls):
     for url in urls:
         crawl_page(url)
+```
 
 %time main(['url_1', 'url_2', 'url_3', 'url_4'])
 
 ########## 输出 ##########
 
+```text
 crawling url_1
 OK url_1
 crawling url_2
@@ -53,6 +60,7 @@ OK url_3
 crawling url_4
 OK url_4
 Wall time: 10 s
+```
 
 
 （注意：本节的主要目的是协程的基础概念，因此我们简化爬虫的 scrawl_page 函数为休眠数秒，休眠时间取决于 url 最后的那个数字。）
@@ -65,20 +73,25 @@ Wall time: 10 s
 
 import asyncio
 
+```python
 async def crawl_page(url):
     print('crawling {}'.format(url))
     sleep_time = int(url.split('_')[-1])
     await asyncio.sleep(sleep_time)
     print('OK {}'.format(url))
+```
 
+```text
 async def main(urls):
     for url in urls:
         await crawl_page(url)
+```
 
 %time asyncio.run(main(['url_1', 'url_2', 'url_3', 'url_4']))
 
 ########## 输出 ##########
 
+```text
 crawling url_1
 OK url_1
 crawling url_2
@@ -88,6 +101,7 @@ OK url_3
 crawling url_4
 OK url_4
 Wall time: 10 s
+```
 
 
 看到这段代码，你应该发现了，在 Python 3.7 以上版本中，使用协程写异步程序非常简单。
@@ -116,21 +130,26 @@ async 修饰词声明异步函数，于是，这里的 crawl_page 和 main 都�
 
 import asyncio
 
+```python
 async def crawl_page(url):
     print('crawling {}'.format(url))
     sleep_time = int(url.split('_')[-1])
     await asyncio.sleep(sleep_time)
     print('OK {}'.format(url))
+```
 
+```text
 async def main(urls):
     tasks = [asyncio.create_task(crawl_page(url)) for url in urls]
     for task in tasks:
         await task
+```
 
 %time asyncio.run(main(['url_1', 'url_2', 'url_3', 'url_4']))
 
 ########## 输出 ##########
 
+```text
 crawling url_1
 crawling url_2
 crawling url_3
@@ -140,6 +159,7 @@ OK url_2
 OK url_3
 OK url_4
 Wall time: 3.99 s
+```
 
 
 你可以看到，我们有了协程对象后，便可以通过 asyncio.create_task 来创建任务。任务创建后很快就会被调度执行，这样，我们的代码也不会阻塞在任务这里。所以，我们要等所有任务都结束才行，用for task in tasks: await task 即可。
@@ -152,20 +172,25 @@ Wall time: 3.99 s
 
 import asyncio
 
+```python
 async def crawl_page(url):
     print('crawling {}'.format(url))
     sleep_time = int(url.split('_')[-1])
     await asyncio.sleep(sleep_time)
     print('OK {}'.format(url))
+```
 
+```text
 async def main(urls):
     tasks = [asyncio.create_task(crawl_page(url)) for url in urls]
     await asyncio.gather(*tasks)
+```
 
 %time asyncio.run(main(['url_1', 'url_2', 'url_3', 'url_4']))
 
 ########## 输出 ##########
 
+```text
 crawling url_1
 crawling url_2
 crawling url_3
@@ -175,6 +200,7 @@ OK url_2
 OK url_3
 OK url_4
 Wall time: 4.01 s
+```
 
 
 这里的代码也很好理解。唯一要注意的是，*tasks 解包列表，将列表变成了函数的参数；与之对应的是， ** dict 将字典变成了函数的参数。
@@ -187,27 +213,34 @@ Wall time: 4.01 s
 
 import asyncio
 
+```python
 async def worker_1():
     print('worker_1 start')
     await asyncio.sleep(1)
     print('worker_1 done')
+```
 
+```python
 async def worker_2():
     print('worker_2 start')
     await asyncio.sleep(2)
     print('worker_2 done')
+```
 
+```python
 async def main():
     print('before await')
     await worker_1()
     print('awaited worker_1')
     await worker_2()
     print('awaited worker_2')
+```
 
 %time asyncio.run(main())
 
 ########## 输出 ##########
 
+```text
 before await
 worker_1 start
 worker_1 done
@@ -216,20 +249,26 @@ worker_2 start
 worker_2 done
 awaited worker_2
 Wall time: 3 s
+```
 
 
 import asyncio
 
+```python
 async def worker_1():
     print('worker_1 start')
     await asyncio.sleep(1)
     print('worker_1 done')
+```
 
+```python
 async def worker_2():
     print('worker_2 start')
     await asyncio.sleep(2)
     print('worker_2 done')
+```
 
+```python
 async def main():
     task1 = asyncio.create_task(worker_1())
     task2 = asyncio.create_task(worker_2())
@@ -238,11 +277,13 @@ async def main():
     print('awaited worker_1')
     await task2
     print('awaited worker_2')
+```
 
 %time asyncio.run(main())
 
 ########## 输出 ##########
 
+```text
 before await
 worker_1 start
 worker_2 start
@@ -251,11 +292,13 @@ awaited worker_1
 worker_2 done
 awaited worker_2
 Wall time: 2.01 s
+```
 
 
 不过，第二个代码，到底发生了什么呢？为了让你更详细了解到协程和线程的具体区别，这里我详细地分析了整个过程。步骤有点多，别着急，我们慢慢来看。
 
 
+```text
 asyncio.run(main())，程序进入 main() 函数，事件循环开启；
 task1 和 task2 任务被创建，并进入事件循环等待运行；运行到 print，输出 'before await'；
 await task1 执行，用户选择从当前的主任务中切出，事件调度器开始调度 worker_1；
@@ -266,41 +309,56 @@ worker_2 开始运行，运行 print 输出 'worker_2 start'，然后运行 awai
 await task1 完成，事件调度器将控制器传给主任务，输出 'awaited worker_1'，·然后在 await task2 处继续等待；
 两秒钟后，worker_2 的 sleep 完成，事件调度器将控制权重新传给 task_2，输出 'worker_2 done'，task_2 完成任务，从事件循环中退出；
 主任务输出 'awaited worker_2'，协程全任务结束，事件循环结束。
+```
 
 
 接下来，我们进阶一下。如果我们想给某些协程任务限定运行时间，一旦超时就取消，又该怎么做呢？再进一步，如果某些协程运行时出现错误，又该怎么处理呢？同样的，来看代码。
 
 import asyncio
 
+```text
 async def worker_1():
     await asyncio.sleep(1)
     return 1
+```
 
+```text
 async def worker_2():
     await asyncio.sleep(2)
     return 2 / 0
+```
 
+```text
 async def worker_3():
     await asyncio.sleep(3)
     return 3
+```
 
+```text
 async def main():
     task_1 = asyncio.create_task(worker_1())
     task_2 = asyncio.create_task(worker_2())
     task_3 = asyncio.create_task(worker_3())
+```
 
+```text
     await asyncio.sleep(2)
     task_3.cancel()
+```
 
+```python
     res = await asyncio.gather(task_1, task_2, task_3, return_exceptions=True)
     print(res)
+```
 
 %time asyncio.run(main())
 
 ########## 输出 ##########
 
+```text
 [1, ZeroDivisionError('division by zero'), CancelledError()]
 Wall time: 2 s
+```
 
 
 你可以看到，worker_1 正常运行，worker_2 运行中出现错误，worker_3 执行时间过长被我们 cancel 掉了，这些信息会全部体现在最终的返回结果 res 中。
@@ -309,34 +367,48 @@ Wall time: 2 s
 
 到这里，发现了没，线程能实现的，协程都能做到。那就让我们温习一下这些知识点，用协程来实现一个经典的生产者消费者模型吧。
 
+```python
 import asyncio
 import random
+```
 
+```python
 async def consumer(queue, id):
     while True:
         val = await queue.get()
         print('{} get a val: {}'.format(id, val))
         await asyncio.sleep(1)
+```
 
+```python
 async def producer(queue, id):
     for i in range(5):
         val = random.randint(1, 10)
         await queue.put(val)
         print('{} put a val: {}'.format(id, val))
         await asyncio.sleep(1)
+```
 
+```text
 async def main():
     queue = asyncio.Queue()
+```
 
+```text
     consumer_1 = asyncio.create_task(consumer(queue, 'consumer_1'))
     consumer_2 = asyncio.create_task(consumer(queue, 'consumer_2'))
+```
 
+```text
     producer_1 = asyncio.create_task(producer(queue, 'producer_1'))
     producer_2 = asyncio.create_task(producer(queue, 'producer_2'))
+```
 
+```text
     await asyncio.sleep(10)
     consumer_1.cancel()
     consumer_2.cancel()
+```
     
     await asyncio.gather(consumer_1, consumer_2, producer_1, producer_2, return_exceptions=True)
 
@@ -344,6 +416,7 @@ async def main():
 
 ########## 输出 ##########
 
+```text
 producer_1 put a val: 5
 producer_2 put a val: 3
 consumer_1 get a val: 5
@@ -365,6 +438,7 @@ producer_2 put a val: 8
 consumer_1 get a val: 2
 consumer_2 get a val: 8
 Wall time: 10 s
+```
 
 
 实战：豆瓣近日推荐电影爬虫
@@ -377,26 +451,36 @@ Wall time: 10 s
 
 不过，在参考我给出的代码之前，你是不是可以自己先动手写一下、跑一下呢？
 
+```python
 import requests
 from bs4 import BeautifulSoup
+```
 
+```python
 def main():
     url = "https://movie.douban.com/cinema/later/beijing/"
     init_page = requests.get(url).content
     init_soup = BeautifulSoup(init_page, 'lxml')
+```
 
+```html
     all_movies = init_soup.find('div', id="showing-soon")
     for each_movie in all_movies.find_all('div', class_="item"):
         all_a_tag = each_movie.find_all('a')
         all_li_tag = each_movie.find_all('li')
+```
 
+```text
         movie_name = all_a_tag[1].text
         url_to_fetch = all_a_tag[1]['href']
         movie_date = all_li_tag[0].text
+```
 
+```text
         response_item = requests.get(url_to_fetch).content
         soup_item = BeautifulSoup(response_item, 'lxml')
         img_tag = soup_item.find('img')
+```
 
         print('{} {} {}'.format(movie_name, movie_date, img_tag['src']))
 
@@ -404,48 +488,64 @@ def main():
 
 ########## 输出 ##########
 
+```text
 阿拉丁 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2553992741.jpg
 龙珠超：布罗利 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2557371503.jpg
 五月天人生无限公司 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2554324453.jpg
 ... ...
 直播攻略 06月04日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2555957974.jpg
 Wall time: 56.6 s
+```
 
 
+```python
 import asyncio
 import aiohttp
+```
 
 from bs4 import BeautifulSoup
 
+```text
 async def fetch_content(url):
     async with aiohttp.ClientSession(
         headers=header, connector=aiohttp.TCPConnector(ssl=False)
     ) as session:
         async with session.get(url) as response:
             return await response.text()
+```
 
+```text
 async def main():
     url = "https://movie.douban.com/cinema/later/beijing/"
     init_page = await fetch_content(url)
     init_soup = BeautifulSoup(init_page, 'lxml')
+```
 
     movie_names, urls_to_fetch, movie_dates = [], [], []
 
+```html
     all_movies = init_soup.find('div', id="showing-soon")
     for each_movie in all_movies.find_all('div', class_="item"):
         all_a_tag = each_movie.find_all('a')
         all_li_tag = each_movie.find_all('li')
+```
 
+```text
         movie_names.append(all_a_tag[1].text)
         urls_to_fetch.append(all_a_tag[1]['href'])
         movie_dates.append(all_li_tag[0].text)
+```
 
+```text
     tasks = [fetch_content(url) for url in urls_to_fetch]
     pages = await asyncio.gather(*tasks)
+```
 
+```text
     for movie_name, movie_date, page in zip(movie_names, movie_dates, pages):
         soup_item = BeautifulSoup(page, 'lxml')
         img_tag = soup_item.find('img')
+```
 
         print('{} {} {}'.format(movie_name, movie_date, img_tag['src']))
 
@@ -453,12 +553,14 @@ async def main():
 
 ########## 输出 ##########
 
+```text
 阿拉丁 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2553992741.jpg
 龙珠超：布罗利 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2557371503.jpg
 五月天人生无限公司 05月24日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2554324453.jpg
 ... ...
 直播攻略 06月04日 https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2555957974.jpg
 Wall time: 4.98 s
+```
 
 
 总结
@@ -466,9 +568,11 @@ Wall time: 4.98 s
 到这里，今天的主要内容就讲完了。今天我用了较长的篇幅，从一个简单的爬虫开始，到一个真正的爬虫结束，在中间穿插讲解了 Python 协程最新的基本概念和用法。这里带你简单复习一下。
 
 
+```text
 协程和多线程的区别，主要在于两点，一是协程为单线程；二是协程由用户决定，在哪些地方交出控制权，切换到下一个任务。
 协程的写法更加简洁清晰，把async / await 语法和 create_task 结合来用，对于中小级别的并发需求已经毫无压力。
 写协程程序的时候，你的脑海中要有清晰的事件循环概念，知道程序在什么时候需要暂停、等待 I/O，什么时候需要一并执行到底。
+```
 
 
 最后的最后，请一定不要轻易炫技。多线程模型也一定有其优点，一个真正牛逼的程序员，应该懂得，在什么时候用什么模型能达到工程上的最优，而不是自觉某个技术非常牛逼，所有项目创造条件也要上。技术是工程，而工程则是时间、资源、人力等纷繁复杂的事情的折衷。

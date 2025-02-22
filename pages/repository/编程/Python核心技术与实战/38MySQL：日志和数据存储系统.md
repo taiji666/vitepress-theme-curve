@@ -1,10 +1,12 @@
 ---
 title: 38MySQL：日志和数据存储系统
-date: 1739706057.5585132
+date: 2025-02-22
 categories: [Python核心技术与实战]
 ---
+```text
                             38 MySQL：日志和数据存储系统
                             你好，我是景霄。今天这节课，我们来聊聊日志和存储系统。
+```
 
 在互联网公司中，日志系统是一个非常重要的技术底层。在每一次重要的交互行为中，关键信息都会被记录下来存档，以供日后线下分析，或者线上实时分析。这些数据，甚至可以说是硅谷互联网大公司的命脉所在。
 
@@ -25,19 +27,23 @@ categories: [Python核心技术与实战]
 MySQL 属于典型的关系型数据库（RDBMS），所谓的关系型数据库，就是指建立在关系模型基础上的数据库，借助于集合代数等数学概念和方法，来处理数据库中的数据。基本上任何学习资料都会告诉你，它有着下面这几个特征：
 
 
+```text
 数据是以表格的形式出现的；
 每一行是各种记录名称；
 每一列是记录名称所对应的数据域；
 许多的行和列，组成一张表单；
 若干的表单，组成数据库（database）这个整体。
+```
 
 
 不过，抛开这些抽象的特征不谈，你首先需要掌握的，是下面这些术语的概念。
 
 
+```text
 数据库，是一些关联表的集合；而数据表则是数据的矩阵。在一个数据库中，数据表看起来就像是一个简单的电子表格。
 在数据表中，每一列包含的是相同类型的数据；每一行则是一组相关的数据。
 主键也是数据表中的一个列，只不过，这一列的每行元素都是唯一的，且一个数据表中只能包含一个主键；而外键则用于关联两个表。
+```
 
 
 除此之外，你还需要了解索引。索引是对数据库表中一列或多列的值进行排序的一种结构。使用索引，我们可以快速访问数据库表中的特定信息。一般来说，你可以对很多列设置索引，这样在检索指定列的时候，就大大加快了速度，当然，代价是插入数据会变得更慢。
@@ -56,8 +62,10 @@ mysqlclient 完全兼容 MySQLdb，同时支持 Python3.x，是 Django ORM的依
 
 它的安装方式很简单：
 
+```text
 sudo apt-get install python3-dev
 pip install mysqlclient
+```
 
 
 我们来看一个样例代码：
@@ -65,6 +73,7 @@ pip install mysqlclient
 import MySQLdb
 
 
+```python
 def test_pymysql():
     conn = MySQLdb.connect(
         host='localhost',
@@ -73,7 +82,9 @@ def test_pymysql():
         passwd=your_password’,
         db='mysql'
     )
+```
 
+```sql
     cur = conn.cursor()
     cur.execute('''
             CREATE TABLE price (
@@ -88,9 +99,12 @@ def test_pymysql():
                 11234.56
             );
         ''')
+```
 
+```text
     conn.commit()
     conn.close()
+```
 
 
 test_pymy
@@ -121,24 +135,32 @@ pip install peewee
 
 我们来看一个样例代码：
 
+```python
 import peewee
 from peewee import *
+```
 
 db = MySQLDatabase('mysql', user='your_username', passwd=your_password’)
 
 
+```python
 class Price(peewee.Model):
     timestamp = peewee.DateTimeField(primary_key=True)
     BTCUSD = peewee.FloatField()
+```
 
+```python
     class Meta:
         database = db
+```
 
 
+```python
 def test_peewee():
     Price.create_table()
     price = Price(timestamp='2019-06-07 13:17:18', BTCUSD='12345.67')
     price.save()
+```
 
 
 test_p
@@ -158,10 +180,13 @@ test_p
 
 我们来看下面这段代码：
 
+```python
 import MySQLdb
 import numpy as np
+```
 
 
+```python
 def test_pymysql():
     conn = MySQLdb.connect(
         host='localhost',
@@ -170,7 +195,9 @@ def test_pymysql():
         passwd='your_password',
         db='mysql'
     )
+```
 
+```sql
     cur = conn.cursor()
     cur.execute('''
             SELECT
@@ -180,9 +207,12 @@ def test_pymysql():
             WHERE
               timestamp > now() - interval 60 minute
     ''')
+```
 
+```python
     BTCUSD = np.array(cur.fetchall())
     print(BTCUSD.max(), BTCUSD.min())
+```
 
     conn.close()
 
@@ -221,9 +251,11 @@ test_pym
 至于实时警报，最关键的依然是数据。
 
 
+```text
 比如，数据系统异常停止，被监视的表没有更新；
 或者，交易系统的连接出了故障，委托订单的某些状态超过了一定的阈值；
 再或者，仓位信息出现了较大的、预计之外的变动。
+```
 
 
 这些情况都需要进行报警，也就是硅谷大公司所说的“oncall”。一旦发生意外，负责人会迅速收到电话、短信和邮件，然后通过监控平台来确认，是真的出了事故还是监控误报。

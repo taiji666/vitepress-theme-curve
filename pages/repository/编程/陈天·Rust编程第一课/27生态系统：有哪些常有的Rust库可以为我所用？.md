@@ -1,10 +1,12 @@
 ---
 title: 27生态系统：有哪些常有的Rust库可以为我所用？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             27 生态系统：有哪些常有的Rust库可以为我所用？
                             你好，我是陈天。
+```
 
 一门编程语言的能力，语言本身的设计占了四成，围绕着语言打造的生态系统占了六成。
 
@@ -34,24 +36,30 @@ serde
 你还可以为自己的格式撰写对 serde 的支持，比如使用 DynamoDB，你可以用 serde_dynamo：
 
 #[derive(Serialize, Deserialize)]
+```css
 pub struct User {
     id: String,
     name: String,
     age: u8,
 };
+```
 
+```javascript
 // Get documents from DynamoDB
 let input = ScanInput {
     table_name: "users".to_string(),
     ..ScanInput::default()
 };
 let result = client.scan(input).await?;
+```
 
+```cpp
 if let Some(items) = result.items {
     // 直接一句话，就拿到 User 列表
     let users: Vec<User> = serde_dynamo::from_items(items)?;
     println!("Got {} users", users.len());
 }
+```
 
 
 如果你用过其它语言的 ORM，那么，你可以把 serde 理解成增强版的、普适性的 ORM，它可以把任意可序列化的数据结构，序列化成任意格式，或者从任意格式中反序列化。
@@ -144,18 +152,23 @@ Web 和 Web 服务开发
 
 举个例子，比如要构建一个 CRD：
 
+```cpp
 use kube::{CustomResource, CustomResourceExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+```
 
 // Book 作为一个新的 Custom resource
 #[derive(CustomResource, Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[kube(group = "k8s.tyr.app", version = "v1", kind = "Book", namespaced)]
+```html
 pub struct BookSpec {
     pub title: String,
     pub authors: Option<Vec<String>>,
 }
+```
 
+```javascript
 fn main() {
     let book = Book::new(
         "rust-programming",
@@ -167,23 +180,30 @@ fn main() {
     println!("{}", serde_yaml::to_string(&Book::crd()).unwrap());
     println!("{}", serde_yaml::to_string(&book).unwrap());
 }
+```
 
 
 短短 20 行代码就创建了一个 crd，是不是干净利落，写起来一气呵成？
 
+```text
 ❯ cargo run | kubectl apply -f -
     Finished dev [unoptimized + debuginfo] target(s) in 0.14s
      Running `/Users/tchen/.target/debug/k8s-controller`
 customresourcedefinition.apiextensions.k8s.io/books.k8s.tyr.app configured
 book.k8s.tyr.app/rust-programming created
+```
 
+```text
 ❯ kubectl get crds
 NAME                CREATED AT
 books.k8s.tyr.app   2021-10-20T01:44:57Z
+```
 
+```text
 ❯ kubectl get book
 NAME               AGE
 rust-programming   5m22s
+```
 
 
 如果你用 Golang 的 kubebuilder 做过类似的事情，是不是发现 Golang 那些生成大量脚手架代码和大量 YAML 文件的过程，顿时就不香了？
@@ -204,8 +224,10 @@ WebAssembly 开发
 
 Rust 内置了 wasm32-unknown-unknown 作为编译目标，如果你没添加，可以用 rustup 添加，然后在编译的时候指明目标，就可以得到 wasm：
 
+```bash
 $ rustup target add wasm32-unknown-unknown
 $ cargo build --target wasm32-unknown-unknown --release
+```
 
 
 你可以用 wasm-pack 和 wasm-bindgen，不但生成 wasm，同时还生成 ts/js 调用 wasm 的代码。你可以在 rustwasm 下找到更多相关的项目。

@@ -1,10 +1,12 @@
 ---
 title: 26代码贡献者的拦路虎：test__nginx简介
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             26 代码贡献者的拦路虎：test__nginx 简介
                             你好，我是温铭。
+```
 
 测试，是软件开发中必不可少的一个重要环节。测试驱动开发（TDD）的理念已经深入人心，几乎每家软件公司都有 QA 团队来负责测试的工作。
 
@@ -32,8 +34,10 @@ test::nginx 糅合了Perl、数据驱动以及 DSL（领域小语言）。对于
 
 test::nginx 的安装和使用也不例外，在 travis 中，它可以分为 4 步。
 
+```cpp
 1. 先安装 Perl 的包管理器 cpanminus。-
 2. 然后，通过 cpanm 来安装 test::nginx：
+```
 
 sudo cpanm --notest Test::Nginx IPC::Run > build.log 2>&1 || (cat build.log && exit 1)
 
@@ -57,18 +61,20 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: set Server
 --- config
     location /foo {
         echo hi;
         more_set_headers 'Server: Foo';
     }
 --- request
-    GET /foo
 --- response_headers
 Server: Foo
 --- response_body
+```text
+=== TEST 1: set Server
+    GET /foo
 hi
+```
 
 
 虽然 test::nginx 是用 Perl 编写的，并且是其中的一个模块，但从上面的测试中，你是不是完全看不到，Perl 或者其他任何其他语言的影子呀？有这个感觉这就对了。因为，test::nginx 本身就是作者自己用 Perl 实现的 DSL（小语言），是专门针对 Nginx 和 OpenResty 的测试而抽象出来的。
@@ -122,6 +128,7 @@ __DATA__
 
 === TEST 1: basic get and set
 --- config
+```css
         location /test {
             content_by_lua_block {
                 local memcached = require "resty.memcached"
@@ -130,35 +137,43 @@ __DATA__
                     ngx.say("failed to instantiate memc: ", err)
                     return
                 end
+```
 
+```text
                 memc:set_timeout(1000) -- 1 sec
                 local ok, err = memc:connect("127.0.0.1", 11212)
+```
 
+```text
                 local ok, err = memc:set("dog", 32)
                 if not ok then
                     ngx.say("failed to set dog: ", err)
                     return
                 end
+```
 
+```text
                 local res, flags, err = memc:get("dog")
                 ngx.say("dog: ", res)
             }
         }
+```
 
 --- stream_config
     lua_shared_dict memcached 100m;
 
 --- stream_server_config
+```css
     listen 11212;
     content_by_lua_block {
         local m = require("memcached-server")
         m.go()
     }
+```
 
 --- request
 GET /test
 --- response_body
-dog: 32
 --- no_error_log
 [error]
 
@@ -180,3 +195,4 @@ dog: 32
                         
                         
                             
+dog: 32

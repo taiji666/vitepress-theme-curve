@@ -1,18 +1,22 @@
 ---
 title: 29网络开发（下）：如何使用Rust处理网络请求？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             29 网络开发（下）：如何使用Rust处理网络请求？
                             你好，我是陈天。
+```
 
 上一讲介绍了如何用Rust做基于 TCP 的网络开发，通过 TcpListener 监听，使用 TcpStream 连接。在 *nix 操作系统层面，一个 TcpStream 背后就是一个文件描述符。值得注意的是，当我们在处理网络应用的时候，有些问题一定要正视：
 
 
+```text
 网络是不可靠的
 网络的延迟可能会非常大
 带宽是有限的
 网络是非常不安全的
+```
 
 
 我们可以使用 TCP 以及构建在 TCP 之上的协议应对网络的不可靠；使用队列和超时来应对网络的延时；使用精简的二进制结构、压缩算法以及某些技巧（比如 HTTP 的 304）来减少带宽的使用，以及不必要的网络传输；最后，需要使用 TLS 或者 noise protocol 这样的安全协议来保护传输中的数据。
@@ -86,6 +90,7 @@ Rust 如何处理P2P网络
 
 下面是一个简单的P2P 聊天应用，在本地网络中通过 MDNS 做节点发现，使用 floodpub 做消息传播。在关键位置都写了注释：
 
+```cpp
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{
@@ -100,11 +105,15 @@ use libp2p::{
 };
 use std::borrow::Cow;
 use tokio::io::{stdin, AsyncBufReadExt, BufReader};
+```
 
+```text
 /// 处理 p2p 网络的 behavior 数据结构
 /// 里面的每个域需要实现 NetworkBehaviour，或者使用 #[behaviour(ignore)]
+```
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
+```css
 struct ChatBehavior {
     /// flood subscription，比较浪费带宽，gossipsub 是更好的选择
     floodsub: Floodsub,
@@ -114,7 +123,9 @@ struct ChatBehavior {
     // #[behaviour(ignore)]
     // _useless: String,
 }
+```
 
+```cpp
 impl ChatBehavior {
     /// 创建一个新的 ChatBehavior
     pub async fn new(id: PeerId) -> Result<Self> {
@@ -124,7 +135,9 @@ impl ChatBehavior {
         })
     }
 }
+```
 
+```javascript
 impl NetworkBehaviourEventProcess<FloodsubEvent> for ChatBehavior {
     // 处理 floodsub 产生的消息
     fn inject_event(&mut self, event: FloodsubEvent) {
@@ -134,7 +147,9 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for ChatBehavior {
         }
     }
 }
+```
 
+```javascript
 impl NetworkBehaviourEventProcess<MdnsEvent> for ChatBehavior {
     fn inject_event(&mut self, event: MdnsEvent) {
         match event {
@@ -155,26 +170,36 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for ChatBehavior {
         }
     }
 }
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     // 如果带参数，当成一个 topic
     let name = match std::env::args().nth(1) {
         Some(arg) => Cow::Owned(arg),
         None => Cow::Borrowed("lobby"),
     };
+```
 
+```javascript
     // 创建 floodsub topic
     let topic = floodsub::Topic::new(name);
+```
 
+```text
     // 创建 swarm
     let mut swarm = create_swarm(topic.clone()).await?;
+```
 
     swarm.listen_on("/ip4/127.0.0.1/tcp/0".parse()?)?;
 
+```cpp
     // 获取 stdin 的每一行
     let mut stdin = BufReader::new(stdin()).lines();
+```
 
+```javascript
     // main loop
     loop {
         tokio::select! {
@@ -190,16 +215,22 @@ async fn main() -> Result<()> {
         }
     }
 }
+```
 
+```javascript
 async fn create_swarm(topic: Topic) -> Result<Swarm<ChatBehavior>> {
     // 创建 identity（密钥对）
     let id_keys = identity::Keypair::generate_ed25519();
     let peer_id = PeerId::from(id_keys.public());
     println!("Local peer id: {:?}", peer_id);
+```
 
+```javascript
     // 使用 noise protocol 来处理加密和认证
     let noise_keys = noise::Keypair::<noise::X25519Spec>::new().into_authentic(&id_keys)?;
+```
 
+```javascript
     // 创建传输层
     let transport = TokioTcpConfig::new()
         .nodelay(true)
@@ -207,7 +238,9 @@ async fn create_swarm(topic: Topic) -> Result<Swarm<ChatBehavior>> {
         .authenticate(noise::NoiseConfig::xx(noise_keys).into_authenticated())
         .multiplex(yamux::YamuxConfig::default())
         .boxed();
+```
 
+```javascript
     // 创建 chat behavior
     let mut behavior = ChatBehavior::new(peer_id.clone()).await?;
     // 订阅某个主题
@@ -218,21 +251,27 @@ async fn create_swarm(topic: Topic) -> Result<Swarm<ChatBehavior>> {
             tokio::spawn(fut);
         }))
         .build();
+```
 
+```text
     Ok(swarm)
 }
+```
 
 
 要运行这段代码，你需要在 Cargo.toml 中使用 futures 和 libp2p：
 
+```text
 futures = "0.3"
 libp2p = { version = "0.39",  features = ["tcp-tokio"] }
+```
 
 
 完整的代码可以在这门课程 GitHub repo 这一讲的目录中找到。
 
 如果你开一个窗口 A 运行：
 
+```text
 ❯ cargo run --example p2p_chat --quiet
 Local peer id: PeerId("12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg")
 Listening on "/ip4/127.0.0.1/tcp/51654"
@@ -243,10 +282,12 @@ Got peer: 12D3KooWMRQvxJcjcexCrNfgSVd2iChpiDWzbgRRS6c5mn9bBzdT with addr /ip4/19
 Got peer: 12D3KooWMRQvxJcjcexCrNfgSVd2iChpiDWzbgRRS6c5mn9bBzdT with addr /ip4/127.0.0.1/tcp/51661
 Got peer: 12D3KooWRy9r8j7UQMxavqTcNmoz1JmnLcTU5UZvzvE5jz4Zw3eh with addr /ip4/192.168.86.23/tcp/51670
 Got peer: 12D3KooWRy9r8j7UQMxavqTcNmoz1JmnLcTU5UZvzvE5jz4Zw3eh with addr /ip4/127.0.0.1/tcp/51670
+```
 
 
 然后窗口 B/C 分别运行：
 
+```text
 ❯ cargo run --example p2p_chat --quiet
 Local peer id: PeerId("12D3KooWAw1gTLCesw1bvTiKNYFyacwbAcjvKwfDsJiH8AuBFgFA")
 Listening on "/ip4/127.0.0.1/tcp/51656"
@@ -267,10 +308,12 @@ Got peer: 12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg with addr /ip4/12
 // 下面的内容在新节点加入时逐渐出现
 Got peer: 12D3KooWRy9r8j7UQMxavqTcNmoz1JmnLcTU5UZvzvE5jz4Zw3eh with addr /ip4/192.168.86.23/tcp/51670
 Got peer: 12D3KooWRy9r8j7UQMxavqTcNmoz1JmnLcTU5UZvzvE5jz4Zw3eh with addr /ip4/127.0.0.1/tcp/51670
+```
 
 
 然后窗口 D 使用 topic 参数，让它和其它的 topic 不同：
 
+```text
 ❯ cargo run --example p2p_chat --quiet -- hello
 Local peer id: PeerId("12D3KooWRy9r8j7UQMxavqTcNmoz1JmnLcTU5UZvzvE5jz4Zw3eh")
 Listening on "/ip4/127.0.0.1/tcp/51670"
@@ -280,6 +323,7 @@ Got peer: 12D3KooWAw1gTLCesw1bvTiKNYFyacwbAcjvKwfDsJiH8AuBFgFA with addr /ip4/19
 Got peer: 12D3KooWAw1gTLCesw1bvTiKNYFyacwbAcjvKwfDsJiH8AuBFgFA with addr /ip4/127.0.0.1/tcp/51656
 Got peer: 12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg with addr /ip4/192.168.86.23/tcp/51654
 Got peer: 12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg with addr /ip4/127.0.0.1/tcp/51654
+```
 
 
 你会看到，每个节点运行时，都会通过 MDNS 广播，来发现本地已有的 P2P 节点。现在 A/B/C/D 组成了一个 P2P 网络，其中 A/B/C 都订阅了 lobby，而 D 订阅了 hello。
@@ -288,23 +332,29 @@ Got peer: 12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg with addr /ip4/12
 
 窗口 A：
 
+```text
 hello from A
 PeerId("12D3KooWAw1gTLCesw1bvTiKNYFyacwbAcjvKwfDsJiH8AuBFgFA"): "hello from B"
 PeerId("12D3KooWMRQvxJcjcexCrNfgSVd2iChpiDWzbgRRS6c5mn9bBzdT"): "hello from C"
+```
 
 
 窗口 B：
 
+```text
 PeerId("12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg"): "hello from A"
 hello from B
 PeerId("12D3KooWMRQvxJcjcexCrNfgSVd2iChpiDWzbgRRS6c5mn9bBzdT"): "hello from C"
+```
 
 
 窗口 C：
 
+```text
 PeerId("12D3KooWDJtZVKBCa7B9C8ZQmRpP7cB7CgeG7PWLXYCnN3aXkaVg"): "hello from A"
 PeerId("12D3KooWAw1gTLCesw1bvTiKNYFyacwbAcjvKwfDsJiH8AuBFgFA"): "hello from B"
 hello from C
+```
 
 
 窗口 D：
@@ -327,9 +377,11 @@ hello from D
 思考题
 
 
+```text
 看一看 libp2p 的文档和示例代码，把 libp2p clone 到本地，运行每个示例代码。
 阅读 libp2p 的 NetworkBehaviour trait，以及 floodsub 对应的实现。
 如有余力和兴趣，尝试把这个例子中的 floodsub 替换成更高效更节省带宽的 gossipsub。
+```
 
 
 恭喜你已经完成了Rust学习的第29次打卡，如果你觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论。我们下节课见～

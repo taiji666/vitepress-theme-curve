@@ -1,18 +1,22 @@
 ---
 title: 23[视频]导读lua-resty-requests：优秀的lua-resty-_是如何编写的？
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             23 [视频]导读lua-resty-requests：优秀的lua-resty-_是如何编写的？
                             23 [视频]导读lua-resty-requests：优秀的lua-resty-*是如何编写的？
+```
 
 你好，我是温铭。
 
 今天的内容，我同样会以视频的形式来讲解。老规矩，在你进行视频学习之前，先问你这么几个问题：
 
 
+```text
 面对多个相同功能的 lua-resty 库，我们应该从哪些方面来选择？
 如何来组织一个 lua-resty 的结构？
+```
 
 
 这几个问题，也是今天视频课要解决的核心内容，希望你可以先自己思考一下，并带着问题来学习今天的视频内容。

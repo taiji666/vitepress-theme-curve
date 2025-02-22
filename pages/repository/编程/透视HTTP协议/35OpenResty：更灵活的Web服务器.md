@@ -1,10 +1,12 @@
 ---
 title: 35OpenResty：更灵活的Web服务器
-date: 1739706057.3526535
+date: 2025-02-22
 categories: [透视HTTP协议]
 ---
+```text
                             35  OpenResty：更灵活的Web服务器
                             在上一讲里，我们看到了高性能的 Web 服务器 Nginx，它资源占用少，处理能力高，是搭建网站的首选。
+```
 
 虽然 Nginx 成为了 Web 服务器领域无可争议的“王者”，但它也并不是没有缺点的，毕竟它已经 15 岁了。
 
@@ -70,10 +72,12 @@ OpenResty 里每一段 Lua 程序都由协程来调度运行。和 Linux 的 epo
 
 ngx.req.read_body()                  -- 同步非阻塞 (1)
  
+```python
 local data = ngx.req.get_body_data()
 if data then
     ngx.print("body: ", data)        -- 同步非阻塞 (2)
 end
+```
 
 
 代码中的“ngx.req.read_body”和“ngx.print”分别是数据的收发动作，只有收到数据才能发送数据，所以是“同步”的。
@@ -115,18 +119,22 @@ OpenResty 里还有两个不同于 Nginx 的特殊阶段。
 小结
 
 
+```text
 Nginx 依赖于磁盘上的静态配置文件，修改后必须重启才能生效，缺乏灵活性；
 OpenResty 基于 Nginx，打包了很多有用的模块和库，是一个高性能的 Web 开发平台；
 OpenResty 的工作语言是 Lua，它小巧灵活，执行效率高，支持“代码热加载”；
 OpenResty 的核心编程范式是“同步非阻塞”，使用协程，不需要异步回调函数；
 OpenResty 也使用“阶段式处理”的工作模式，但因为在阶段里执行的都是 Lua 代码，所以非常灵活，配合 Redis 等外部数据库能够实现各种动态配置。
+```
 
 
 课下作业
 
 
+```text
 谈一下这些天你对实验环境里 OpenResty 的感想和认识。
 你觉得 Nginx 和 OpenResty 的“阶段式处理”有什么好处？对你的实际工作有没有启发？
+```
 
 
 欢迎你把自己的学习体会写在留言区，与我和其他同学一起讨论。如果你觉得有所收获，也欢迎把文章分享给你的朋友。

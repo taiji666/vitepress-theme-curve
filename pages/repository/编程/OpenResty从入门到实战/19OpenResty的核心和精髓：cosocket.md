@@ -1,10 +1,12 @@
 ---
 title: 19OpenResty的核心和精髓：cosocket
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             19 OpenResty 的核心和精髓：cosocket
                             你好，我是温铭，今天我们来学习下 OpenResty 中的核心技术：cosocket。
+```
 
 其实在前面的课程中，我们就已经多次提到过它了，cosocket 是各种 lua-resty-* 非阻塞库的基础，没有 cosocket，开发者就无法用 Lua 来快速连接各种外部的网络服务。
 
@@ -33,6 +35,7 @@ cosocket API 和指令简介
 TCP 相关的 cosocket API 可以分为下面这几类。
 
 
+```text
 创建对象：ngx.socket.tcp。
 设置超时：tcpsock:settimeout 和 tcpsock:settimeouts。
 建立连接：tcpsock:connect。
@@ -40,6 +43,7 @@ TCP 相关的 cosocket API 可以分为下面这几类。
 接受数据：tcpsock:receive、tcpsock:receiveany 和 tcpsock:receiveuntil。
 连接池：tcpsock:setkeepalive。
 关闭连接：tcpsock:close。
+```
 
 
 我们还要特别注意下，这些 API 可以使用的上下文：
@@ -52,6 +56,7 @@ rewrite_by_lua*, access_by_lua*, content_by_lua*, ngx.timer.*, ssl_certificate_b
 此外，与这些 API 相关的，还有 8 个 lua_socket_ 开头的 Nginx 指令，我们简单来看一下。
 
 
+```text
 lua_socket_connect_timeout：连接超时，默认 60 秒。
 lua_socket_send_timeout：发送超时，默认 60 秒。
 lua_socket_send_lowat：发送阈值（low water），默认为 0。
@@ -60,12 +65,14 @@ lua_socket_buffer_size：读取数据的缓存区大小，默认 4k/8k。
 lua_socket_pool_size：连接池大小，默认 30。
 lua_socket_keepalive_timeout：连接池 cosocket 对象的空闲时间，默认 60 秒。
 lua_socket_log_errors：cosocket 发生错误时，是否记录日志，默认为 on。
+```
 
 
 这里你也可以看到，有些指令和 API 的功能一样的，比如设置超时时间和连接池大小等。不过，如果两者有冲突的话，API 的优先级高于指令，会覆盖指令设置的值。所以，一般来说，我们都推荐使用 API 来做设置，这样也会更加灵活。
 
 接下来，我们一起来看一个具体的例子，弄明白到底如何使用这些 cosocket API。下面这段代码的功能很简单，是发送 TCP 请求到一个网站，并把返回的内容打印出来：
 
+```bash
 $ resty -e 'local sock = ngx.socket.tcp()
         sock:settimeout(1000)  -- one second timeout
         local ok, err = sock:connect("www.baidu.com", 80)
@@ -73,33 +80,42 @@ $ resty -e 'local sock = ngx.socket.tcp()
             ngx.say("failed to connect: ", err)
             return
         end
+```
 
+```text
         local req_data = "GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"
         local bytes, err = sock:send(req_data)
         if err then
             ngx.say("failed to send: ", err)
             return
         end
+```
 
+```text
         local data, err, partial = sock:receive()
         if err then
             ngx.say("failed to receive: ", err)
             return
         end
+```
 
+```text
         sock:close()
         ngx.say("response is: ", data)'
+```
 
 
 我们来具体分析下这段代码。
 
 
+```text
 首先，通过 ngx.socket.tcp() ，创建 TCP 的 cosocket 对象，名字是 sock。
 然后，使用 settimeout() ，把超时时间设置为 1 秒。注意这里的超时没有区分 connect、receive，是统一的设置。
 接着，使用 connect() 去连接指定网站的 80 端口，如果失败就直接退出。
 连接成功的话，就使用 send() 来发送构造好的数据，如果发送失败就退出。
 发送数据成功的话，就使用 receive() 来接收网站返回的数据。这里 receive() 的默认参数值是 *l，也就是只返回第一行的数据；如果参数设置为了*a，就是持续接收数据，直到连接关闭；
 最后，调用 close() ，主动关闭 socket 连接。
+```
 
 
 你看，短短几步就可以完成，使用 cosocket API 来做网络通信，就是这么简单。不过，不能满足于此，接下来，我们对这个示例再做一些调整。
@@ -132,6 +148,7 @@ receiveuntil() 专门用来解决这类问题，它不会像 receive() 和 recei
 
  local reader = sock:receiveuntil("\r\n")
 
+```text
  while true do
      local data, err, partial = reader(4)
      if not data then
@@ -139,12 +156,15 @@ receiveuntil() 专门用来解决这类问题，它不会像 receive() 和 recei
              ngx.say("failed to read the data stream: ", err)
              break
          end
+```
 
+```text
          ngx.say("read done")
          break
      end
      ngx.say("read chunk: [", data, "]")
  end
+```
 
 
 这段代码中的 receiveuntil 会返回 \r\n 之前的数据，并通过迭代器每次读取其中的 4 个字节，也就实现了我们想要的功能。
@@ -155,10 +175,12 @@ receiveuntil() 专门用来解决这类问题，它不会像 receive() 和 recei
 
 为了避免这个问题，在你使用完一个 cosocket 后，可以调用 setkeepalive() 放到连接池中，比如下面这样的写法：
 
+```text
 local ok, err = sock:setkeepalive(2 * 1000, 100)
 if not ok then
     ngx.say("failed to set reusable: ", err)
 end
+```
 
 
 这段代码设置了连接的空闲时间为 2 秒，连接池的大小为 100。这样，在调用 connect() 函数时，就会优先从连接池中获取 cosocket 对象。
@@ -166,8 +188,10 @@ end
 不过，关于连接池的使用，有两点需要我们注意一下。
 
 
+```text
 第一，不能把发生错误的连接放入连接池，否则下次使用时，就会导致收发数据失败。这也是为什么我们需要判断每一个 API 调用是否成功的一个原因。
 第二，要搞清楚连接的数量。连接池是 worker 级别的，每个 worker 都有自己的连接池。所以，如果你有 10 个 worker，连接池大小设置为 30，那么对于后端的服务来讲，就等于有 300 个连接。
+```
 
 
 写在最后

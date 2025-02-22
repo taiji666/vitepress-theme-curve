@@ -1,6 +1,6 @@
 ---
 title: 6 基础篇｜掌握最独特的数据类型：Symbol
-date: 1739707492.912006
+date: 2025-02-22
 categories: [JavaScript 语言编程进阶]
 ---
 前面讲到的 String 类型可以作为对象的 key，今天我们来学习另一个可以作为 key 的类型，就是 `Symbol`。
@@ -247,9 +247,11 @@ console.log(sliced.constructor); // Array
 
 ECMAScript 还在如下这些对象类型上也定义了 `[Symbol.species]`：
 
+```text
 1.  `Promise`，它的 then、catch、finally 方法都会参考 `[Symbol.species]` 来决定生成的新 Promise 的构造函数；
 2.  `ArrayBuffer`/`SharedArrayBuffer` 的 slice 方法，与 Array 类似；
 3.  `RegExp` 原型链的 **Symbol.matchAll/split** 方法，用于在 String 调用 matchAll/split 时，构造指定的正则对象，举例来说：
+```
 
 ```js
 class MyReg extends RegExp {

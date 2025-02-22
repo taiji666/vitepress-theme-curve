@@ -1,6 +1,6 @@
 ---
 title: 10 拓展：剖析 Immer.js 工作原理与设计模式
-date: 1739708222.3684838
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 #### $\color{lightPink}保姆式教学の温馨提示$
@@ -71,7 +71,7 @@ console.log(baseObj.b === changedObjA.b)
 
 这一步对应的是 `produce` 函数对 `setter` 的代理逻辑：
 
-```
+```javascript
 const baseHandler = {
   set(obj, key, value) {
     // 先检查 copy 是否存在，如果不存在，创建 copy

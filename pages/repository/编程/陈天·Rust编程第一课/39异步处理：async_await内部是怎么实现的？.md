@@ -1,10 +1,12 @@
 ---
 title: 39异步处理：async_await内部是怎么实现的？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             39 异步处理：async_await内部是怎么实现的？
                             你好，我是陈天。
+```
 
 学完上一讲，我们对 Future 和 async/await 的基本概念有一个比较扎实的理解了，知道在什么情况下该使用 Future、什么情况下该使用 Thread，以及 executor 和 reactor 是怎么联动最终让 Future 得到了一个结果。
 
@@ -12,10 +14,12 @@ categories: [陈天·Rust编程第一课]
 
 提前说明一下，我们会继续围绕着 Future 这个简约却又并不简单的接口，来探讨一些原理性的东西，主要是 Context 和 Pin这两个结构：
 
+```cpp
 pub trait Future {
     type Output;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
 }
+```
 
 
 这堂课的内容即便没有完全弄懂，也并不影响你使用 async/await。如果精力有限，你可以不用理解所有细节，只要抓住这些问题产生的原因，以及解决方案的思路即可。
@@ -28,28 +32,33 @@ Waker 的调用机制
 
 其实，它隐含在 Context 中：
 
+```text
 pub struct Context<'a> {
     waker: &'a Waker,
     _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
+```
 
 
 所以，Context 就是 Waker 的一个封装。
 
 如果你去看 Waker 的定义和相关的代码，会发现它非常抽象，内部使用了一个 vtable 来允许各种各样的 waker 的行为：
 
+```css
 pub struct RawWakerVTable {
     clone: unsafe fn(*const ()) -> RawWaker,
     wake: unsafe fn(*const ()),
     wake_by_ref: unsafe fn(*const ()),
     drop: unsafe fn(*const ()),
 }
+```
 
 
 这种手工生成 vtable 的做法，我们[之前]阅读 bytes 的源码已经见识过了，它可以最大程度兼顾效率和灵活性。
 
 Rust 自身并不提供异步运行时，它只在标准库里规定了一些基本的接口，至于怎么实现，可以由各个运行时（如 tokio）自行决定。所以在标准库中，你只会看到这些接口的定义，以及“高层”接口的实现，比如 Waker 下的 wake 方法，只是调用了 vtable 里的 wake() 而已：
 
+```javascript
 impl Waker {
     /// Wake up the task associated with this `Waker`.
     #[inline]
@@ -58,10 +67,14 @@ impl Waker {
         // to the implementation which is defined by the executor.
         let wake = self.waker.vtable.wake;
         let data = self.waker.data;
+```
 
+```cpp
         // Don't call `drop` -- the waker will be consumed by `wake`.
         crate::mem::forget(self);
+```
 
+```cpp
         // SAFETY: This is safe because `Waker::from_raw` is the only way
         // to initialize `wake` and `data` requiring the user to acknowledge
         // that the contract of `RawWaker` is upheld.
@@ -69,6 +82,7 @@ impl Waker {
     }
     ...
 }
+```
 
 
 如果你想顺藤摸瓜找到 vtable 是怎么设置的，却发现一切线索都悄无声息地中断了，那是因为，具体的实现并不在标准库中，而是在第三方的异步运行时里，比如 tokio。
@@ -81,12 +95,16 @@ async究竟生成了什么？
 
 为了讲明白 Pin，我们得往前追踪一步，看看产生 Future的一个 async block/fn 内部究竟生成了什么样的代码？来看下面这个简单的 async 函数：
 
+```cpp
 async fn write_hello_file_async(name: &str) -> anyhow::Result<()> {
     let mut file = fs::File::create(name).await?;
     file.write_all(b"hello world!").await?;
+```
 
+```text
     Ok(())
 }
+```
 
 
 首先它创建一个文件，然后往这个文件里写入 “hello world!”。这个函数有两个 await，创建文件的时候会异步创建，写入文件的时候会异步写入。最终，整个函数对外返回一个 Future。
@@ -98,14 +116,17 @@ write_hello_file_async("/tmp/hello").await?;
 
 我们知道，executor 处理 Future 时，会不断地调用它的 poll() 方法，于是，上面那句实际上相当于：
 
+```javascript
 match write_hello_file_async.poll(cx) {
     Poll::Ready(result) => return result,
     Poll::Pending => return Poll::Pending
 }
+```
 
 
 这是单个 await 的处理方法，那更加复杂的，一个函数中有若干个 await，该怎么处理呢？以前面write_hello_file_async 函数的内部实现为例，显然，我们只有在处理完 create()，才能处理 write_all()，所以，应该是类似这样的代码：
 
+```javascript
 let fut = fs::File::create(name);
 match fut.poll(cx) {
     Poll::Ready(Ok(file)) => {
@@ -117,10 +138,12 @@ match fut.poll(cx) {
     }
     Poll::Pending => return Poll::Pending,
 }
+```
 
 
 但是，前面说过，async 函数返回的是一个 Future，所以，还需要把这样的代码封装在一个 Future 的实现里，对外提供出去。因此，我们需要实现一个数据结构，把内部的状态保存起来，并为这个数据结构实现 Future。比如：
 
+```cpp
 enum WriteHelloFile {
     // 初始阶段，用户提供文件名
     Init(String),
@@ -132,31 +155,43 @@ enum WriteHelloFile {
     // Future 处理完毕
     Done,
 }
+```
 
+```cpp
 impl WriteHelloFile {
     pub fn new(name: impl Into<String>) -> Self {
         Self::Init(name.into())
     }
 }
+```
 
+```cpp
 impl Future for WriteHelloFile {
     type Output = Result<(), std::io::Error>;
+```
 
+```cpp
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         todo!()
     }
 }
+```
 
+```cpp
 fn write_hello_file_async(name: &str) -> WriteHelloFile {
     WriteHelloFile::new(name)
 }
+```
 
 
 这样，我们就把刚才的 write_hello_file_async 异步函数，转化成了一个返回 WriteHelloFile Future 的函数。来看这个 Future 如何实现（详细注释了）：
 
+```cpp
 impl Future for WriteHelloFile {
     type Output = Result<(), std::io::Error>;
+```
 
+```javascript
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         loop {
@@ -192,18 +227,23 @@ impl Future for WriteHelloFile {
         }
     }
 }
+```
 
 
 这个 Future 完整实现的内部结构 ，其实就是一个状态机的迁移。
 
 这段（伪）代码和之前异步函数是等价的：
 
+```cpp
 async fn write_hello_file_async(name: &str) -> anyhow::Result<()> {
     let mut file = fs::File::create(name).await?;
     file.write_all(b"hello world!").await?;
+```
 
+```text
     Ok(())
 }
+```
 
 
 Rust 在编译 async fn 或者 async block 时，就会生成类似的状态机的实现。你可以看到，看似简单的异步处理，内部隐藏了一套并不难理解、但是写起来很生硬很啰嗦的状态机管理代码。
@@ -214,6 +254,7 @@ Rust 在编译 async fn 或者 async block 时，就会生成类似的状态机�
 
 在上面实现 Future 的状态机中，我们引用了 file 这样一个局部变量：
 
+```javascript
 WriteHelloFile::AwaitingCreate(fut) => match fut.poll(cx) {
     Poll::Ready(Ok(file)) => {
         let fut = file.write_all(b"hello world!");
@@ -222,10 +263,12 @@ WriteHelloFile::AwaitingCreate(fut) => match fut.poll(cx) {
     Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
     Poll::Pending => return Poll::Pending,
 }
+```
 
 
 这个代码是有问题的，file 被 fut 引用，但 file 会在这个作用域被丢弃。所以，我们需要把它保存在数据结构中：
 
+```cpp
 enum WriteHelloFile {
     // 初始阶段，用户提供文件名
     Init(String),
@@ -236,11 +279,14 @@ enum WriteHelloFile {
     // Future 处理完毕
     Done,
 }
+```
 
+```cpp
 struct AwaitingWriteData {
     fut: impl Future<Output = Result<(), std::io::Error>>,
     file: fs::File,
 }
+```
 
 
 可以生成一个 AwaitingWriteData 数据结构，把 file 和 fut 都放进去，然后在 WriteHelloFile 中引用它。此时，在同一个数据结构内部，fut 指向了对 file 的引用，这样的数据结构，叫自引用结构（Self-Referential Structure）。
@@ -250,22 +296,28 @@ struct AwaitingWriteData {
 
 所以需要有某种机制来保证这种情况不会发生。Pin 就是为这个目的而设计的一个数据结构，我们可以 Pin 住指向一个 Future 的指针，看文稿中 Pin 的声明：
 
+```html
 pub struct Pin<P> {
     pointer: P,
 }
+```
 
+```html
 impl<P: Deref> Deref for Pin<P> {
     type Target = P::Target;
     fn deref(&self) -> &P::Target {
         Pin::get_ref(Pin::as_ref(self))
     }
 }
+```
 
+```html
 impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
     fn deref_mut(&mut self) -> &mut P::Target {
         Pin::get_mut(Pin::as_mut(self))
     }
 }
+```
 
 
 Pin 拿住的是一个可以解引用成 T 的指针类型 P，而不是直接拿原本的类型 T。所以，对于 Pin 而言，你看到的都是 Pin>、Pin<&mut T>，但不会是 Pin。因为 Pin 的目的是，把 T 的内存位置锁住，从而避免移动后自引用类型带来的引用失效问题。-
@@ -278,12 +330,15 @@ Pin 拿住的是一个可以解引用成 T 的指针类型 P，而不是直接�
 当然，自引用数据结构并非只在异步代码里出现，只不过异步代码在内部生成用状态机表述的 Future 时，很容易产生自引用结构。我们看一个和 Future 无关的例子（代码）：
 
 #[derive(Debug)]
+```css
 struct SelfReference {
     name: String,
     // 在初始化后指向 name
     name_ptr: *const String,
 }
+```
 
+```cpp
 impl SelfReference {
     pub fn new(name: impl Into<String>) -> Self {
         SelfReference {
@@ -291,11 +346,15 @@ impl SelfReference {
             name_ptr: std::ptr::null(),
         }
     }
+```
 
+```text
     pub fn init(&mut self) {
         self.name_ptr = &self.name as *const String;
     }
+```
 
+```css
     pub fn print_name(&self) {
         println!(
             "struct {:p}: (name: {:p} name_ptr: {:p}), name: {}, name_ref: {}",
@@ -309,7 +368,9 @@ impl SelfReference {
         );
     }
 }
+```
 
+```javascript
 fn main() {
     let data = move_creates_issue();
     println!("data: {:?}", data);
@@ -318,40 +379,57 @@ fn main() {
     print!("\\n");
     mem_swap_creates_issue();
 }
+```
 
+```cpp
 fn move_creates_issue() -> SelfReference {
     let mut data = SelfReference::new("Tyr");
     data.init();
+```
 
+```text
     // 不 move，一切正常
     data.print_name();
+```
 
     let data = move_it(data);
 
+```text
     // move 之后，name_ref 指向的位置是已经失效的地址
     // 只不过现在 move 前的地址还没被回收挪作它用
     data.print_name();
     data
 }
+```
 
+```cpp
 fn mem_swap_creates_issue() {
     let mut data1 = SelfReference::new("Tyr");
     data1.init();
+```
 
+```cpp
     let mut data2 = SelfReference::new("Lindsey");
     data2.init();
+```
 
+```text
     data1.print_name();
     data2.print_name();
+```
 
+```cpp
     std::mem::swap(&mut data1, &mut data2);
     data1.print_name();
     data2.print_name();
 }
+```
 
+```css
 fn move_it(data: SelfReference) -> SelfReference {
     data
 }
+```
 
 
 我们创建了一个自引用结构 SelfReference，它里面的 name_ref 指向了 name。正常使用它时，没有任何问题，但一旦对这个结构做 move 操作，name_ref 指向的位置还会是 move 前 name 的地址，这就引发了问题。看下图：-
@@ -362,20 +440,25 @@ fn move_it(data: SelfReference) -> SelfReference {
 
 看代码的输出，辅助你理解：
 
+```css
 struct 0x7ffeea91d6e8: (name: 0x7ffeea91d6e8 name_ptr: 0x7ffeea91d6e8), name: Tyr, name_ref: Tyr
 struct 0x7ffeea91d760: (name: 0x7ffeea91d760 name_ptr: 0x7ffeea91d6e8), name: Tyr, name_ref: Tyr
 data: SelfReference { name: "Tyr", name_ptr: 0x7ffeea91d6e8 }
+```
 
+```text
 struct 0x7ffeea91d6f0: (name: 0x7ffeea91d6f0 name_ptr: 0x7ffeea91d6f0), name: Tyr, name_ref: Tyr
 struct 0x7ffeea91d710: (name: 0x7ffeea91d710 name_ptr: 0x7ffeea91d710), name: Lindsey, name_ref: Lindsey
 struct 0x7ffeea91d6f0: (name: 0x7ffeea91d6f0 name_ptr: 0x7ffeea91d710), name: Lindsey, name_ref: Tyr
 struct 0x7ffeea91d710: (name: 0x7ffeea91d710 name_ptr: 0x7ffeea91d6f0), name: Tyr, name_ref: Lindsey
+```
 
 
 可以看到，swap 之后，name_ref 指向的内容确实和 name 不一样了。这就是自引用结构带来的问题。
 
 你也许会奇怪，不是说 move 也会出问题么？为什么第二行打印 name_ref 还是指向了 “Tyr”？这是因为 move 后，之前的内存失效，但是内存地址还没有被挪作它用，所以还能正常显示 “Tyr”。但这样的内存访问是不安全的，如果你把 main 中这句代码注释掉，程序就会 crash：
 
+```javascript
 fn main() {
     let data = move_creates_issue();
     println!("data: {:?}", data);
@@ -384,6 +467,7 @@ fn main() {
     print!("\\n");
     mem_swap_creates_issue();
 }
+```
 
 
 现在你应该了解到在 Rust 下，自引用类型带来的潜在危害了吧。
@@ -393,6 +477,7 @@ fn main() {
 use std::{marker::PhantomPinned, pin::Pin};
 
 #[derive(Debug)]
+```css
 struct SelfReference {
     name: String,
     // 在初始化后指向 name
@@ -400,7 +485,9 @@ struct SelfReference {
     // PhantomPinned 占位符
     _marker: PhantomPinned,
 }
+```
 
+```cpp
 impl SelfReference {
     pub fn new(name: impl Into<String>) -> Self {
         SelfReference {
@@ -409,14 +496,18 @@ impl SelfReference {
             _marker: PhantomPinned,
         }
     }
+```
 
+```javascript
     pub fn init(self: Pin<&mut Self>) {
         let name_ptr = &self.name as *const String;
         // SAFETY: 这里并不会把任何数据从 &mut SelfReference 中移走
         let this = unsafe { self.get_unchecked_mut() };
         this.name_ptr = name_ptr;
     }
+```
 
+```css
     pub fn print_name(self: Pin<&Self>) {
         println!(
             "struct {:p}: (name: {:p} name_ptr: {:p}), name: {}, name_ref: {}",
@@ -430,35 +521,50 @@ impl SelfReference {
         );
     }
 }
+```
 
+```text
 fn main() {
     move_creates_issue();
 }
+```
 
+```cpp
 fn move_creates_issue() {
     let mut data = SelfReference::new("Tyr");
     let mut data = unsafe { Pin::new_unchecked(&mut data) };
     SelfReference::init(data.as_mut());
+```
 
+```text
     // 不 move，一切正常
     data.as_ref().print_name();
+```
 
+```text
     // 现在只能拿到 pinned 后的数据，所以 move 不了之前
     move_pinned(data.as_mut());
     println!("{:?} ({:p})", data, &data);
+```
 
+```text
     // 你无法拿回 Pin 之前的 SelfReference 结构，所以调用不了 move_it
     // move_it(data);
 }
+```
 
+```text
 fn move_pinned(data: Pin<&mut SelfReference>) {
     println!("{:?} ({:p})", data, &data);
 }
+```
 
 #[allow(dead_code)]
+```text
 fn move_it(data: SelfReference) {
     println!("{:?} ({:p})", data, &data);
 }
+```
 
 
 由于数据结构被包裹在 Pin 内部，所以在函数间传递时，变化的只是指向 data 的 Pin：-
@@ -477,28 +583,37 @@ Pin 是为了让某个数据结构无法合法地移动，而 Unpin 则相当于
 
 在 Rust 中，绝大多数数据结构都是可以移动的，所以它们都自动实现了 Unpin。即便这些结构被 Pin 包裹，它们依旧可以进行移动，比如：
 
+```cpp
 use std::mem;
 use std::pin::Pin;
+```
 
+```cpp
 let mut string = "this".to_string();
 let mut pinned_string = Pin::new(&mut string);
+```
 
+```cpp
 // We need a mutable reference to call `mem::replace`.
 // We can obtain such a reference by (implicitly) invoking `Pin::deref_mut`,
 // but that is only possible because `String` implements `Unpin`.
 mem::replace(&mut *pinned_string, "other".to_string());
+```
 
 
 当我们不希望一个数据结构被移动，可以使用 !Unpin。在 Rust 里，实现了 !Unpin 的，除了内部结构（比如 Future），主要就是 PhantomPinned：
 
+```css
 pub struct PhantomPinned;
 impl !Unpin for PhantomPinned {}
+```
 
 
 所以，如果你希望你的数据结构不能被移动，可以为其添加 PhantomPinned 字段来隐式声明 !Unpin。
 
 当数据结构满足 Unpin 时，创建 Pin 以及使用 Pin（主要是 DerefMut）都可以使用安全接口，否则，需要使用 unsafe 接口：
 
+```html
 // 如果实现了 Unpin，可以通过安全接口创建和进行 DerefMut
 impl<P: Deref<Target: Unpin>> Pin<P> {
     pub const fn new(pointer: P) -> Pin<P> {
@@ -510,33 +625,42 @@ impl<P: Deref<Target: Unpin>> Pin<P> {
         pin.pointer
     }
 }
+```
 
+```html
 impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
     fn deref_mut(&mut self) -> &mut P::Target {
         Pin::get_mut(Pin::as_mut(self))
     }
 }
+```
 
+```html
 // 如果没有实现 Unpin，只能通过 unsafe 接口创建，不能使用 DerefMut
 impl<P: Deref> Pin<P> {
     pub const unsafe fn new_unchecked(pointer: P) -> Pin<P> {
         Pin { pointer }
     }
+```
 
+```html
     pub const unsafe fn into_inner_unchecked(pin: Pin<P>) -> P {
         pin.pointer
     }
 }
+```
 
 
 async 产生的 Future 究竟是什么类型？
 
 现在，我们对 Future 的接口有了一个完整的认识，也知道 async 关键字的背后都发生了什么事情：
 
+```cpp
 pub trait Future {
     type Output;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
 }
+```
 
 
 那么，当你写一个 async fn 或者使用了一个 async block 时，究竟得到了一个什么类型的数据呢？比如：
@@ -548,15 +672,21 @@ let fut = async { 42 };
 
 对，但是 impl Future 不是一个具体的类型啊，我们讲过，它相当于 T: Future，那么这个 T 究竟是什么呢？我们来写段代码探索一下（代码）：
 
+```javascript
 fn main() {
     let fut = async { 42 };
+```
 
+```text
     println!("type of fut is: {}", get_type_name(&fut));
 }
+```
 
+```cpp
 fn get_type_name<T>(_: &T) -> &'static str {
     std::any::type_name::<T>()
 }
+```
 
 
 它的输出如下：
@@ -570,6 +700,7 @@ type of fut is: core::future::from_generator::GenFuture<xxx::main::{{closure}}>
 
 struct GenFuture<T: Generator<ResumeTy, Yield = ()>>(T);
 
+```cpp
 pub trait Generator<R = ()> {
     type Yield;
     type Return;
@@ -578,21 +709,27 @@ pub trait Generator<R = ()> {
         arg: R
     ) -> GeneratorState<Self::Yield, Self::Return>;
 }
+```
 
 
 Generator 是 Rust nightly 的一个 trait，还没有进入到标准库。大致看看官网展示的例子，它是怎么用的：
 
 #![feature(generators, generator_trait)]
 
+```cpp
 use std::ops::{Generator, GeneratorState};
 use std::pin::Pin;
+```
 
+```text
 fn main() {
     let mut generator = || {
         yield 1;
         return "foo"
     };
+```
 
+```javascript
     match Pin::new(&mut generator).resume(()) {
         GeneratorState::Yielded(1) => {}
         _ => panic!("unexpected return from resume"),
@@ -602,6 +739,7 @@ fn main() {
         _ => panic!("unexpected return from resume"),
     }
 }
+```
 
 
 可以看到，如果你创建一个闭包，里面有 yield 关键字，就会得到一个 Generator。如果你在 Python 中使用过 yield，二者其实非常类似。因为 Generator 是一个还没进入到稳定版的功能，大致了解一下就行，以后等它的 API 稳定后再仔细研究。

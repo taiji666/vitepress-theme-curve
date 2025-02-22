@@ -1,10 +1,12 @@
 ---
 title: 40Polyfill：通过Polyfill让浏览器提供原生支持
-date: 1739706057.6210232
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
+```text
                             40 Polyfill：通过Polyfill让浏览器提供原生支持
                             你好，我是石川。
+```
 
 在之前的课程中，我们提到过，用 JavaScript 写的程序不是在统一的环境中运行的。虽然我们知道现实中存在定义 ECMAScript 规范的组织 TC39，以及编写 HTML5 和 CSS 规范的组织 W3C（万维网联盟），但不同的浏览器厂商对 JavaScript 虚机的实现都会影响我们的程序在最终执行时的结果。因为虽然标准是存在的，但问题是执行这些标准的公司是独立于标准之外存在的，这就导致了同样的标准，在不同浏览器厂商和JS引擎的理解下，产生了不同的实现。
 
@@ -17,9 +19,11 @@ categories: [JavaScript进阶实战课]
 原生支持问题其实一直都困扰着开发者，在互联网应用出现的早期，出现最多原生支持问题的便是 IE。这主要是由几方面的原因造成的：
 
 
+```text
 第一，IE早期的版本没有自动更新，而且我们大多数人都没有手动更新软件的习惯，这也就造成了很多的用户在新版本的 IE 提供了更多新功能升级和 bug 修复的情况下，仍然停留在老版本的浏览器上；
 第二，因为 Windows 的系统早期并不是和电脑捆绑售卖的，也就造成了很多人使用的是破解版的 Windows 系统，为了避免升级时影响盗版的使用，很多人也不会主动更新操作系统，这就进一步造成了人们对系统连带的浏览器版本更新的滞后；
 第三，企业中使用的 IE 也是浏览器兼容性问题的重灾区。因为越是大的公司，越是“稳定”压倒一切，就越是需要 IT 管理员来集中地更新公司电脑操作系统和软件的版本，而对浏览器这种“病从口入”的连接互联网的窗口软件，更是安全防护的重点，需要集中更新，所以更是大大减缓了浏览器更新的速度。所以早期的网站和 Web 应用开发，主要的问题都集中在 IE6+ 的版本对新版的 JavaScript 原生支持的问题。
+```
 
 
 如今，随着 IE 退出了历史舞台，向下兼容的问题在逐渐减少，但是问题也不是一下子就完全消失了。因为除了 IE 的问题外，其它的浏览器提供商，如 Chrome、Safari、Mozilla、Opera 等也都是公司。既然是公司，那么它们之间就会存在竞争，从而争取更多的市场份额。
@@ -31,8 +35,10 @@ categories: [JavaScript进阶实战课]
 那么面对不同浏览器对新功能支持的不统一，如果我们想使用较新的 JavaScript 功能，有两个方法：
 
 
+```text
 第一，是使用我们在前面提到过的 Babel.js，通过对 JavaScript 的转译，我们可以在提前用到新功能的同时，保证较老版本浏览器的支持；
 第二个方法，就是使用 Polyfill，Polyfill 作为一个插件，它提供了较新浏览器的功能，但也提供了较旧版本的功能。
+```
 
 
 前面，我们讲过了代码转译的工具 Babel.js，那我们是不是可以用类似的工具解决所有的原生支持问题呢？
@@ -62,12 +68,16 @@ array.forEach(function(currentValue, index, arr), thisValue)
 
 下面我们再来看看 forEach 方法的用途。首先让我们先创建一个数组，我们称之为 oldArray。然后里面，我们加入三个地名，纽约、东京、巴黎。之后，让我们再创建一个空数组，newArray。我们可以通过遍历第一个数组的方式，将里面的元素推送到第二个数组中。这就是一个 forEach 的简单用例。
 
+```javascript
 var oldArray = ["纽约", "东京", "巴黎"];
 var newArray = [];
+```
 
+```text
 oldArray.forEach( function(item, index) {
   newArray.push(index + "." + item);
 }, oldArray);
+```
 
 newArray; // ['0.纽约', '1.东京', '2.巴黎']
 
@@ -85,6 +95,7 @@ Array.prototype.forEach !== undefined;
 
 这里有一点需要注意的是，因为我们现在的浏览器是支持 forEach 功能的，所以这么做其实就等于覆盖了原生支持的 forEach 功能。所以首先，我们需要判断用户传入的是不是一个函数参数。这里，我们可以使用 JavaScript 内置的 typeof 方法来实现对参数类型的检查。如果返回的结果不是函数类型的话，程序应该返回一条报错。这其实就是一种类型检查。
 
+```javascript
 Array.prototype.forEach = function(callback, thisValue){
   if (typeof(callback) !== "function") {
     throw new TypeError(callback + "不是一个函数");
@@ -94,13 +105,18 @@ Array.prototype.forEach = function(callback, thisValue){
     callback.call(thisValue, this[i], i, this);
   }
 }
+```
 
+```javascript
 var oldArray = ["纽约", "东京", "巴黎"];
 var newArray = [];
+```
 
+```text
 oldArray.forEach( function(item, index) {
   newArray.push(index + "." + item);
 }, oldArray); 
+```
 
 newArray; // ['0.纽约', '1.东京', '2.巴黎']
 
@@ -118,8 +134,10 @@ newArray; // ['0.纽约', '1.东京', '2.巴黎']
 通过这一讲的学习，我们知道了如何使用 Polyfill 来解决原生支持的问题，也了解了它和转译工具的不同点和互补之处。如果只有使用，没有了解过它们的工作原理，这两个工具是很容易被混淆的。所以我在这里也再次强调下，加深一下理解，转译和 Polyfill 的共同点是它们的目的都是为了提供原生支持；而它们的区别在于支持的内容和实现的方式。
 
 
+```text
 转译解决的主要是语法的原生支持问题，它的实现方式是通过将源代码转换成源代码，而不是机器码。
 Polyfill 解决的主要是功能的原生支持问题，它的实现方式可以是通过在对象原型上增加补丁来支持相关功能。
+```
 
 
 转译和 Polyfill 并不是非此即彼的概念，相反，它们是高度互补的，大多情况下可以结合起来使用。

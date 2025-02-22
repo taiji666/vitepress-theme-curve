@@ -1,6 +1,6 @@
 ---
 title: 12 基础篇｜从 class 语法视角看类的继承与实例创建
-date: 1739707492.879861
+date: 2025-02-22
 categories: [JavaScript 语言编程进阶]
 ---
 ## class 是什么
@@ -167,11 +167,13 @@ class Child extends Parent {
 }
 ```
 
+```markdown
 这不是 class 语法的全部能力，但已经能涵盖绝大部分场景，我们一步一步来讲。上面的代码体现了下列几个功能：
 1. 构造函数；
 2. 类成员；
 3. 继承，包括成员属性、成员函数、super；
 4. 类`静态`成员。
+```
 
 我们接下来就以上面的代码作为案例，尝试**翻译**成普通 function 语法。
 
@@ -188,10 +190,12 @@ function createInstance(Constructor, ...args) {}
 
 首先你的构造函数 Constructor 必须确定满足构造函数的定义。我们在前面的函数一章中讲到过，函数对象可能存在一个叫做 `[[Construct]]` 的内部方法，存在则代表它可以作为构造函数。显然异步函数、生成器函数就没有`[[Construct]]`。
 
+```markdown
 一般对象的 `[[Construct]]` 方法的实现大致如下：
 1. 创建一个对象 P，原型链指向 Constructor.prototype；
 2. 生成一个上下文，有两个变量绑定需要关注，第一是 `this`，指向刚创建的 P，第二是 `new.target`，指向 Constructor；
 3. 执行 Constructor 的代码，如果返回一个对象（即非 `Primitive` 值），那么就作为构造函数的结果，否则将 P 作为构造函数的结果。
+```
 
 用代码的话，可以近似表述成：
 
@@ -414,12 +418,14 @@ Child.prototype = Object.create(Parent.prototype, {
 
 > 注意 super.say()，可以等价写作 Parent.prototype.say.call(this)。
 
+```markdown
 以上只是说明了用普通函数实现继承的大概原理，但是在生产环境中，还有很多细节需要考虑，比如：
 1. 如果 Parent 是 null 怎么办？
 2. 如果 Parent 有返回值怎们办？
 3. Child 的 prototype 不应该被 `for...in` 遍历出来，怎么办？
 4. 跨层级调用 super 怎么实现？
 5. ……
+```
 
 大家可以顺着我上面的代码继续思考，看能不能把提到的这些问题一一解决。如果没有思路，建议大家去看一下 `Babel` 或者 `TypeScript` 的编译产出。不过它们的实现也并不一致，孰优孰劣，留给大家自己去判断了。
 

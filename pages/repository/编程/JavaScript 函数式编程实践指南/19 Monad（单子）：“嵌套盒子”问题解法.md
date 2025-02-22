@@ -1,6 +1,6 @@
 ---
 title: 19 Monad（单子）：“嵌套盒子”问题解法
-date: 1739708222.3878226
+date: 2025-02-22
 categories: [JavaScript 函数式编程实践指南]
 ---
 书接上回，我们已经知道，通过往 map 方法里“加料”，我们可以拓展 Functor 的能力，进而定制出不同类型的 Functor。
@@ -32,8 +32,10 @@ Monad 中文叫做“单子”，它是一种特殊的 Functor（函子）。
 
 会导致嵌套 Functor 的场景有很多，这里我举两个比较典型的 case：
 
+```markdown
 -   线性计算场景下的嵌套 Functor —— Functor 作为另一个 Functor 的计算中间态出现
 -   非线性计算场景下的嵌套 Functor —— 两个 Functor 共同作为计算入参出现
+```
 
   
 
@@ -83,7 +85,7 @@ const isExisted = id => id % 3 === 0
 
 将这个 isExisted 代入楼上的示例代码，我们就可以检验 getUserSafely 的执行效果了：
 
-```
+```javascript
 const res = getUserSafely(1110021)  
 
 // 输出 'Maybe {[object Object]}'
@@ -218,8 +220,10 @@ userInfo.valueOf().valueOf()
 
 我们知道，在盒子模式中，盒子的【行为】大体上可以分为两类：
 
+```markdown
 -   回调函数的行为，也就是 map 方法中传入的那个 f。这个 f 是灵活可变的，我们可以通过 map 来组合各种各样不同的 f。我们把 f 记为“**自定义行为**”。
 -   盒子本身预设的行为，比如 Functor 盒子中的 map。这个 map 的行为是确定的、不可变的，我们把这样的行为记作“**基础行为**”。
+```
 
 既然“自定义行为”没法干这个“打开盒子”的活，我们就只能往“基础行为”上使使劲儿啦。
 

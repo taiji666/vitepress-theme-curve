@@ -1,18 +1,22 @@
 ---
 title: 13[视频]实战：基于FFI实现的lua-resty-lrucache
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             13 [视频]实战：基于FFI实现的lua-resty-lrucache
                             13 [视频]实战：基于FFI实现的lua-resty-lrucache
+```
 
 你好，我是温铭。
 
 今天的内容，我同样会以视频的形式来讲解。不过，在你进行视频学习之前，我想先问你这么几个问题：
 
 
+```text
 lua-resty-lrucache 内部最重要的数据结构是什么？
 lua-resty-lrucache 有两种 FFI 的实现，我们今天讲的这一种更适合什么场景？
+```
 
 
 这几个问题，也是今天视频课要解决的核心内容，希望你可以先自己思考一下，并带着问题来学习今天的视频内容。

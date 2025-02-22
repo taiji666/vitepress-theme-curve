@@ -1,10 +1,12 @@
 ---
 title: 44OpenResty的杀手锏：动态
-date: 1739706057.2093432
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             44 OpenResty 的杀手锏：动态
                             你好，我是温铭。
+```
 
 到目前为止，和 OpenResty 性能相关的内容，我就差不多快要介绍完了。我相信，掌握并灵活运用好这些优化技巧，一定可以让你的代码性能提升一个数量级。今天，在性能优化的最后一个部分，我来讲一讲 OpenResty 中被普遍低估的一种能力：动态。
 
@@ -20,17 +22,21 @@ categories: [OpenResty从入门到实战]
 
 下面我们就来看看，如何在 OpenResty 中动态地加载 Lua 代码：
 
+```text
 resty -e 'local s = [[ngx.say("hello world")]]
 local func, err = loadstring(s)
 func()'
+```
 
 
 你没有看错，只要短短的两三行代码，就可以把一个字符串变为一个 Lua 函数，并运行起来。我们进一步仔细看下这几行代码，我来简单解读一下：
 
 
+```text
 首先，我们声明了一个字符串，它的内容是一段合法的 Lua 代码，把 hello world 打印出来；
 然后，使用 Lua 中的 loadstring 函数，把字符串对象转为函数对象func；
 最后，在函数名的后面加上括号，把 func 执行起来，打印出 hello world 来。
+```
 
 
 当然，在这段代码的基础之上，我们还可以扩展出更多好玩和实用的功能。接下来，我就带你一起来“尝尝鲜”。
@@ -39,21 +45,26 @@ func()'
 
 首先是函数即服务，这是近年来很热门的技术方向，我们看下在 OpenResty 中如何实现。在刚刚的代码中，字符串是一段 Lua 代码，我们还可以把它改成一个 Lua 函数：
 
+```text
 local s = [[
  return function()
      ngx.say("hello world")
 end
 ]]
+```
 
 
 我们讲过，函数在 Lua 中是一等公民，这段代码便是返回了一个匿名函数。在执行这个匿名函数时，我们使用 pcall 做了一层保护。pcall 会在保护模式下运行函数，并捕获其中的异常，如果正常就返回 true 和执行的结果，如果失败就返回 false 和错误信息，也就是下面这段代码：
 
+```text
 local func1, err = loadstring(s)
 local ret, func = pcall(func1)
+```
 
 
 自然，把上面的两部分结合起来，就会得到完整的、可运行的示例：
 
+```text
 resty -e 'local s = [[
  return function()
     ngx.say("hello world")
@@ -62,6 +73,7 @@ end
 local  func1 = loadstring(s)
 local ret, func = pcall(func1)
 func()'
+```
 
 
 更深入一步，我们还可以把 s 这个包含函数的字符串，改成可以由用户指定的形式，并加上执行它的条件，这样其实就是 FaaS 的原型了。这里，我提供了一个完整的实现，如果你对FaaS感兴趣，想要继续研究，推荐你通过这个链接深入学习。
@@ -79,8 +91,10 @@ OpenResty 的动态不仅可以用于 FaaS，让脚本语言的动态细化到�
 CloudFlare 的做法和上面动态加载代码的原理是类似的，大概可以分为下面几个步骤：
 
 
+```text
 首先，从键值数据库集群中获取到有变化的代码文件，获取的方式可以是后台 timer 轮询，也可以是用“发布-订阅”的模式来监听；
 然后，用更新的代码文件替换本地磁盘的旧文件，然后使用 loadstring 和 pcall的方式，来更新内存中加载的缓存；
+```
 
 
 这样，下一个被处理的终端请求，就会走更新后的代码逻辑。
@@ -95,17 +109,21 @@ CloudFlare 的做法和上面动态加载代码的原理是类似的，大概可
 
 现在，让我们把思绪拉回到 OpenResty 上来，一起来看如何实现动态上游。lua-resty-core 提供了 ngx.balancer 这个库来设置上游，它需要放到 OpenResty 的 balancer 阶段来运行：
 
+```css
 balancer_by_lua_block {
     local balancer = require "ngx.balancer"
     local host = "127.0.0.2"
     local port = 8080
+```
 
+```text
     local ok, err = balancer.set_current_peer(host, port)
     if not ok then
         ngx.log(ngx.ERR, "failed to set the current peer: ", err)
         return ngx.exit(500)
     end
 }
+```
 
 
 我来简单解释一下。set_current_peer 函数，就是用来设置上游的 IP 地址和端口的。不过要注意，这里并不支持域名，你需要使用 lua-resty-dns 库来为域名和 IP 做一层解析。
@@ -113,8 +131,10 @@ balancer_by_lua_block {
 不过，ngx.balancer 还比较底层，虽然它有设置上游的能力，但动态上游的实现远非如此简单。所以，在 ngx.balancer 前面还需要两个功能：
 
 
+```text
 一是上游的选择算法，究竟是一致性哈希，还是 roundrobin；
 二是上游的健康检查机制，这个机制需要剔除掉不健康的上游，并且需要在不健康的上游变健康的时候，重新把它加入进来。
+```
 
 
 而OpenResty 官方的 lua-resty-balancer 这个库中，则包含了 resty.chash 和 resty.roundrobin 两类算法来完成第一个功能，并且有 lua-resty-upstream-healthcheck 来尝试完成第二个功能。

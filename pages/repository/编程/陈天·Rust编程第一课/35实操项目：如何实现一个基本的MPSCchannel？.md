@@ -1,10 +1,12 @@
 ---
 title: 35实操项目：如何实现一个基本的MPSCchannel？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             35 实操项目：如何实现一个基本的MPSC channel？
                             你好，我是陈天。
+```
 
 通过上两讲的学习，相信你已经意识到，虽然并发原语看上去是很底层、很神秘的东西，但实现起来也并不像想象中的那么困难，尤其是在 Rust 下，在[第 33 讲]中，我们用了几十行代码就实现了一个简单的 SpinLock。
 
@@ -24,29 +26,37 @@ categories: [陈天·Rust编程第一课]
 要实现刚才说的 MPSC channel，都有什么需求呢？首先，生产者可以产生数据，消费者能够消费产生出来的数据，也就是基本的 send/recv，我们以下面这个单元测试 1 来描述这个需求：
 
 #[test]
+```javascript
 fn channel_should_work() {
     let (mut s, mut r) = unbounded();
     s.send("hello world!".to_string()).unwrap();
     let msg = r.recv().unwrap();
     assert_eq!(msg, "hello world!");
 }
+```
 
 
 这里，通过 unbounded() 方法， 可以创建一个 sender和一个 receiver，sender 有 send() 方法，可以发送数据，receiver 有 recv() 方法，可以接受数据。整体的接口，我们设计和 std::sync::mpsc 保持一致，避免使用者使用上的心智负担。
 
 为了实现这样一个接口，需要什么样的数据结构呢？首先，生产者和消费者之间会共享一个队列，上一讲我们说到，可以用 VecDeque。显然，这个队列在插入和取出数据时需要互斥，所以需要用 Mutex 来保护它。所以，我们大概可以得到这样一个结构：
 
+```html
 struct Shared<T> {
     queue: Mutex<VecDeque<T>>,
 }
+```
 
+```html
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
 }
+```
 
+```html
 pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
 }
+```
 
 
 这样的数据结构应该可以满足单元测试 1。
@@ -56,6 +66,7 @@ pub struct Receiver<T> {
 由于需要的是 MPSC，所以，我们允许多个 sender 往 channel 里发送数据，用单元测试 2 来描述这个需求：
 
 #[test]
+```javascript
 fn multiple_senders_should_work() {
     let (mut s, mut r) = unbounded();
     let mut s1 = s.clone();
@@ -72,13 +83,18 @@ fn multiple_senders_should_work() {
     for handle in [t, t1, t2] {
         handle.join().unwrap();
     }
+```
 
+```text
     let mut result = [r.recv().unwrap(), r.recv().unwrap(), r.recv().unwrap()];
     // 在这个测试里，数据到达的顺序是不确定的，所以我们排个序再 assert
     result.sort();
+```
 
+```text
     assert_eq!(result, [1, 2, 3]);
 }
+```
 
 
 这个需求，刚才的数据结构就可以满足，只是 Sender 需要实现 Clone trait。不过我们在写这个测试的时候稍微有些别扭，因为这一行有不断重复的代码：
@@ -95,6 +111,7 @@ let mut result = [r.recv().unwrap(), r.recv().unwrap(), r.recv().unwrap()];
 不过，我们可以通过检测“线程是否退出”来间接判断线程是否被阻塞。理由很简单，如果线程没有继续工作，又没有退出，那么一定被阻塞住了。阻塞住之后，我们继续发送数据，消费者所在的线程会被唤醒，继续工作，所以最终队列长度应该为 0。我们看单元测试 3：
 
 #[test]
+```cpp
 fn receiver_should_be_blocked_when_nothing_to_read() {
     let (mut s, r) = unbounded();
     let mut s1 = s.clone();
@@ -106,27 +123,38 @@ fn receiver_should_be_blocked_when_nothing_to_read() {
         // 读不到应该休眠，所以不会执行到这一句，执行到这一句说明逻辑出错
         assert!(false);
     });
+```
 
+```cpp
     thread::spawn(move || {
         for i in 0..100usize {
             s.send(i).unwrap();
         }
     });
+```
 
+```cpp
     // 1ms 足够让生产者发完 100 个消息，消费者消费完 100 个消息并阻塞
     thread::sleep(Duration::from_millis(1));
+```
 
+```css
     // 再次发送数据，唤醒消费者
     for i in 100..200usize {
         s1.send(i).unwrap();
     }
+```
 
+```cpp
     // 留点时间让 receiver 处理
     thread::sleep(Duration::from_millis(1));
+```
 
+```text
     // 如果 receiver 被正常唤醒处理，那么队列里的数据会都被读完
     assert_eq!(s1.total_queued_items(), 0);
 }
+```
 
 
 这个测试代码中，我们假定 receiver 实现了 Iterator，还假定 sender 提供了一个方法total_queued_items()。这些可以在实现的时候再处理。
@@ -135,19 +163,23 @@ fn receiver_should_be_blocked_when_nothing_to_read() {
 
 好，如果要能支持队列为空时阻塞，我们需要使用 Condvar。所以 Shared 需要修改一下：
 
+```html
 struct Shared<T> {
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
 }
+```
 
 
 这样当实现 Receiver 的 recv() 方法后，我们可以在读不到数据时阻塞线程：
 
+```text
 // 拿到锁
 let mut inner = self.shared.queue.lock().unwrap();
 // ... 假设读不到数据
 // 使用 condvar 和 MutexGuard 阻塞当前线程
 self.shared.available.wait(inner)
+```
 
 
 需求 4
@@ -157,12 +189,15 @@ self.shared.available.wait(inner)
 我们来写单元测试 4：
 
 #[test]
+```javascript
 fn last_sender_drop_should_error_when_receive() {
     let (s, mut r) = unbounded();
     let s1 = s.clone();
     let senders = [s, s1];
     let total = senders.len();
+```
 
+```cpp
     // sender 即用即抛
     for mut sender in senders {
         thread::spawn(move || {
@@ -172,15 +207,20 @@ fn last_sender_drop_should_error_when_receive() {
         .join()
         .unwrap();
     }
+```
 
+```css
     // 虽然没有 sender 了，接收者依然可以接受已经在队列里的数据
     for _ in 0..total {
         r.recv().unwrap();
     }
+```
 
+```text
     // 然而，读取更多数据时会出错
     assert!(r.recv().is_err());
 }
+```
 
 
 这个测试依旧很简单。你可以想象一下，使用什么样的数据结构可以达到这样的目的。
@@ -191,11 +231,13 @@ fn last_sender_drop_should_error_when_receive() {
 
 哈，你一定想到了可以使用 atomics。对，我们可以用 AtomicUsize。所以，Shared 数据结构需要更新一下：
 
+```html
 struct Shared<T> {
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
     senders: AtomicUsize,
 }
+```
 
 
 需求 5
@@ -203,6 +245,7 @@ struct Shared<T> {
 既然没有 Sender 了要报错，那么如果没有 Receiver了，Sender 发送时是不是也应该错误返回？这个需求和上面类似，就不赘述了。看构造的单元测试 5：
 
 #[test]
+```javascript
 fn receiver_drop_should_error_when_send() {
     let (mut s1, mut s2) = {
         let (s, _) = unbounded();
@@ -210,22 +253,27 @@ fn receiver_drop_should_error_when_send() {
         let s2 = s.clone();
         (s1, s2)
     };
+```
 
+```text
     assert!(s1.send(1).is_err());
     assert!(s2.send(1).is_err());
 }
+```
 
 
 这里，我们创建一个 channel，产生两个 Sender 后便立即丢弃 Receiver。两个 Sender 在发送时都会出错。
 
 同样的，Shared 数据结构要更新一下：
 
+```html
 struct Shared<T> {
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
     senders: AtomicUsize,
     receivers: AtomicUsize,
 }
+```
 
 
 实现 MPSC channel
@@ -234,97 +282,133 @@ struct Shared<T> {
 
 创建一个新的项目 cargo new con_utils --lib。在 cargo.toml 中添加 anyhow 作为依赖。在 lib.rs 里，我们就写入一句：pub mod channel , 然后创建 src/channel.rs，把刚才设计时使用的 test case、设计的数据结构，以及 test case 里使用到的接口，用代码全部放进来：
 
+```cpp
 use anyhow::Result;
 use std::{
     collections::VecDeque,
     sync::{atomic::AtomicUsize, Arc, Condvar, Mutex},
 };
+```
 
+```html
 /// 发送者
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
 }
+```
 
+```html
 /// 接收者
 pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
 }
+```
 
+```text
 /// 发送者和接收者之间共享一个 VecDeque，用 Mutex 互斥，用 Condvar 通知
 /// 同时，我们记录有多少个 senders 和 receivers
+```
 
+```html
 struct Shared<T> {
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
     senders: AtomicUsize,
     receivers: AtomicUsize,
 }
+```
 
+```html
 impl<T> Sender<T> {
     /// 生产者写入一个数据
     pub fn send(&mut self, t: T) -> Result<()> {
         todo!()
     }
+```
 
+```css
     pub fn total_receivers(&self) -> usize {
         todo!()
     }
+```
 
+```css
     pub fn total_queued_items(&self) -> usize {
         todo!()
     }
 }
+```
 
+```html
 impl<T> Receiver<T> {
     pub fn recv(&mut self) -> Result<T> {
         todo!()
     }
+```
 
+```css
     pub fn total_senders(&self) -> usize {
         todo!()
     }
 }
+```
 
+```html
 impl<T> Iterator for Receiver<T> {
     type Item = T;
+```
 
+```cpp
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
     }
 }
+```
 
+```html
 /// 克隆 sender
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
         todo!()
     }
 }
+```
 
+```html
 /// Drop sender
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
         todo!()
     }
 }
+```
 
+```html
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         todo!()
     }
 }
+```
 
+```html
 /// 创建一个 unbounded channel
 pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     todo!()
 }
+```
 
 #[cfg(test)]
+```cpp
 mod tests {
     use std::{thread, time::Duration};
+```
 
+```text
     use super::*;
 		// 此处省略所有 test case
 }
+```
 
 
 目前这个代码虽然能够编译通过，但因为没有任何实现，所以 cargo test 全部出错。接下来，我们就来一点点实现功能。
@@ -333,6 +417,7 @@ mod tests {
 
 创建 unbounded channel 的接口很简单：
 
+```javascript
 pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     let shared = Shared::default();
     let shared = Arc::new(shared);
@@ -343,7 +428,9 @@ pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
         Receiver { shared },
     )
 }
+```
 
+```cpp
 const INITIAL_SIZE: usize = 32;
 impl<T> Default for Shared<T> {
     fn default() -> Self {
@@ -355,6 +442,7 @@ impl<T> Default for Shared<T> {
         }
     }
 }
+```
 
 
 因为这里使用 default() 创建了 Shared 结构，所以我们需要为其实现 Default。创建时，我们有 1 个生产者和1 个消费者。
@@ -365,6 +453,7 @@ impl<T> Default for Shared<T> {
 
 在 recv 中，如果队列中有数据，那么直接返回；如果没数据，且所有生产者都离开了，我们就返回错误；如果没数据，但还有生产者，我们就阻塞消费者的线程：
 
+```javascript
 impl<T> Receiver<T> {
     pub fn recv(&mut self) -> Result<T> {
         // 拿到队列的锁
@@ -390,11 +479,14 @@ impl<T> Receiver<T> {
             }
         }
     }
+```
 
+```cpp
     pub fn total_senders(&self) -> usize {
         self.shared.senders.load(Ordering::SeqCst)
     }
 }
+```
 
 
 注意看这里 Condvar 的使用。
@@ -408,11 +500,13 @@ inner = self.shared.available.wait(inner).map_err(|_| anyhow!("lock poisoned"))?
 
 记得还要处理消费者的 drop：
 
+```cpp
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         self.shared.receivers.fetch_sub(1, Ordering::AcqRel);
     }
 }
+```
 
 
 很简单，消费者离开时，将 receivers 减一。
@@ -423,6 +517,7 @@ impl<T> Drop for Receiver<T> {
 
 首先，在没有消费者的情况下，应该报错。正常应该使用 thiserror 定义自己的错误，不过这里为了简化代码，就使用 anyhow! 宏产生一个 adhoc 的错误。如果消费者还在，那么我们获取 VecDeque 的锁，把数据压入：
 
+```html
 impl<T> Sender<T> {
     /// 生产者写入一个数据
     pub fn send(&mut self, t: T) -> Result<()> {
@@ -430,7 +525,9 @@ impl<T> Sender<T> {
         if self.total_receivers() == 0 {
             return Err(anyhow!("no receiver left"));
         }
+```
 
+```javascript
         // 加锁，访问 VecDeque，压入数据，然后立刻释放锁
         let was_empty = {
             let mut inner = self.shared.queue.lock().unwrap();
@@ -438,24 +535,33 @@ impl<T> Sender<T> {
             inner.push_back(t);
             empty
         };
+```
 
+```css
         // 通知任意一个被挂起等待的消费者有数据
         if was_empty {
             self.shared.available.notify_one();
         }
+```
 
+```text
         Ok(())
     }
+```
 
+```cpp
     pub fn total_receivers(&self) -> usize {
         self.shared.receivers.load(Ordering::SeqCst)
     }
+```
 
+```javascript
     pub fn total_queued_items(&self) -> usize {
         let queue = self.shared.queue.lock().unwrap();
         queue.len()
     }
 }
+```
 
 
 这里，获取 total_receivers 时，我们使用了 Ordering::SeqCst，保证所有线程看到同样顺序的对 receivers 的操作。这个值是最新的值。
@@ -464,6 +570,7 @@ impl<T> Sender<T> {
 
 由于我们可以有多个生产者，所以要允许它 clone：
 
+```cpp
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
         self.shared.senders.fetch_add(1, Ordering::AcqRel);
@@ -472,31 +579,40 @@ impl<T> Clone for Sender<T> {
         }
     }
 }
+```
 
 
 实现 Clone trait 的方法很简单，但记得要把 shared.senders 加 1，使其保持和当前的 senders 的数量一致。
 
 当然，在 drop 的时候我们也要维护 shared.senders 使其减 1：
 
+```cpp
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
         self.shared.senders.fetch_sub(1, Ordering::AcqRel);
+```
 
+```text
     }
 }
+```
 
 
 其它功能
 
 目前还缺乏 Receiver 的 Iterator 的实现，这个很简单，就是在 next() 里调用 recv() 方法，Rust 提供了支持在 Option/Result 之间很方便转换的函数，所以这里我们可以直接通过 ok() 来将 Result 转换成 Option：
 
+```html
 impl<T> Iterator for Receiver<T> {
     type Item = T;
+```
 
+```cpp
     fn next(&mut self) -> Option<Self::Item> {
         self.recv().ok()
     }
 }
+```
 
 
 好，目前所有需要实现的代码都实现完毕， cargo test 测试一下。wow！测试一次性通过！这也太顺利了吧！
@@ -506,6 +622,7 @@ impl<T> Iterator for Receiver<T> {
 我们来设计一个场景让这个问题暴露：
 
 #[test]
+```javascript
 fn receiver_shall_be_notified_when_all_senders_exit() {
     let (s, mut r) = unbounded::<usize>();
     // 用于两个线程同步
@@ -515,14 +632,19 @@ fn receiver_shall_be_notified_when_all_senders_exit() {
         sender.send(0).unwrap();
         assert!(r.recv().is_err());
     });
+```
 
+```cpp
     thread::spawn(move || {
         receiver.recv().unwrap();
         drop(s);
     });
+```
 
+```text
     t1.join().unwrap();
 }
+```
 
 
 在我进一步解释之前，你可以停下来想想为什么这个测试可以保证暴露这个问题？它是怎么暴露的？如果想不到，再 cargo test 看看会出现什么问题。
@@ -535,6 +657,7 @@ fn receiver_shall_be_notified_when_all_senders_exit() {
 
 要修复这个问题，我们需要妥善处理 Sender 的 Drop：
 
+```javascript
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
         let old = self.shared.senders.fetch_sub(1, Ordering::AcqRel);
@@ -545,6 +668,7 @@ impl<T> Drop for Sender<T> {
         }
     }
 }
+```
 
 
 这里，如果减一之前，旧的 senders 的数量小于等于 1，意味着现在是最后一个 Sender 要离开了，不管怎样我们都要唤醒 Receiver ，所以这里使用了 notify_all()。如果 Receiver 之前已经被阻塞，此刻就能被唤醒。修改完成，cargo test 一切正常。
@@ -557,10 +681,12 @@ impl<T> Drop for Sender<T> {
 
 顺着这个思路，我们可以在 Receiver 的结构中放一个 cache：
 
+```html
 pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
     cache: VecDeque<T>,
 }
+```
 
 
 如果你之前有 C 语言开发的经验，也许会想，到了这一步，何必把 queue 中的数据全部读出来，存入 Receiver 的 cache 呢？这样效率太低，如果能够直接 swap 两个结构内部的指针，这样，即便队列中有再多的数据，也是一个 O(1) 的操作。
@@ -569,25 +695,32 @@ pub struct Receiver<T> {
 
 use std::mem;
 
+```text
 fn main() {
     let mut x = "hello world".to_string();
     let mut y = "goodbye world".to_string();
+```
 
     mem::swap(&mut x, &mut y);
 
+```text
     assert_eq!("goodbye world", x);
     assert_eq!("hello world", y);
 }
+```
 
 
 好，了解了 swap 方法，我们看看如何修改 Receiver 的 recv() 方法来提升性能：
 
+```html
 pub fn recv(&mut self) -> Result<T> {
     // 无锁 fast path
     if let Some(v) = self.cache.pop_front() {
         return Ok(v);
     }
+```
 
+```cpp
     // 拿到队列的锁
     let mut inner = self.shared.queue.lock().unwrap();
     loop {
@@ -616,12 +749,14 @@ pub fn recv(&mut self) -> Result<T> {
         }
     }
 }
+```
 
 
 当 cache 中有数据时，总是从 cache 中读取；当 cache 中没有，我们拿到队列的锁，读取一个数据，然后看看队列是否还有数据，有的话，就 swap cache 和 queue，然后返回之前读取的数据。
 
 好，做完这个重构和优化，我们可以运行 cargo test，看看已有的测试是否正常。如果你遇到报错，应该是 cache 没有初始化，你可以自行解决，也可以参考：
 
+```javascript
 pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     let shared = Shared::default();
     let shared = Arc::new(shared);
@@ -635,17 +770,21 @@ pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
         },
     )
 }
+```
 
 
 虽然现有的测试全数通过，但我们并没有为这个优化写测试，这里补个测试：
 
 #[test]
+```css
     fn channel_fast_path_should_work() {
     let (mut s, mut r) = unbounded();
     for i in 0..10usize {
         s.send(i).unwrap();
     }
+```
 
+```text
     assert!(r.cache.is_empty());
     // 读取一个数据，此时应该会导致 swap，cache 中有数据
     assert_eq!(0, r.recv().unwrap());
@@ -653,12 +792,15 @@ pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     assert_eq!(r.cache.len(), 9);
     // 在 queue 里没有数据了
     assert_eq!(s.total_queued_items(), 0);
+```
 
+```text
     // 从 cache 里读取剩下的数据
     for (idx, i) in r.into_iter().take(9).enumerate() {
         assert_eq!(idx + 1, i);
     }
 }
+```
 
 
 这个测试很简单，详细注释也都写上了。

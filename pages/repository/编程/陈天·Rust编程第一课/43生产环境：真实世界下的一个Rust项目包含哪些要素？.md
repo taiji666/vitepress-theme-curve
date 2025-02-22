@@ -1,10 +1,12 @@
 ---
 title: 43生产环境：真实世界下的一个Rust项目包含哪些要素？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             43 生产环境：真实世界下的一个Rust项目包含哪些要素？
                             你好，我是陈天。
+```
 
 随着我们的实战项目 KV server 接近尾声，课程也到了收官阶段。掌握一门语言的特性，能写出应用这些特性解决一些小问题的代码，算是初窥门径，就像在游泳池里练习冲浪；真正想把语言融会贯通，还要靠大风大浪中的磨练。所以接下来的三篇文章，我们会偏重了解真实的 Rust 应用环境，看看如何用 Rust 构建复杂的软件系统。
 
@@ -26,6 +28,7 @@ categories: [陈天·Rust编程第一课]
 
 如果你使用 Git 来管理代码仓库，那么可以使用 pre-commit hook。一般来说，我们不必自己撰写 pre-commit hook 脚本，可以使用 pre-commit 这个工具。下面是我在 tyrchen/geektime-rust 中使用的 pre-commit 配置，供你参考：
 
+```markdown
 ❯ cat .pre-commit-config.yaml
 fail_fast: false
 repos:
@@ -74,6 +77,7 @@ repos:
         language: rust
         files: \.rs$
         pass_filenames: false
+```
 
 
 你在根目录生成 .pre-commit-config.yaml 后，运行 pre-commit install，以后 git commit 时就会自动做这一系列的检查，保证提交代码的最基本的正确性。
@@ -92,6 +96,7 @@ cargo-deny 对于生产环境下的代码非常重要，因为现代软件依赖
 
 不过还有一种单元测试是和文档放在一起的，doctest，如果你在学习这门课的过程中已经习惯遇到问题就去看源代码的话，会看到很多类似这样的 doctest，比如下面的 HashMap::get 方法的 doctest：
 
+```cpp
 /// Returns a reference to the value corresponding to the key.
 ///
 /// The key may be any borrowed form of the map's key type, but
@@ -108,8 +113,10 @@ cargo-deny 对于生产环境下的代码非常重要，因为现代软件依赖
 /// assert_eq!(map.get(&1), Some(&"a"));
 /// assert_eq!(map.get(&2), None);
 /// ```
+```
 #[stable(feature = "rust1", since = "1.0.0")]
 #[inline]
+```html
 pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
 where
     K: Borrow<Q>,
@@ -117,6 +124,7 @@ where
 {
     self.base.get(k)
 }
+```
 
 
 在之前的代码中，虽然我们没有明确介绍文档注释，但想必你已经知道，可以通过 “///” 来撰写数据结构、trait、方法和函数的文档注释。
@@ -131,9 +139,12 @@ where
 
 如果你用 GitHub 来管理代码仓库，可以使用 github workflow 来进行持续集成，比如下面是一个最基本的 Rust github workflow 的定义：
 
+```text
 ❯ cat .github/workflows/build.yml
 name: build
+```
 
+```markdown
 on:
   push:
     branches:
@@ -141,7 +152,9 @@ on:
   pull_request:
     branches:
       - master
+```
 
+```markdown
 jobs:
   build-rust:
     strategy:
@@ -181,6 +194,7 @@ jobs:
         run: cargo test --all-features -- --test-threads=1 --nocapture
       - name: Generate docs
         run: cargo doc --all-features --no-deps
+```
 
 
 我们会处理代码格式，做基本的静态检查、单元测试和集成测试，以及生成文档。
@@ -198,16 +212,21 @@ jobs:
 //! 这是 crate 文档
 
 
+```text
 如果你想强迫自己要撰写每个公共接口的文档，保持系统有良好的文档覆盖，那么可以使用 ![deny(missing_docs)]。这样，任何时候只要你忘记撰写文档，都会产生编译错误。如果你觉得编译错误太严格，也可以用编译报警：![warn(missing_docs]。之前我们阅读过 bytes crate 的源码，可以再回过头来看看它的 lib.rs 的开头。-
 在介绍测试的时候，我们提到了文档测试。
+```
 
 在文档中撰写样例代码并保证这个样例代码可以正常运行非常重要，因为使用者在看你的 crate 文档时，往往先会参考你的样例代码，了解接口如何使用。大部分时候，你的样例代码该怎么写就怎么写，但是，在进行异步处理和错误处理时，需要稍微做一些额外工作。
 
 我们来看一个文档里异步处理的例子（代码）：
 
+```cpp
 use std::task::Poll;
 use futures::{prelude::*, stream::poll_fn};
+```
 
+```javascript
 /// fibnacci 算法
 /// 示例：
 /// ```
@@ -232,24 +251,30 @@ pub fn fib(mut n: usize) -> impl Stream<Item = i32> {
         Poll::Ready(Some(b))
     })
 }
+```
 
 
 注意这段代码中的这两句注释：
 
+```cpp
 /// # futures::executor::block_on(async {
 /// ...
 /// # });
+```
 
 
 在 /// 后出现了 #，代表这句话不会出现在示例中，但会被包括在生成的测试代码中。之所以需要 block_on，是因为调用我们的测试代码时，需要使用 await，所以需要使用异步运行时来运行它。
 
 实际上，这个的文档测试相当于：
 
+```cpp
 fn main() {
     fn _doctest_main_xxx() {
         use futures::prelude::*;
         use playground::fib; // playground crate 名字叫 playground
+```
 
+```cpp
         futures::executor::block_on(async {
             let mut st = fib(10);
             assert_eq!(Some(2), st.next().await);
@@ -257,13 +282,17 @@ fn main() {
     }
     _doctest_main_xxx()
 }
+```
 
 
 我们再来看一个文档中做错误处理的例子（代码）：
 
+```cpp
 use std::io;
 use std::fs;
+```
 
+```cpp
 /// 写入文件
 /// 示例：
 /// ```
@@ -274,6 +303,7 @@ use std::fs;
 pub fn write_file(name: &str, contents: &str) -> Result<(), io::Error> {
     fs::write(name, contents)
 }
+```
 
 
 这个例子中，我们使用 ? 进行了错误处理，所以需要最后补一句 Ok::<_, io::Error> 来明确返回的错误类型。
@@ -298,14 +328,19 @@ pub fn write_file(name: &str, contents: &str) -> Result<(), io::Error> {
 
 比如在做中文繁简转换的时候，可以预先把单字对照表从文件中读取出来，处理成 Vec<(char, char)>，然后生成 bincode 存入到可执行文件中。我们看这个例子（代码）：
 
+```cpp
 use std::io::{self, BufRead};
 use std::{env, fs::File, path::Path};
+```
 
+```text
 fn main() {
     // 如果 build.rs 或者繁简对照表文件变化，则重新编译
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/t2s.txt");
+```
 
+```javascript
     // 生成 OUT_DIR/map.bin 供 lib.rs 访问
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_file = Path::new(&out_dir).join("map.bin");
@@ -313,7 +348,9 @@ fn main() {
     let v = get_kv("src/t2s.txt");
     bincode::serialize_into(f, &v).unwrap();
 }
+```
 
+```javascript
 // 把 split 出来的 &str 转换成 char
 fn s2c(s: &str) -> char {
     let mut chars = s.chars();
@@ -322,7 +359,9 @@ fn s2c(s: &str) -> char {
     assert!(c.len_utf8() == 3);
     c
 }
+```
 
+```javascript
 // 读取文件，把每一行繁简对照的字符串转换成 Vec<(char, char)>
 fn get_kv(filename: &str) -> Vec<(char, char)> {
     let f = File::open(filename).unwrap();
@@ -333,15 +372,19 @@ fn get_kv(filename: &str) -> Vec<(char, char)> {
         let kv: Vec<_> = line.split(' ').collect();
         v.push((s2c(kv[0]), s2c(kv[1])));
     }
+```
 
+```text
     v
 }
+```
 
 
 通过这种方式，我们在编译期额外花费了一些时间，却让运行期的代码和工作大大简化（代码）：
 
 static MAP_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/map.bin"));
 
+```cpp
 lazy_static! {
     /// state machine for the translation
     static ref MAP: HashMap<char, char> = {
@@ -350,6 +393,7 @@ lazy_static! {
     };
     ...
 }
+```
 
 
 日志和监控

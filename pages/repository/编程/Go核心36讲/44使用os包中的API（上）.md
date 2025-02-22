@@ -1,10 +1,12 @@
 ---
 title: 44使用os包中的API（上）
-date: 1739706057.6848104
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             44 使用os包中的API （上）
                             我们今天要讲的是os代码包中的API。这个代码包可以让我们拥有操控计算机操作系统的能力。
+```
 
 前导内容：os包中的API
 
@@ -79,11 +81,13 @@ file3 := os.NewFile(uintptr(syscall.Stderr), "/dev/stderr")
 
 然后，通过这个File值向标准错误输出上写入一些内容：
 
+```css
 if file3 != nil {
  defer file3.Close()
  file3.WriteString(
   "The Go language program writes the contents into stderr.\n")
 }
+```
 
 
 os.Open函数会打开一个文件并返回包装了该文件的File值。 然而，该函数只能以只读模式打开文件。换句话说，我们只能从该函数返回的File值中读取内容，而不能向它写入任何内容。
@@ -110,8 +114,10 @@ os.OpenFile函数的参数perm代表的也是模式，它的类型是os.FileMode
 
 为了加以区别，我们把参数flag指代的模式叫做操作模式，而把参数perm指代的模式叫做权限模式。可以这么说，操作模式限定了操作文件的方式，而权限模式则可以控制文件的访问权限。关于权限模式的更多细节我们将在后面讨论。
 
+```text
 -
 （获得os.File类型的指针值的几种方式）
+```
 
 到这里，你需要记住的是，通过os.File类型的值，我们不但可以对文件进行读取、写入、关闭等操作，还可以设定下一次读取或写入时的起始索引位置。
 

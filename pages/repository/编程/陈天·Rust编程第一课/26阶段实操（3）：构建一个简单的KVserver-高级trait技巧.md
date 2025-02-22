@@ -1,10 +1,12 @@
 ---
 title: 26阶段实操（3）：构建一个简单的KVserver-高级trait技巧
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             26 阶段实操（3）：构建一个简单的KV server-高级trait技巧
                             你好，我是陈天。
+```
 
 到现在，泛型的基础知识、具体如何使用以及设计理念，我们已经学得差不多了，也和函数作了类比帮助你理解，泛型就是数据结构的函数。
 
@@ -15,8 +17,10 @@ categories: [陈天·Rust编程第一课]
 在 [21 讲]、[22讲]中，我们已经完成了 KV store 的基本功能，但留了两个小尾巴：
 
 
+```text
 Storage trait 的 get_iter() 方法没有实现；
 Service 的 execute() 方法里面还有一些 TODO，需要处理事件的通知。
+```
 
 
 我们一个个来解决。先看 get_iter() 方法。
@@ -26,14 +30,17 @@ Service 的 execute() 方法里面还有一些 TODO，需要处理事件的通�
 在开始撰写代码之前，先把之前在 src/storage/mod.rs 里注掉的测试，加回来：
 
 #[test]
+```javascript
 fn memtable_iter_should_work() {
     let store = MemTable::new();
     test_get_iter(store);
 }
+```
 
 
 然后在 src/storge/memory.rs 里尝试实现它。
 
+```javascript
 impl Storage for MemTable {
     ...
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError> {
@@ -45,22 +52,28 @@ impl Storage for MemTable {
         Ok(Box::new(iter)) // <-- 编译出错
     }
 }
+```
 
 
 很不幸的，编译器提示我们 Box::new(iter) 不行，“cannot return value referencing local variable table” 。这让人很不爽，究其原因，table.iter() 使用了 table 的引用，我们返回 iter，但 iter 引用了作为局部变量的 table，所以无法编译通过。
 
 此刻，我们需要有一个能够完全占有 table 的迭代器。Rust 标准库里提供了一个 trait IntoIterator，它可以把数据结构的所有权转移到 Iterator 中，看它的声明（代码）：
 
+```cpp
 pub trait IntoIterator {
     type Item;
     type IntoIter: Iterator<Item = Self::Item>;
+```
 
+```cpp
     fn into_iter(self) -> Self::IntoIter;
 }
+```
 
 
 绝大多数的集合类数据结构都实现了它。DashMap 也实现了它，所以我们可以用 table.into_iter() 把 table 的所有权转移给 iter：
 
+```javascript
 impl Storage for MemTable {
     ...
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError> {
@@ -70,15 +83,18 @@ impl Storage for MemTable {
         Ok(Box::new(iter))
     }
 }
+```
 
 
 这里又遇到了数据转换，从 DashMap 中 iterate 出来的值 (String, Value) 需要转换成 Kvpair，我们依旧用 into() 来完成这件事。为此，需要为 Kvpair 实现这个简单的 From trait：
 
+```cpp
 impl From<(String, Value)> for Kvpair {
     fn from(data: (String, Value)) -> Self {
         Kvpair::new(data.0, data.1)
     }
 }
+```
 
 
 这两段代码都放在 src/storage/memory.rs 下。
@@ -90,43 +106,54 @@ Bingo！这个代码可以编译通过。现在如果运行 cargo test 进行测
 我们会：
 
 
+```text
 拿到一个关于某个 table 下的拥有所有权的 Iterator
 对 Iterator 做 map
 将 map 出来的每个 item 转换成 Kvpair
+```
 
 
 这里的第 2 步对于每个 Storage trait 的 get_iter() 方法的实现来说，都是相同的。有没有可能把它封装起来呢？使得 Storage trait 的实现者只需要提供它们自己的拥有所有权的 Iterator，并对 Iterator 里的 Item 类型提供 Into ？
 
 来尝试一下，在 src/storage/mod.rs 中，构建一个 StorageIter，并实现 Iterator trait：
 
+```html
 /// 提供 Storage iterator，这样 trait 的实现者只需要
 /// 把它们的 iterator 提供给 StorageIter，然后它们保证
 /// next() 传出的类型实现了 Into<Kvpair> 即可
 pub struct StorageIter<T> {
     data: T,
 }
+```
 
+```html
 impl<T> StorageIter<T> {
     pub fn new(data: T) -> Self {
         Self { data }
     }
 }
+```
 
+```cpp
 impl<T> Iterator for StorageIter<T>
 where
     T: Iterator,
     T::Item: Into<Kvpair>,
 {
     type Item = Kvpair;
+```
 
+```cpp
     fn next(&mut self) -> Option<Self::Item> {
         self.data.next().map(|v| v.into())
     }
 }
+```
 
 
 这样，我们在 src/storage/memory.rs 里对 get_iter() 的实现，就可以直接使用 StorageIter 了。不过，还要为 DashMap 的 Iterator 每次调用 next() 得到的值 (String, Value) ，做个到 Kvpair 的转换：
 
+```javascript
 impl Storage for MemTable {
     ...
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError> {
@@ -136,6 +163,7 @@ impl Storage for MemTable {
           Ok(Box::new(iter))
       }
 }
+```
 
 
 我们可以再次使用 cargo test 测试，同样通过！
@@ -148,28 +176,35 @@ impl Storage for MemTable {
 
 好，我们再来看事件通知。在 src/service/mod.rs 中（以下代码，如无特殊声明，都是在 src/service/mod.rs 中），目前的 execute() 方法还有很多 TODO 需要解决：
 
+```javascript
 pub fn execute(&self, cmd: CommandRequest) -> CommandResponse {
     debug!("Got request: {:?}", cmd);
     // TODO: 发送 on_received 事件
     let res = dispatch(cmd, &self.inner.store);
     debug!("Executed response: {:?}", res);
     // TODO: 发送 on_executed 事件
+```
 
+```text
     res
 }
+```
 
 
 为了解决这些 TODO，我们需要提供事件通知的机制：
 
 
+```text
 在创建 Service 时，注册相应的事件处理函数；
 在 execute() 方法执行时，做相应的事件通知，使得注册的事件处理函数可以得到执行。
+```
 
 
 先看事件处理函数如何注册。
 
 如果想要能够注册，那么倒推也就是，Service/ServiceInner 数据结构就需要有地方能够承载事件注册函数。可以尝试着把它加在 ServiceInner 结构里：
 
+```html
 /// Service 内部数据结构
 pub struct ServiceInner<Store> {
     store: Store,
@@ -178,20 +213,24 @@ pub struct ServiceInner<Store> {
     on_before_send: Vec<fn(&mut CommandResponse)>,
     on_after_send: Vec<fn()>,
 }
+```
 
 
 按照 21 讲的设计，我们提供了四个事件：
 
 
+```text
 on_received：当服务器收到 CommandRequest 时触发；
 on_executed：当服务器处理完 CommandRequest 得到 CommandResponse 时触发；
 on_before_send：在服务器发送 CommandResponse 之前触发。注意这个接口提供的是 &mut CommandResponse，这样事件的处理者可以根据需要，在发送前，修改 CommandResponse。
 on_after_send：在服务器发送完 CommandResponse 后触发。
+```
 
 
 在撰写事件注册的代码之前，还是先写个测试，从使用者的角度，考虑如何进行注册：
 
 #[test]
+```cpp
 fn event_registration_should_work() {
     fn b(cmd: &CommandRequest) {
         info!("Got {:?}", cmd);
@@ -205,7 +244,9 @@ fn event_registration_should_work() {
     fn e() {
         info!("Data is sent");
     }
+```
 
+```cpp
     let service: Service = ServiceInner::new(MemTable::default())
         .fn_received(|_: &CommandRequest| {})
         .fn_received(b)
@@ -213,18 +254,22 @@ fn event_registration_should_work() {
         .fn_before_send(d)
         .fn_after_send(e)
         .into();
+```
 
+```javascript
     let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
     assert_eq!(res.status, StatusCode::CREATED.as_u16() as _);
     assert_eq!(res.message, "");
     assert_eq!(res.values, vec![Value::default()]);
 }
+```
 
 
 从测试代码中可以看到，我们希望通过 ServiceInner 结构，不断调用 fn_xxx 方法，为 ServiceInner 注册相应的事件处理函数；添加完毕后，通过 into() 方法，我们再把 ServiceInner 转换成 Service。这是一个经典的构造者模式（Builder Pattern），在很多 Rust 代码中，都能看到它的身影。
 
 那么，诸如 fn_received() 这样的方法有什么魔力呢？它为什么可以一路做链式调用呢？答案很简单，它把 self 的所有权拿过来，处理完之后，再返回 self。所以，我们继续添加如下代码：
 
+```cpp
 impl<Store: Storage> ServiceInner<Store> {
     pub fn new(store: Store) -> Self {
         Self {
@@ -235,31 +280,41 @@ impl<Store: Storage> ServiceInner<Store> {
             on_after_send: Vec::new(),
         }
     }
+```
 
+```css
     pub fn fn_received(mut self, f: fn(&CommandRequest)) -> Self {
         self.on_received.push(f);
         self
     }
+```
 
+```css
     pub fn fn_executed(mut self, f: fn(&CommandResponse)) -> Self {
         self.on_executed.push(f);
         self
     }
+```
 
+```css
     pub fn fn_before_send(mut self, f: fn(&mut CommandResponse)) -> Self {
         self.on_before_send.push(f);
         self
     }
+```
 
+```css
     pub fn fn_after_send(mut self, f: fn()) -> Self {
         self.on_after_send.push(f);
         self
     }
 }
+```
 
 
 这样处理之后呢，Service 之前的 new() 方法就没有必要存在了，可以把它删除。同时，我们需要为 Service 类型提供一个 From 的实现：
 
+```cpp
 impl<Store: Storage> From<ServiceInner<Store>> for Service<Store> {
     fn from(inner: ServiceInner<Store>) -> Self {
         Self {
@@ -267,13 +322,16 @@ impl<Store: Storage> From<ServiceInner<Store>> for Service<Store> {
         }
     }
 }
+```
 
 
 目前，代码中几处使用了 Service::new() 的地方需要改成使用 ServiceInner::new()，比如：
 
+```javascript
 // 我们需要一个 service 结构至少包含 Storage
 // let service = Service::new(MemTable::default());
 let service: Service = ServiceInner::new(MemTable::default()).into();
+```
 
 
 全部改动完成后，代码可以编译通过。
@@ -283,18 +341,24 @@ let service: Service = ServiceInner::new(MemTable::default()).into();
 test service::tests::event_registration_should_work ... FAILED
 
 
+```text
 这是因为，我们虽然完成了事件处理函数的注册，但现在还没有发事件通知。-
 另外因为我们的事件包括不可变事件（比如 on_received）和可变事件（比如 on_before_send），所以事件通知需要把二者分开。来定义两个 trait：Notify 和 NotifyMut：
+```
 
+```html
 /// 事件通知（不可变事件）
 pub trait Notify<Arg> {
     fn notify(&self, arg: &Arg);
 }
+```
 
+```html
 /// 事件通知（可变事件）
 pub trait NotifyMut<Arg> {
     fn notify(&self, arg: &mut Arg);
 }
+```
 
 
 这两个 trait 是泛型 trait，其中的 Arg 参数，对应事件注册函数里的 arg，比如：
@@ -304,6 +368,7 @@ fn(&CommandRequest);
 
 由此，我们可以特地为 Vec 和 Vec 实现事件处理，它们涵盖了目前支持的几种事件：
 
+```html
 impl<Arg> Notify<Arg> for Vec<fn(&Arg)> {
     #[inline]
     fn notify(&self, arg: &Arg) {
@@ -312,7 +377,9 @@ impl<Arg> Notify<Arg> for Vec<fn(&Arg)> {
         }
     }
 }
+```
 
+```html
 impl<Arg> NotifyMut<Arg> for Vec<fn(&mut Arg)> {
 	#[inline]
     fn notify(&self, arg: &mut Arg) {
@@ -321,10 +388,12 @@ impl<Arg> NotifyMut<Arg> for Vec<fn(&mut Arg)> {
         }
     }
 }
+```
 
 
 Notify/NotifyMut trait 实现好之后，我们就可以修改 execute() 方法了：
 
+```html
 impl<Store: Storage> Service<Store> {
     pub fn execute(&self, cmd: CommandRequest) -> CommandResponse {
         debug!("Got request: {:?}", cmd);
@@ -336,10 +405,13 @@ impl<Store: Storage> Service<Store> {
         if !self.inner.on_before_send.is_empty() {
             debug!("Modified response: {:?}", res);
         }
+```
 
+```text
         res
     }
 }
+```
 
 
 现在，相应的事件就可以被通知到相应的处理函数中了。这个通知机制目前还是同步的函数调用，未来如果需要，我们可以将其改成消息传递，进行异步处理。
@@ -363,79 +435,110 @@ sled = "0.34" # sled db
 
 然后创建 src/storage/sleddb.rs，并添加如下代码：
 
+```cpp
 use sled::{Db, IVec};
 use std::{convert::TryInto, path::Path, str};
+```
 
 use crate::{KvError, Kvpair, Storage, StorageIter, Value};
 
 #[derive(Debug)]
 pub struct SledDb(Db);
 
+```html
 impl SledDb {
     pub fn new(path: impl AsRef<Path>) -> Self {
         Self(sled::open(path).unwrap())
     }
+```
 
+```css
     // 在 sleddb 里，因为它可以 scan_prefix，我们用 prefix
     // 来模拟一个 table。当然，还可以用其它方案。
     fn get_full_key(table: &str, key: &str) -> String {
         format!("{}:{}", table, key)
     }
+```
 
+```css
     // 遍历 table 的 key 时，我们直接把 prefix: 当成 table
     fn get_table_prefix(table: &str) -> String {
         format!("{}:", table)
     }
 }
+```
 
+```html
 /// 把 Option<Result<T, E>> flip 成 Result<Option<T>, E>
 /// 从这个函数里，你可以看到函数式编程的优雅
 fn flip<T, E>(x: Option<Result<T, E>>) -> Result<Option<T>, E> {
     x.map_or(Ok(None), |v| v.map(Some))
 }
+```
 
+```javascript
 impl Storage for SledDb {
     fn get(&self, table: &str, key: &str) -> Result<Option<Value>, KvError> {
         let name = SledDb::get_full_key(table, key);
         let result = self.0.get(name.as_bytes())?.map(|v| v.as_ref().try_into());
         flip(result)
     }
+```
 
+```javascript
     fn set(&self, table: &str, key: String, value: Value) -> Result<Option<Value>, KvError> {
         let name = SledDb::get_full_key(table, &key);
         let data: Vec<u8> = value.try_into()?;
+```
 
+```javascript
         let result = self.0.insert(name, data)?.map(|v| v.as_ref().try_into());
         flip(result)
     }
+```
 
+```javascript
     fn contains(&self, table: &str, key: &str) -> Result<bool, KvError> {
         let name = SledDb::get_full_key(table, &key);
+```
 
+```text
         Ok(self.0.contains_key(name)?)
     }
+```
 
+```javascript
     fn del(&self, table: &str, key: &str) -> Result<Option<Value>, KvError> {
         let name = SledDb::get_full_key(table, &key);
+```
 
+```javascript
         let result = self.0.remove(name)?.map(|v| v.as_ref().try_into());
         flip(result)
     }
+```
 
+```javascript
     fn get_all(&self, table: &str) -> Result<Vec<Kvpair>, KvError> {
         let prefix = SledDb::get_table_prefix(table);
         let result = self.0.scan_prefix(prefix).map(|v| v.into()).collect();
+```
 
+```text
         Ok(result)
     }
+```
 
+```javascript
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError> {
         let prefix = SledDb::get_table_prefix(table);
         let iter = StorageIter::new(self.0.scan_prefix(prefix));
         Ok(Box::new(iter))
     }
 }
+```
 
+```javascript
 impl From<Result<(IVec, IVec), sled::Error>> for Kvpair {
     fn from(v: Result<(IVec, IVec), sled::Error>) -> Self {
         match v {
@@ -447,13 +550,16 @@ impl From<Result<(IVec, IVec), sled::Error>> for Kvpair {
         }
     }
 }
+```
 
+```javascript
 fn ivec_to_key(ivec: &[u8]) -> &str {
     let s = str::from_utf8(ivec).unwrap();
     let mut iter = s.split(":");
     iter.next();
     iter.next().unwrap()
 }
+```
 
 
 这段代码主要就是在实现 Storage trait。每个方法都很简单，就是在 sled 提供的功能上增加了一次封装。如果你对代码中某个调用有疑虑，可以参考 sled 的文档。
@@ -465,27 +571,34 @@ mod sleddb;
 pub use sleddb::SledDb;
 
 #[cfg(test)]
+```cpp
 mod tests {
     use tempfile::tempdir;
+```
 
     use super::*;
 
     ...
 
+```javascript
     #[test]
     fn sleddb_basic_interface_should_work() {
         let dir = tempdir().unwrap();
         let store = SledDb::new(dir);
         test_basi_interface(store);
     }
+```
 
+```javascript
     #[test]
     fn sleddb_get_all_should_work() {
         let dir = tempdir().unwrap();
         let store = SledDb::new(dir);
         test_get_all(store);
     }
+```
 
+```javascript
     #[test]
     fn sleddb_iter_should_work() {
         let dir = tempdir().unwrap();
@@ -493,14 +606,17 @@ mod tests {
         test_get_iter(store);
     }
 }
+```
 
 
 因为 SledDb 创建时需要指定一个目录，所以要在测试中使用 tempfile 库，它能让文件资源在测试结束时被回收。我们在 Cargo.toml 中引入它：
 
+```text
 [dev-dependencies]
 ...
 tempfile = "3" # 处理临时目录和临时文件
 ...
+```
 
 
 代码目前就可以编译通过了。如果你运行 cargo test 测试，会发现所有测试都正常通过！
@@ -509,6 +625,7 @@ tempfile = "3" # 处理临时目录和临时文件
 
 现在完成了 SledDb 和事件通知相关的实现，我们可以尝试构建支持事件通知，并且使用 SledDb 的 KV server 了。把 examples/server.rs 拷贝出 examples/server_with_sled.rs，然后修改 let service 那一行：
 
+```javascript
 // let service: Service = ServiceInner::new(MemTable::new()).into();
 let service: Service<SledDb> = ServiceInner::new(SledDb::new("/tmp/kvserver"))
     .fn_before_send(|res| match res.message.as_ref() {
@@ -516,20 +633,24 @@ let service: Service<SledDb> = ServiceInner::new(SledDb::new("/tmp/kvserver"))
         s => res.message = format!("altered: {}", s),
     })
     .into();
+```
 
 
 当然，需要引入 SledDb 让编译通过。你看，只需要在创建 KV server 时使用 SledDb，就可以实现 data store 的切换，未来还可以进一步通过配置文件，来选择使用什么样的 store。非常方便。
 
 新的 examples/server_with_sled.rs 的完整的代码：
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
 use kv1::{CommandRequest, CommandResponse, Service, ServiceInner, SledDb};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let service: Service<SledDb> = ServiceInner::new(SledDb::new("/tmp/kvserver"))
@@ -557,6 +678,7 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 它和之前的 server 几乎一样，只有 11 行生成 service 的代码应用了新的 storage，并且引入了事件通知。
@@ -567,8 +689,10 @@ async fn main() -> Result<()> {
 
 此外，如果你注意看 client 的日志，会发现原本应该是空字符串的 messag 包含了 “altered. Original message is empty.”：
 
+```css
 ❯ RUST_LOG=info cargo run --example client --quiet
 Sep 23 22:09:12.215  INFO client: Got response CommandResponse { status: 200, message: "altered. Original message is empty.", values: [Value { value: Some(String("world")) }], pairs: [] }
+```
 
 
 这是因为，我们的服务器注册了 fn_before_send 的事件通知，对返回的数据做了修改。未来我们可以用这些事件做很多事情，比如监控数据的发送，甚至写 WAL。
@@ -581,6 +705,7 @@ Sep 23 22:09:12.215  INFO client: Got response CommandResponse { status: 200, me
 
 除此之外，也进一步熟悉了如何为带泛型参数的数据结构实现 trait。我们不仅可以为具体的数据结构实现 trait，也可以为更笼统的泛型参数实现 trait。除了文中这个例子：
 
+```html
 impl<Arg> Notify<Arg> for Vec<fn(&Arg)> {
     #[inline]
     fn notify(&self, arg: &Arg) {
@@ -589,16 +714,19 @@ impl<Arg> Notify<Arg> for Vec<fn(&Arg)> {
         }
     }
 }
+```
 
 
 其实之前还见到过：
 
+```cpp
 impl<T, U> Into<U> for T where U: From<T>,
 {
     fn into(self) -> U {
         U::from(self)
     }
 }
+```
 
 
 也是一样的道理。
@@ -616,9 +744,11 @@ impl<T, U> Into<U> for T where U: From<T>,
 思考题
 
 
+```text
 如果你在 21 讲已经完成了 KV server 其它的 6 个命令，可以对照着我在 GitHub repo 里的代码和测试，看看你写的结果。
 我们的 Notify 和 NotifyMut trait 目前只能做到通知，无法告诉 execute 提前结束处理并直接给客户端返回错误。试着修改一下这两个 trait，让它具备提前结束整个 pipeline 的能力。
 RocksDB 是一个非常优秀的 KV DB，它有对应的 rust 库。尝试着为 RocksDB 实现 Storage trait，然后写个 example server 应用它。
+```
 
 
 感谢你的收听，你已经完成了Rust学习的第26次打卡，如果你觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论。我们下节课见~

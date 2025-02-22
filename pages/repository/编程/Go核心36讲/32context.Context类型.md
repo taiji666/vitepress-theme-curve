@@ -1,10 +1,12 @@
 ---
 title: 32context.Context类型
-date: 1739706057.6688364
+date: 2025-02-22
 categories: [Go核心36讲]
 ---
+```text
                             32 context.Context类型
                             我们在上篇文章中讲到了sync.WaitGroup类型：一个可以帮我们实现一对多goroutine协作流程的同步工具。
+```
 
 在使用WaitGroup值的时候，我们最好用“先统一Add，再并发Done，最后Wait”的标准模式来构建协作流程。
 
@@ -20,6 +22,7 @@ categories: [Go核心36讲]
 
 只要我们在严格遵循上述规则的前提下，分批地启用执行子任务的goroutine，就肯定不会有问题。具体的实现方式有不少，其中最简单的方式就是使用for循环来作为辅助。这里的代码如下：
 
+```css
 func coordinateWithWaitGroup() {
  total := 12
  stride := 3
@@ -35,6 +38,7 @@ func coordinateWithWaitGroup() {
  }
  fmt.Println("End.")
 }
+```
 
 
 这里展示的coordinateWithWaitGroup函数，就是上一篇文章中同名函数的改造版本。而其中调用的addNum函数，则是上一篇文章中同名函数的简化版本。这两个函数都已被放置在了demo67.go文件中。
@@ -51,6 +55,7 @@ func coordinateWithWaitGroup() {
 
 我在这里给你一个参考答案。
 
+```css
 func coordinateWithContext() {
  total := 12
  var num int32
@@ -66,6 +71,7 @@ func coordinateWithContext() {
  <-cxt.Done()
  fmt.Println("End.")
 }
+```
 
 
 在这个函数体中，我先后调用了context.Background函数和context.WithCancel函数，并得到了一个可撤销的context.Context类型的值（由变量cxt代表），以及一个context.CancelFunc类型的撤销函数（由变量cancelFunc代表）。

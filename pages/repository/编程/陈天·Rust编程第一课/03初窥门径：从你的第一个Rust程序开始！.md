@@ -1,10 +1,12 @@
 ---
 title: 03初窥门径：从你的第一个Rust程序开始！
-date: 1739706057.3685184
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             03 初窥门径：从你的第一个Rust程序开始！
                             你好，我是陈天。储备好前置知识之后，今天我们就正式开始 Rust 语言本身的学习。
+```
 
 学语言最好的捷径就是把自己置身于语言的环境中，而且我们程序员讲究 “get hands dirty”，直接从代码开始学能带来最直观的体验。所以从这一讲开始，你就要在电脑上设置好 Rust 环境了。
 
@@ -12,26 +14,26 @@ categories: [陈天·Rust编程第一课]
 
 Rust 安装起来非常方便，你可以用 rustup.rs 中给出的方法，根据你的操作系统进行安装。比如在 UNIX 系统下，可以直接运行：
 
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
+curl --proto '=https' --tlsv1.2 -sSf <https://sh.rustup.rs> | sh
 
 这会在你的系统上安装 Rust 工具链，之后，你就可以在本地用 cargo new 新建 Rust 项目、尝试 Rust 功能。动起手来，试试用Rust写你的第一个 hello world 程序吧！
 
+```text
 fn main() {
     println!("Hello world!");
 }
-
+```
 
 你可以使用任何编辑器来撰写 Rust 代码，我个人偏爱 VS Code，因为它免费，功能强大且速度很快。在 VS Code 下我为 Rust 安装了一些插件，下面是我的安装顺序，你可以参考：
 
-
+```text
 rust-analyzer：它会实时编译和分析你的 Rust 代码，提示代码中的错误，并对类型进行标注。你也可以使用官方的 Rust 插件取代。
 rust syntax：为代码提供语法高亮。
 crates：帮助你分析当前项目的依赖是否是最新的版本。
 better toml：Rust 使用 toml 做项目的配置管理。better toml 可以帮你语法高亮，并展示 toml 文件中的错误。
 rust test lens：可以帮你快速运行某个 Rust 测试。
 Tabnine：基于 AI 的自动补全，可以帮助你更快地撰写代码。
-
+```
 
 第一个实用的 Rust 程序
 
@@ -45,10 +47,11 @@ Tabnine：基于 AI 的自动补全，可以帮助你更快地撰写代码。
 
 首先，我们用 cargo new scrape_url 生成一个新项目。默认情况下，这条命令会生成一个可执行项目 scrape_url，入口在 src/main.rs。我们在 Cargo.toml 文件里，加入如下的依赖：
 
+```text
 [dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
 html2md = "0.2"
-
+```
 
 Cargo.toml 是 Rust 项目的配置管理文件，它符合 toml 的语法。我们为这个项目添加了两个依赖：reqwest 和 html2md。reqwest 是一个 HTTP 客户端，它的使用方式和 Python 下的 request 类似；html2md 顾名思义，把 HTML 文本转换成Markdown。
 
@@ -56,27 +59,35 @@ Cargo.toml 是 Rust 项目的配置管理文件，它符合 toml 的语法。我
 
 use std::fs;
 
+```javascript
 fn main() {
   let url = "https://www.rust-lang.org/";
   let output = "rust.md";
+```
 
+```javascript
   println!("Fetching url: {}", url);
   let body = reqwest::blocking::get(url).unwrap().text().unwrap();
+```
 
+```javascript
   println!("Converting html to markdown...");
   let md = html2md::parse_html(&body);
+```
 
+```cpp
   fs::write(output, md.as_bytes()).unwrap();
   println!("Converted markdown has been saved in {}.", output);
 }
-
+```
 
 保存后，在命令行下，进入这个项目的目录，运行 cargo run，在一段略微漫长的编译后，程序开始运行，在命令行下，你会看到如下的输出：
 
+```text
 Fetching url: https://www.rust-lang.org/
 Converting html to markdown...
 Converted markdown has been saved in rust.md.
-
+```
 
 并且，在当前目录下，一个 rust.md 文件被创建出来了。打开一看，其内容就是 Rust 官网主页的内容。
 
@@ -92,27 +103,23 @@ Bingo！我们第一个 Rust 程序运行成功！
 
 很多不习惯类型推导的开发者，觉得这会降低代码的可读性，因为可能需要根据上下文才知道当前变量是什么类型。不过没关系，如果你在编辑器中使用了 rust-analyzer 插件，变量的类型会自动提示出来：
 
-
-
 最后，Rust 支持宏编程，很多基础的功能比如 println!() 都被封装成一个宏，便于开发者写出简洁的代码。
 
 这里例子没有展现出来，但 Rust 还具备的其它特点有：
 
-
+```text
 Rust 的变量默认是不可变的，如果要修改变量的值，需要显式地使用 mut 关键字。
 除了 let/static/const/fn 等少数语句外，Rust 绝大多数代码都是表达式（expression）。所以 if/while/for/loop 都会返回一个值，函数最后一个表达式就是函数的返回值，这和函数式编程语言一致。
 Rust 支持面向接口编程和泛型编程。
 Rust 有非常丰富的数据类型和强大的标准库。
 Rust 有非常丰富的控制流程，包括模式匹配（pattern match）。
-
+```
 
 第一个实用的 Rust 程序就运行成功了，不知道你现在是不是有点迟疑，这些我现在都不太懂怎么办，是不是得先去把这些都掌握了才能继续学？不要迟疑，跟着继续学，后面都会讲到。
 
 接下来，为了快速入门 Rust，我们一起梳理 Rust 开发的基本内容。
 
 这部分涉及的知识在各个编程语言中都大同小异，略微枯燥，但是这一讲是我们后续学习的基础，建议你每段示例代码都写一下，运行一下，并且和自己熟悉的语言对比来加深印象。
-
-
 
 基本语法和基础数据类型
 
@@ -126,46 +133,60 @@ Rust 有非常丰富的控制流程，包括模式匹配（pattern match）。
 
 在Rust 下，函数是一等公民，可以作为参数或者返回值。我们来看一个函数作为参数的例子（代码）：
 
+```css
 fn apply(value: i32, f: fn(i32) -> i32) -> i32 {
     f(value)
 }
+```
 
+```css
 fn square(value: i32) -> i32 {
     value * value
 }
+```
 
+```css
 fn cube(value: i32) -> i32 {
     value * value * value
 }
+```
 
+```text
 fn main() {
     println!("apply square: {}", apply(2, square));
     println!("apply cube: {}", apply(2, cube));
 }
-
+```
 
 这里 fn(i32) -> i32 是 apply 函数第二个参数的类型，它表明接受一个函数作为参数，这个传入的函数必须是：参数只有一个，且类型为 i32，返回值类型也是 i32。
 
 Rust 函数参数的类型和返回值的类型都必须显式定义，如果没有返回值可以省略，返回 unit。函数内部如果提前返回，需要用 return 关键字，否则最后一个表达式就是其返回值。如果最后一个表达式后添加了; 分号，隐含其返回值为 unit。你可以看这个例子（代码）：
 
+```css
 fn pi() -> f64 {
   3.1415926
 }
+```
 
+```text
 fn not_pi() {
   3.1415926;
 }
+```
 
+```javascript
 fn main() {
   let is_pi = pi();
   let is_unit1 = not_pi();
   let is_unit2 = {
     pi();
   };
+```
 
+```text
   println!("is_pi: {:?}, is_unit1: {:?}, is_unit2: {:?}", is_pi, is_unit1, is_unit2);
 }
-
+```
 
 数据结构
 
@@ -175,62 +196,79 @@ fn main() {
 
 比如我们可以这样定义一个聊天服务的数据结构（代码）：
 
-#[derive(Debug)]
+# [derive(Debug)]
+
+```css
 enum Gender {
   Unspecified = 0,
   Female = 1,
   Male = 2,
 }
+```
 
-#[derive(Debug, Copy, Clone)]
+# [derive(Debug, Copy, Clone)]
 struct UserId(u64);
 
-#[derive(Debug, Copy, Clone)]
+# [derive(Debug, Copy, Clone)]
 struct TopicId(u64);
 
-#[derive(Debug)]
+# [derive(Debug)]
+
+```css
 struct User {
   id: UserId,
   name: String,
   gender: Gender,
 }
+```
 
-#[derive(Debug)]
+# [derive(Debug)]
+
+```css
 struct Topic {
   id: TopicId,
   name: String,
   owner: UserId,
 }
+```
 
 // 定义聊天室中可能发生的事件
-#[derive(Debug)]
+# [derive(Debug)]
+
+```css
 enum Event {
   Join((UserId, TopicId)),
   Leave((UserId, TopicId)),
   Message((UserId, TopicId, String)),
 }
+```
 
+```javascript
 fn main() {
     let alice = User { id: UserId(1), name: "Alice".into(), gender: Gender::Female };
     let bob = User { id: UserId(2), name: "Bob".into(), gender: Gender::Male };
+```
 
+```javascript
     let topic = Topic { id: TopicId(1), name: "rust".into(), owner: UserId(1) };
     let event1 = Event::Join((alice.id, topic.id));
     let event2 = Event::Join((bob.id, topic.id));
     let event3 = Event::Message((alice.id, topic.id, "Hello world!".into()));
+```
 
+```text
     println!("event1: {:?}, event2: {:?}, event3: {:?}", event1, event2, event3);
 }
-
+```
 
 简单解释一下：
 
-
+```text
 Gender：一个枚举类型，在 Rust 下，使用 enum 可以定义类似 C 的枚举类型
 UserId/TopicId ：struct 的特殊形式，称为元组结构体。它的域都是匿名的，可以用索引访问，适用于简单的结构体。
 User/Topic：标准的结构体，可以把任何类型组合在结构体里使用。
 Event：标准的标签联合体，它定义了三种事件：Join、Leave、Message。每种事件都有自己的数据结构。
-
+```
 
 在定义数据结构的时候，我们一般会加入修饰，为数据结构引入一些额外的行为。在 Rust 里，数据的行为通过 trait 来定义，后续我们会详细介绍 trait，你现在可以暂时认为 trait 定义了数据结构可以实现的接口，类似 Java 中的 interface。
 
@@ -239,8 +277,6 @@ Event：标准的标签联合体，它定义了三种事件：Join、Leave、Mes
 在定义 UserId/TopicId 时我们还用到了 Copy/Clone 两个派生宏，Clone 让数据结构可以被复制，而 Copy 则让数据结构可以在参数传递的时候自动按字节拷贝。在下一讲所有权中，我会具体讲什么时候需要 Copy。
 
 简单总结一下 Rust 定义变量、函数和数据结构：
-
-
 
 控制流程
 
@@ -252,50 +288,65 @@ Rust 的循环和大部分语言都一致，支持死循环 loop、条件循环 
 
 满足某个条件时会跳转， Rust 支持分支跳转、模式匹配、错误跳转和异步跳转。
 
-
+```text
 分支跳转就是我们熟悉的 if/else；
 Rust 的模式匹配可以通过匹配表达式或者值的某部分的内容，来进行分支跳转；
 在错误跳转中，当调用的函数返回错误时，Rust 会提前终止当前函数的执行，向上一层返回错误。
 在 Rust 的异步跳转中 ，当 async 函数执行 await 时，程序当前上下文可能被阻塞，执行流程会跳转到另一个异步任务执行，直至 await 不再阻塞。
-
+```
 
 我们通过斐波那契数列，使用 if 和 loop/while/for 这几种循环，来实现程序的基本控制流程（代码）：
 
+```text
 fn fib_loop(n: u8) {
     let mut a = 1;
     let mut b = 1;
     let mut i = 2u8;
+```
 
+```javascript
     loop {
         let c = a + b;
         a = b;
         b = c;
         i += 1;
+```
 
         println!("next val is {}", b);
 
+```css
         if i >= n {
             break;
         }
     }
 }
+```
 
+```text
 fn fib_while(n: u8) {
     let (mut a, mut b, mut i) = (1, 1, 2);
+```
 
+```javascript
     while i < n {
         let c = a + b;
         a = b;
         b = c;
         i += 1;
+```
 
+```css
         println!("next val is {}", b);
     }
 }
+```
 
+```text
 fn fib_for(n: u8) {
     let (mut a, mut b) = (1, 1);
+```
 
+```javascript
     for _i in 2..n {
         let c = a + b;
         a = b;
@@ -303,14 +354,16 @@ fn fib_for(n: u8) {
         println!("next val is {}", b);
     }
 }
+```
 
+```javascript
 fn main() {
     let n = 10;
     fib_loop(n);
     fib_while(n);
     fib_for(n);
 }
-
+```
 
 这里需要指出的是，Rust 的 for 循环可以用于任何实现了 IntoIterator trait 的数据结构。
 
@@ -318,21 +371,21 @@ fn main() {
 
 在 fib_for 函数中，我们还看到 2…n 这样的语法，想必 Python 开发者一眼就能明白这是 Range 操作，2…n 包含 2<= x < n 的所有值。和 Python 一样，在Rust中，你也可以省略 Range 的下标或者上标，比如：
 
+```javascript
 let arr = [1, 2, 3];
 assert_eq!(arr[..], [1, 2, 3]);
 assert_eq!(arr[0..=1], [1, 2]);
-
+```
 
 和 Python 不同的是，Range 不支持负数，所以你不能使用 arr[1..-1] 这样的代码。这是因为，Range 的下标上标都是 usize 类型，不能为负数。
 
 下表是 Rust 主要控制流程的一个总结：
 
-
-
 模式匹配
 
 Rust 的模式匹配吸取了函数式编程语言的优点，强大优雅且效率很高。它可以用于 struct/enum 中匹配部分或者全部内容，比如上文中我们设计的数据结构 Event，可以这样匹配（代码）：
 
+```javascript
 fn process_event(event: &Event) {
     match event {
         Event::Join((uid, _tid)) => println!("user {:?} joined", uid),
@@ -340,18 +393,19 @@ fn process_event(event: &Event) {
         Event::Message((_, _, msg)) => println!("broadcast: {}", msg),
     }
 }
-
+```
 
 从代码中我们可以看到，可以直接对 enum 内层的数据进行匹配并赋值，这比很多只支持简单模式匹配的语言，例如 JavaScript 、Python ，可以省出好几行代码。
 
 除了使用 match 关键字做模式匹配外，我们还可以用 if let/while let 做简单的匹配，如果上面的代码我们只关心 Event::Message，可以这么写（代码）：
 
+```cpp
 fn process_message(event: &Event) {
     if let Event::Message((_, _, msg)) = event {
         println!("broadcast: {}", msg);   
     }
 }
-
+```
 
 Rust 的模式匹配是一个很重要的语言特性，被广泛应用在状态机处理、消息处理和错误处理中，如果你之前使用的语言是 C/Java/Python/JavaScript ，没有强大的模式匹配支持，要好好练习这一块。
 
@@ -361,42 +415,58 @@ Rust 没有沿用 C++/Java 等诸多前辈使用的异常处理方式，而是�
 
 今天开始的 scrape_url 项目，其实里面很多调用已经使用了 Result<T, E> 类型，这里我再展示一下代码，不过我们使用了 unwrap() 方法，只关心成功返回的结果，如果出错，整个程序会终止。
 
+```cpp
 use std::fs;
 fn main() {
   let url = "https://www.rust-lang.org/";
   let output = "rust.md";
+```
 
+```javascript
   println!("Fetching url: {}", url);
   let body = reqwest::blocking::get(url).unwrap().text().unwrap();
+```
 
+```javascript
   println!("Converting html to markdown...");
   let md = html2md::parse_html(&body);
+```
 
+```cpp
   fs::write(output, md.as_bytes()).unwrap();
   println!("Converted markdown has been saved in {}.", output);
 }
-
+```
 
 如果想让错误传播，可以把所有的 unwrap() 换成 ? 操作符，并让 main() 函数返回一个 Result，如下所示：
 
+```cpp
 use std::fs;
 // main 函数现在返回一个 Result
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let url = "https://www.rust-lang.org/";
     let output = "rust.md";
+```
 
+```javascript
     println!("Fetching url: {}", url);
     let body = reqwest::blocking::get(url)?.text()?;
+```
 
+```javascript
     println!("Converting html to markdown...");
     let md = html2md::parse_html(&body);
+```
 
+```cpp
     fs::write(output, md.as_bytes())?;
     println!("Converted markdown has been saved in {}.", output);
+```
 
+```text
     Ok(())
 }
-
+```
 
 关于错误处理我们先讲这么多，之后我们会单开一讲，对比其他语言，来详细学习 Rust 的错误处理。
 
@@ -406,22 +476,22 @@ Rust 项目的组织
 
 具体做法是：在项目的入口文件 lib.rs/main.rs 里，用 mod 来声明要加载的其它代码文件。如果模块内容比较多，可以放在一个目录下，在该目录下放一个 mod.rs 引入该模块的其它文件。这个文件，和 Python 的 __init__.py 有异曲同工之妙。这样处理之后，就可以用 mod + 目录名引入这个模块了，如下图所示：
 
-
-
-在 Rust 里，一个项目也被称为一个 crate。crate 可以是可执行项目，也可以是一个库，我们可以用 cargo new <name> -- lib 来创建一个库。当 crate 里的代码改变时，这个 crate 需要被重新编译。
+在 Rust 里，一个项目也被称为一个 crate。crate 可以是可执行项目，也可以是一个库，我们可以用```textcargo new <name> -- lib``` 来创建一个库。当 crate 里的代码改变时，这个 crate 需要被重新编译。
 
 在一个 crate 下，除了项目的源代码，单元测试和集成测试的代码也会放在 crate 里。
 
 Rust 的单元测试一般放在和被测代码相同的文件中，使用条件编译 #[cfg(test)] 来确保测试代码只在测试环境下编译。以下是一个单元测试的例子：
 
-#[cfg(test)]
+# [cfg(test)]
+
+```css
 mod tests {
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
     }
 }
-
+```
 
 集成测试一般放在 tests 目录下，和 src 平行。和单元测试不同，集成测试只能测试 crate 下的公开接口，编译时编译成单独的可执行文件。
 
@@ -431,8 +501,6 @@ mod tests {
 
 一个 workspace 可以包含一到多个 crates，当代码发生改变时，只有涉及的 crates 才需要重新编译。当我们要构建一个 workspace 时，需要先在某个目录下生成一个如图所示的 Cargo.toml，包含 workspace 里所有的 crates，然后可以 cargo new 生成对应的 crates：
 
-
-
 crate 和 workspace 还有一些更高级的用法，在后面遇到的时候会具体讲解。如果你有兴趣，也可以先阅读 Rust book 第 14 章了解更多的知识。
 
 小结
@@ -440,8 +508,6 @@ crate 和 workspace 还有一些更高级的用法，在后面遇到的时候会
 我们简单梳理了 Rust 的基本概念。通过 let/let mut 定义变量、用 fn 定义函数、用 struct/enum 定义复杂的数据结构，也学习了 Rust 的基本的控制流程，了解了模式匹配如何运作，知道如何处理错误。
 
 最后考虑到代码规模问题，介绍了如何使用 mod、crate 和 workspace 来组织 Rust 代码。我总结到图中你可以看看。
-
-
 
 今天是让你对 Rust 形成非常基本的认识，能够开始尝试写一些简单的 Rust 项目。
 
@@ -455,21 +521,21 @@ crate 和 workspace 还有一些更高级的用法，在后面遇到的时候会
 
 2.在 scrape_url 的例子里，我们在代码中写死了要获取的 URL 和要输出的文件名，这太不灵活了。你能改进这个代码，从命令行参数中获取用户提供的信息来绑定 URL 和文件名么？类似这样：
 
-cargo run -- https://www.rust-lang.org rust.md
-
+cargo run -- <https://www.rust-lang.org> rust.md
 
 提示一下，打印一下 std::env::args() 看看会发生什么？
 
+```cpp
 for arg in std::env::args() {
     println!("{}", arg);
 }
-
+```
 
 欢迎在留言区分享你的思考。恭喜你完成了 Rust 学习的第三次打卡，我们下一讲见！
 
 参考资料
 
-
+```text
 TOML
 static 关键字
 lazy_static
@@ -477,8 +543,4 @@ unit 类型
 How to write tests
 More about cargo and crates.io
 Rust 支持声明宏（declarative macro）和过程宏（procedure macro），其中过程宏又包含三种方式：函数宏（function macro），派生宏（derive macro）和属性宏（attribute macro）。println! 是函数宏，是因为 Rust 是强类型语言，函数的类型需要在编译期敲定，而 println! 接受任意个数的参数，所以只能用宏来表达。
-
-
-                        
-                        
-                            
+```

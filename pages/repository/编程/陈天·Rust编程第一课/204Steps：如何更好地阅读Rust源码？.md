@@ -1,10 +1,12 @@
 ---
 title: 204Steps：如何更好地阅读Rust源码？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             20 4 Steps ：如何更好地阅读Rust源码？
                             你好，我是陈天。
+```
 
 到目前为止，Rust 的基础知识我们就学得差不多了。这倒不是说已经像用筛子一样，把基础知识仔细筛了一遍，毕竟我只能给你提供学习Rust的思路，扫清入门障碍。老话说得好，师傅领进门修行靠个人，在 Rust 世界里打怪升级，还要靠你自己去探索、去努力。
 
@@ -64,6 +66,7 @@ categories: [陈天·Rust编程第一课]
 
 Bytes 是 tokio 下一个高效处理网络数据的库，代码本身 3.5k LoC（不包括 2.1k LoC 注释），加上测试 5.3k。代码结构非常简单：
 
+```text
 ❯ tree src
 src
 ├── buf
@@ -87,6 +90,7 @@ src
 ├── lib.rs
 ├── loom.rs
 └── serde.rs
+```
 
 
 能看到，脉络很清晰，是很容易阅读的代码。
@@ -111,9 +115,11 @@ Rust 几乎所有库的文档都在 docs.rs 下，比如 Bytes 的文档可以�
 我看的顺序一般是：trait → struct → 函数/方法。因为这和我们写代码的思考方式非常类似：
 
 
+```text
 先从需求的流程中敲定系统的行为，需要定义什么接口 trait；
 再考虑系统有什么状态，定义了哪些数据结构struct；
 最后到实现细节，包括如何为数据结构实现 trait、数据结构自身有什么算法、如何把整个流程串起来等等。
+```
 
 
 step2：熟悉核心 trait 的行为
@@ -129,9 +135,11 @@ step2：熟悉核心 trait 的行为
 对于其它数据类型（foreign type）：
 
 
+```text
 切片 &[u8]、VecDeque 都实现了 Buf trait；
 如果 T 满足 Buf trait，那么 &mut T、Box 也实现了 Buf trait；
 如果 T 实现了 AsRef<[u8]>，那 Cursor 也实现了 Buf trait。
+```
 
 
 所以回过头来，上一幅图文档给到的示例，一个 &[u8] 可以使用 Buf trait 里的方法就顺理成章了：
@@ -140,12 +148,16 @@ use bytes::Buf;
 
 let mut buf = &b"hello world"[..];
 
+```text
 assert_eq!(b'h', buf.get_u8());
 assert_eq!(b'e', buf.get_u8());
 assert_eq!(b'l', buf.get_u8());
+```
 
+```text
 let mut rest = [0; 8];
 buf.copy_to_slice(&mut rest);
+```
 
 assert_eq!(&rest[..], &b"lo world"[..]);
 
@@ -155,8 +167,10 @@ assert_eq!(&rest[..], &b"lo world"[..]);
 看到这里，我们目前还没有深入源码，但已经可以学习到高手定义 trait 的一些思路：
 
 
+```text
 定义好 trait 后，可以考虑一下标准库的数据结构，哪些可以实现这个 trait。
 如果未来别人的某个类型 T ，实现了你的 trait，那他的 &T、&mut T、Box 等衍生类型，是否能够自动实现这个 trait。
+```
 
 
 好，接着看左侧导航栏中的 “implementors”，Bytes、BytesMut、Chain、Take 都实现了 Buf trait，这样我们知道了在这个 crate 里，哪些数据结构实现了这个 trait，之后遇到它们就知道都能用来做什么了。
@@ -164,8 +178,10 @@ assert_eq!(&rest[..], &b"lo world"[..]);
 现在，对 Buf trait 以及围绕着它的生态，我们已经有了一个基本的认识，后面你可以从几个方向深入学习：
 
 
+```text
 Buf trait 某个缺省方法是如何实现的，比如 get_u8()。
 其它类型是如何实现 Buf trait 的，比如 &[u8]。
+```
 
 
 你甚至不用 clone bytes 的源码，在 docs.rs 里就可以直接完成这些代码的阅读，非常方便。
@@ -177,6 +193,7 @@ step3：掌握主要的struct
 
 一般来说，好的文档会给出数据结构的介绍、用法、使用时的注意事项，以及一些代码示例。了解了数据结构的基本介绍后，继续看看它的内部结构：
 
+```css
 /// ```text
 ///
 ///    Arc ptrs                   +---------+
@@ -199,21 +216,26 @@ pub struct Bytes {
     data: AtomicPtr<()>,
     vtable: &'static Vtable,
 }
+```
 
+```css
 pub(crate) struct Vtable {
     /// fn(data, ptr, len)
     pub clone: unsafe fn(&AtomicPtr<()>, *const u8, usize) -> Bytes,
     /// fn(data, ptr, len)
     pub drop: unsafe fn(&mut AtomicPtr<()>, *const u8, usize),
 }
+```
 
 
 数据结构的代码往往会有一些注释，帮助你理解它的设计。对于 Bytes 来说，顺着代码往下看：
 
 
+```text
 它内部使用了裸指针和长度，模拟一个切片，指向内存中的一片连续地址；
 同时，还使用了 AtomicPtr 和手工打造的 Vtable 来模拟了 trait object 的行为。
 看 Vtable 的样子，大概可以推断出 Bytes 的 clone() 和 drop() 的行为是动态的，这是个很有意思的发现。
+```
 
 
 不过先不忙继续探索它如何实现这个行为的，继续看文档。
@@ -227,8 +249,10 @@ pub(crate) struct Vtable {
 
 注意，除了这些 trait 外，Bytes 还实现了 Send/Sync。如果看很多我们接触过的数据结构，比如 Vec，Send/Sync 是自动实现的，但 Bytes 需要手工实现：
 
+```css
 unsafe impl Send for Bytes {}
 unsafe impl Sync for Bytes {}
+```
 
 
 这是因为之前讲过，如果你的数据结构里使用了不支持 Send/Sync 的类型，编译器默认这个数据结构不能跨线程安全使用，不会自动添加 Send/Sync trait 的实现。但如果你能确保跨线程的安全性，可以手工通过 unsafe impl 实现它们。
@@ -236,10 +260,12 @@ unsafe impl Sync for Bytes {}
 了解一个数据结构实现了哪些 trait，非常有助于理解它如何使用。所以，标准库里的主要 trait 我们一定要好好学习，多多使用，最好能形成肌肉记忆。这样，学习别人的代码时，效率会很高。比如我看 Bytes 这个数据结构，扫一下它实现了哪些 trait，就基本能知道：
 
 
+```text
 什么数据结构可以转化成 Bytes，也就是如何生成 Bytes 结构；
 Bytes 可以跟谁比较；
 Bytes 是否可以跨线程使用；
 在使用中，Bytes 的行为和谁比较像（看 Deref trait）。
+```
 
 
 这就是肌肉记忆的好处。你可以去 crates.io 的 Data structures 类别下多翻翻不同的库，比如 IndexMap，看看它实现了哪些标准 trait，不了解的就看看那些 trait 的文档，也可以回顾[第 14 讲]（有哪些必须掌握的 trait）。
@@ -265,12 +291,14 @@ step4：深入研究实现逻辑
 
 我们就继续以 Bytes 如何实现自己的 vtable 为例，深入看 Bytes 是如何 clone 的？看 clone 的实现：
 
+```css
 impl Clone for Bytes {
     #[inline]
     fn clone(&self) -> Bytes {
         unsafe { (self.vtable.clone)(&self.data, self.ptr, self.len) }
     }
 }
+```
 
 
 它用了 vtable 的 clone 方法，传入了 data ，指向数据的指针以及长度。根据这个信息，我们如果能找到 Bytes 定义的所有 vtable，以及每个 vtable 的 clone() 做了什么事，就足以了解 Bytes 是如何实现 vtable 的了。
@@ -314,6 +342,7 @@ Rust 为了让代码和文档可读性更强，在工具链上做了巨大的努
 
 如果在阅读 Bytes 的 clone() 场景时，对于 PROMOTABLE_EVEN_VTABLE、PROMOTABLE_ODD_VTABLE 这两张表比较迷惑，且不明白为什么会根据 ptr & 0x1 是否等于 0 来提供不同的 vtable：
 
+```cpp
 impl From<Box<[u8]>> for Bytes {
     fn from(slice: Box<[u8]>) -> Bytes {
         // Box<[u8]> doesn't contain a heap allocation for empty slices,
@@ -322,10 +351,14 @@ impl From<Box<[u8]>> for Bytes {
         if slice.is_empty() {
             return Bytes::new();
         }
+```
 
+```javascript
         let len = slice.len();
         let ptr = Box::into_raw(slice) as *mut u8;
+```
 
+```javascript
         if ptr as usize & 0x1 == 0 {
             let data = ptr as usize | KIND_VEC;
             Bytes {
@@ -344,19 +377,24 @@ impl From<Box<[u8]>> for Bytes {
         }
     }
 }
+```
 
 
 这是因为，Box<[u8]> 是 1 字节对齐，所以 Box<[u8]> 指向的堆地址可能末尾是 0 或者 1。而 data 这个 AtomicPtr 指针，在指向 Shared 结构时，这个结构的对齐是 2/4/8 字节（16/32/64 位 CPU 下），末尾一定为 0：
 
+```html
 struct Shared {
     // holds vec for drop, but otherwise doesnt access it
     _vec: Vec<u8>,
     ref_cnt: AtomicUsize,
 }
+```
 
 
+```text
 所以这里用了一个小技巧，以 data 指针末尾是否为 0x1 来区别，当前的 Bytes 是升级成共享，类似于 Arc 的结构（KIND_ARC），还是依旧停留在非共享的，类似 Vec 的结构（KIND_VEC）。-
 这个复用指针最后几个 bit 记录一些 flag 的小技巧，在很多系统中都会使用。比如 Erlang VM，在存储 list 时，因为地址的对齐，最后两个 bit 不会被用到，所以当最后一个 bit 是 1 时，代表这是个指向 list 元素的地址。这种技巧，如果你不知道的话，看代码会很懵，一旦了解就没那么神秘了。
+```
 
 如果你觉得有收获，欢迎分享～
 

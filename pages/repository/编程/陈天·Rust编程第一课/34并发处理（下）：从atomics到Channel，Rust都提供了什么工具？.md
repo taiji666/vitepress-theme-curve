@@ -1,10 +1,12 @@
 ---
 title: 34并发处理（下）：从atomics到Channel，Rust都提供了什么工具？
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             34 并发处理（下）：从atomics到Channel，Rust都提供了什么工具？
                             你好，我是陈天。
+```
 
 对于并发状态下这三种常见的工作模式：自由竞争模式、map/reduce 模式、DAG 模式，我们的难点是如何在这些并发的任务中进行同步。atomic/Mutex 解决了自由竞争模式下并发任务的同步问题，也能够很好地解决 map/reduce 模式下的同步问题，因为此时同步只发生在 map 和 reduce 两个阶段。-
 
@@ -18,20 +20,27 @@ Condvar
 所以，操作系统还提供了 Condvar。Condvar 有两种状态：
 
 
+```text
 等待（wait）：线程在队列中等待，直到满足某个条件。
 通知（notify）：当 condvar 的条件满足时，当前线程通知其他等待的线程可以被唤醒。通知可以是单个通知，也可以是多个通知，甚至广播（通知所有人）。
+```
 
 
 在实践中，Condvar 往往和 Mutex 一起使用：Mutex 用于保证条件在读写时互斥，Condvar 用于控制线程的等待和唤醒。我们来看一个例子：
 
+```cpp
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
+```
 
+```javascript
 fn main() {
     let pair = Arc::new((Mutex::new(false), Condvar::new()));
     let pair2 = Arc::clone(&pair);
+```
 
+```cpp
     thread::spawn(move || {
         let (lock, cvar) = &*pair2;
         let mut started = lock.lock().unwrap();
@@ -44,7 +53,9 @@ fn main() {
             println!("working...");
         }
     });
+```
 
+```css
     // 等待工作线程的通知
     let (lock, cvar) = &*pair;
     let mut started = lock.lock().unwrap();
@@ -53,16 +64,19 @@ fn main() {
     }
     eprintln!("Worker started!");
 }
+```
 
 
 这段代码通过 condvar，我们实现了 worker 线程在执行到一定阶段后通知主线程，然后主线程再做一些事情。
 
 这里，我们使用了一个 Mutex 作为互斥条件，然后在 cvar.wait() 中传入这个 Mutex。这个接口需要一个 MutexGuard，以便于知道需要唤醒哪个 Mutex 下等待的线程：
 
+```text
 pub fn wait<'a, T>(
     &self,
     guard: MutexGuard<'a, T>
 ) -> LockResult<MutexGuard<'a, T>>
+```
 
 
 Channel
@@ -78,8 +92,10 @@ Channel 把锁封装在了队列写入和读取的小块区域内，然后把读
 Channel 在具体实现的时候，根据不同的使用场景，会选择不同的工具。Rust 提供了以下四种 Channel：
 
 
+```text
 oneshot：这可能是最简单的 Channel，写者就只发一次数据，而读者也只读一次。这种一次性的、多个线程间的同步可以用 oneshot channel 完成。由于 oneshot 特殊的用途，实现的时候可以直接用 atomic swap 来完成。
 rendezvous：很多时候，我们只需要通过 Channel 来控制线程间的同步，并不需要发送数据。rendezvous channel 是 channel size 为 0 的一种特殊情况。
+```
 
 
 这种情况下，我们用 Mutex + Condvar 实现就足够了，在具体实现中，rendezvous channel 其实也就是 Mutex + Condvar 的一个包装。
@@ -100,10 +116,12 @@ unbounded：queue 没有上限，如果写满了，就自动扩容。我们知�
 根据 Channel 读者和写者的数量，Channel 又可以分为：
 
 
+```text
 SPSC：Single-Producer Single-Consumer，单生产者，单消费者。最简单，可以不依赖于 Mutex，只用 atomics 就可以实现。
 SPMC：Single-Producer Multi-Consumer，单生产者，多消费者。需要在消费者这侧读取时加锁。
 MPSC：Multi-Producer Single-Consumer，多生产者，单消费者。需要在生产者这侧写入时加锁。
 MPMC：Multi-Producer Multi-Consumer。多生产者，多消费者。需要在生产者写入或者消费者读取时加锁。
+```
 
 
 在众多 Channel 类型中，使用最广的是 MPSC channel，多生产者，单消费者，因为往往我们希望通过单消费者来保证，用于处理消息的数据结构有独占的写访问。-
@@ -113,19 +131,24 @@ MPMC：Multi-Producer Multi-Consumer。多生产者，多消费者。需要在�
 
 如果要能够在各种上下文中使用 index writer，我们就不得不将其用 Arc> 包裹起来，但这样在索引大量数据时效率太低，所以我们可以用 MPSC channel，让各种上下文都把数据发送给单一的线程，使用 index writer 索引，这样就避免了锁：
 
+```html
 pub struct IndexInner {
     index: Index,
     reader: IndexReader,
     config: IndexConfig,
     updater: Sender<Input>,
 }
+```
 
+```html
 pub struct IndexUpdater {
     sender: Sender<Input>,
     t2s: bool,
     schema: Schema,
 }
+```
 
+```javascript
 impl Indexer {
     // 打开或者创建一个 index
     pub fn open_or_create(config: IndexConfig) -> Result<Self> {
@@ -137,14 +160,18 @@ impl Indexer {
         } else {
             Index::create_in_ram(schema.clone())
         };
+```
 
         Self::set_tokenizer(&index, &config);
 
         let mut writer = index.writer(config.writer_memory)?;
 
+```html
         // 创建一个 unbounded MPSC channel
         let (s, r) = unbounded::<Input>();
+```
 
+```cpp
         // 启动一个线程，从 channel 的 reader 中读取数据
         thread::spawn(move || {
             for input in r {
@@ -154,11 +181,15 @@ impl Indexer {
                 }
             }
         });
+```
 
+```cpp
         // 把 channel 的 sender 部分存入 IndexInner 结构
         Self::new(index, config, s)
     }
+```
 
+```javascript
     pub fn get_updater(&self) -> IndexUpdater {
         let t2s = TextLanguage::Chinese(true) == self.config.text_lang;
         // IndexUpdater 内部包含 channel 的 sender 部分
@@ -168,6 +199,7 @@ impl Indexer {
         IndexUpdater::new(self.updater.clone(), self.index.schema(), t2s)
     }
 }
+```
 
 
 Actor
@@ -180,34 +212,47 @@ Rust 标准库没有 actor 的实现，但是社区里有比较成熟的 actix�
 
 下面的代码用 actix 实现了一个简单的 DummyActor，它可以接收一个 InMsg，返回一个 OutMsg：
 
+```cpp
 use actix::prelude::*;
 use anyhow::Result;
+```
 
 // actor 可以处理的消息
 #[derive(Message, Debug, Clone, PartialEq)]
 #[rtype(result = "OutMsg")]
+```css
 enum InMsg {
     Add((usize, usize)),
     Concat((String, String)),
 }
+```
 
 #[derive(MessageResponse, Debug, Clone, PartialEq)]
+```css
 enum OutMsg {
     Num(usize),
     Str(String),
 }
+```
 
+```text
 // Actor
 struct DummyActor;
+```
 
+```html
 impl Actor for DummyActor {
     type Context = Context<Self>;
 }
+```
 
+```html
 // 实现处理 InMsg 的 Handler trait
 impl Handler<InMsg> for DummyActor {
     type Result = OutMsg; // <-  返回的消息
+```
 
+```javascript
     fn handle(&mut self, msg: InMsg, _ctx: &mut Self::Context) -> Self::Result {
         match msg {
             InMsg::Add((a, b)) => OutMsg::Num(a + b),
@@ -218,19 +263,24 @@ impl Handler<InMsg> for DummyActor {
         }
     }
 }
+```
 
 #[actix::main]
+```javascript
 async fn main() -> Result<()> {
     let addr = DummyActor.start();
     let res = addr.send(InMsg::Add((21, 21))).await?;
     let res1 = addr
         .send(InMsg::Concat(("hello, ".into(), "world".into())))
         .await?;
+```
 
     println!("res: {:?}, res1: {:?}", res, res1);
 
+```text
     Ok(())
 }
+```
 
 
 可以看到，对 DummyActor，我们只需要实现 Actor trait和Handler trait 。
@@ -240,10 +290,12 @@ async fn main() -> Result<()> {
 学完这前后两讲，我们小结一下各种并发原语的使用场景Atomic、Mutex、RwLock、Semaphore、Condvar、Channel、Actor。
 
 
+```text
 Atomic 在处理简单的原生类型时非常有用，如果你可以通过 AtomicXXX 结构进行同步，那么它们是最好的选择。
 当你的数据结构无法简单通过 AtomicXXX 进行同步，但你又的确需要在多个线程中共享数据，那么 Mutex/RwLock 可以是一种选择。不过，你需要考虑锁的粒度，粒度太大的 Mutex/RwLock 效率很低。
 如果你有 N 份资源可以供多个并发任务竞争使用，那么，Semaphore 是一个很好的选择。比如你要做一个 DB 连接池。
 当你需要在并发任务中通知、协作时，Condvar 提供了最基本的通知机制，而Channel 把这个通知机制进一步广泛扩展开，于是你可以用 Condvar 进行点对点的同步，用 Channel 做一对多、多对一、多对多的同步。
+```
 
 
 所以，当我们做大部分复杂的系统设计时，Channel 往往是最有力的武器，除了可以让数据穿梭于各个线程、各个异步任务间，它的接口还可以很优雅地跟 stream 适配。
@@ -263,8 +315,10 @@ Atomic 在处理简单的原生类型时非常有用，如果你可以通过 Ato
 思考题
 
 
+```cpp
 请仔细阅读标准库的文档 std::sync，以及 std::sync::atomic 和 std::sync::mpsc。 尝试着使用 mpsc::channel 在两个线程中来回发送消息。比如线程 A 给线程 B 发送：hello world!，线程 B 收到之后回复 goodbye!。
 想想看，如果要你实现 actor model，利用现有的并发原语，你该如何实现呢？
+```
 
 
 欢迎在留言区分享你的思考，感谢你的阅读。你已经完成Rust学习的第34次打卡啦，如果觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论。我们下节课见。

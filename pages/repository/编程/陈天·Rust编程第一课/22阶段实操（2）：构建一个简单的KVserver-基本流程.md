@@ -1,10 +1,12 @@
 ---
 title: 22阶段实操（2）：构建一个简单的KVserver-基本流程
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             22 阶段实操（2）：构建一个简单的KV server-基本流程
                             你好，我是陈天。
+```
 
 上篇我们的KV store刚开了个头，写好了基本的接口。你是不是摩拳擦掌准备开始写具体实现的代码了？别着急，当定义好接口后，先不忙实现，在撰写更多代码前，我们可以从一个使用者的角度来体验接口如何使用、是否好用，反观设计有哪些地方有待完善。
 
@@ -14,29 +16,38 @@ categories: [陈天·Rust编程第一课]
 
 先创建一个项目：cargo new kv --lib。进入到项目目录，在 Cargo.toml 中添加依赖：
 
+```text
 [package]
 name = "kv"
 version = "0.1.0"
 edition = "2018"
+```
 
+```text
 [dependencies]
 bytes = "1" # 高效处理网络 buffer 的库
 prost = "0.8" # 处理 protobuf 的代码
 tracing = "0.1" # 日志处理
+```
 
+```text
 [dev-dependencies]
 anyhow = "1" # 错误处理
 async-prost = "0.2.1" # 支持把 protobuf 封装成 TCP frame
 futures = "0.3" # 提供 Stream trait
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "macros", "net" ] } # 异步网络库
 tracing-subscriber = "0.2" # 日志处理
+```
 
+```text
 [build-dependencies]
 prost-build = "0.8" # 编译 protobuf
+```
 
 
 然后在项目根目录下创建 abi.proto，把上文中 protobuf 的代码放进去。在根目录下，再创建 build.rs：
 
+```cpp
 fn main() {
     let mut config = prost_build::Config::new();
     config.bytes(&["."]);
@@ -46,6 +57,7 @@ fn main() {
         .compile_protos(&["abi.proto"], &["."])
         .unwrap();
 }
+```
 
 
 这个代码在[第 5 讲]已经见过了，build.rs 在编译期运行来进行额外的处理。
@@ -58,6 +70,7 @@ pub mod abi;
 
 use abi::{command_request::RequestData, *};
 
+```cpp
 impl CommandRequest {
     /// 创建 HSET 命令
     pub fn new_hset(table: impl Into<String>, key: impl Into<String>, value: Value) -> Self {
@@ -69,7 +82,9 @@ impl CommandRequest {
         }
     }
 }
+```
 
+```html
 impl Kvpair {
     /// 创建一个新的 kv pair
     pub fn new(key: impl Into<String>, value: Value) -> Self {
@@ -79,7 +94,9 @@ impl Kvpair {
         }
     }
 }
+```
 
+```cpp
 /// 从 String 转换成 Value
 impl From<String> for Value {
     fn from(s: String) -> Self {
@@ -88,7 +105,9 @@ impl From<String> for Value {
         }
     }
 }
+```
 
+```cpp
 /// 从 &str 转换成 Value
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
@@ -97,62 +116,82 @@ impl From<&str> for Value {
         }
     }
 }
+```
 
 
 最后，在 src/lib.rs 中，引入 pb 模块：
 
+```cpp
 mod pb;
 pub use pb::abi::*;
+```
 
 
 这样，我们就有了能把 KV server 最基本的 protobuf 接口运转起来的代码。
 
 在根目录下创建 examples，这样可以写一些代码测试客户端和服务器之间的协议。我们可以先创建一个 examples/client.rs 文件，写入如下代码：
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
 use kv::{CommandRequest, CommandResponse};
 use tokio::net::TcpStream;
 use tracing::info;
+```
 
 #[tokio::main]
+```cpp
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+```
 
+```javascript
     let addr = "127.0.0.1:9527";
     // 连接服务器
     let stream = TcpStream::connect(addr).await?;
+```
 
+```cpp
     // 使用 AsyncProstStream 来处理 TCP Frame
     let mut client =
         AsyncProstStream::<_, CommandResponse, CommandRequest, _>::from(stream).for_async();
+```
 
+```javascript
     // 生成一个 HSET 命令
     let cmd = CommandRequest::new_hset("table1", "hello", "world".into());
+```
 
+```css
     // 发送 HSET 命令
     client.send(cmd).await?;
     if let Some(Ok(data)) = client.next().await {
         info!("Got response {:?}", data);
     }
+```
 
+```text
     Ok(())
 }
+```
 
 
 这段代码连接服务器的 9527 端口，发送一个 HSET 命令出去，然后等待服务器的响应。
 
 同样的，我们创建一个 examples/dummy_server.rs 文件，写入代码：
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
 use kv::{CommandRequest, CommandResponse};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let addr = "127.0.0.1:9527";
@@ -176,6 +215,7 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 在这段代码里，服务器监听 9527 端口，对任何客户端的请求，一律返回 status = 404，message 是 “Not found” 的响应。
@@ -196,48 +236,63 @@ async fn main() -> Result<()> {
 
 所以来定义 KvError。[第 18 讲]讨论错误处理时简单演示了，如何使用 thiserror 的派生宏来定义错误类型，今天就用它来定义 KvError。创建 src/error.rs，然后填入：
 
+```cpp
 use crate::Value;
 use thiserror::Error;
+```
 
 #[derive(Error, Debug, PartialEq)]
+```css
 pub enum KvError {
     #[error("Not found for table: {0}, key: {1}")]
     NotFound(String, String),
+```
 
+```css
     #[error("Cannot parse command: `{0}`")]
     InvalidCommand(String),
     #[error("Cannot convert value {:0} to {1}")]
     ConvertError(Value, &'static str),
     #[error("Cannot process command {0} with table: {1}, key: {2}. Error: {}")]
     StorageError(&'static str, String, String, String),
+```
 
+```cpp
     #[error("Failed to encode protobuf message")]
     EncodeError(#[from] prost::EncodeError),
     #[error("Failed to decode protobuf message")]
     DecodeError(#[from] prost::DecodeError),
+```
 
+```text
     #[error("Internal error: {0}")]
     Internal(String),
 }
+```
 
 
 这些 error 的定义其实是在实现过程中逐步添加的，但为了讲解方便，先一次性添加。对于 Storage 的实现，我们只关心 StorageError，其它的 error 定义未来会用到。
 
 同样，在 src/lib.rs 下引入 mod error，现在 src/lib.rs 是这个样子的：
 
+```text
 mod error;
 mod pb;
 mod storage;
+```
 
+```cpp
 pub use error::KvError;
 pub use pb::abi::*;
 pub use storage::*;
+```
 
 
 src/storage/mod.rs 是这个样子的：
 
 use crate::{KvError, Kvpair, Value};
 
+```html
 /// 对存储的抽象，我们不关心数据存在哪儿，但需要定义外界如何和存储打交道
 pub trait Storage {
     /// 从一个 HashTable 里获取一个 key 的 value
@@ -253,26 +308,34 @@ pub trait Storage {
     /// 遍历 HashTable，返回 kv pair 的 Iterator
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError>;
 }
+```
 
 
 代码目前没有编译错误，可以在这个文件末尾添加测试代码，尝试使用这些接口了，当然，我们还没有构建 MemTable，但通过 Storage trait 已经大概知道 MemTable 怎么用，所以可以先写段测试体验一下：
 
 #[cfg(test)]
+```css
 mod tests {
     use super::*;
+```
 
+```javascript
     #[test]
     fn memtable_basic_interface_should_work() {
         let store = MemTable::new();
         test_basi_interface(store);
     }
+```
 
+```javascript
     #[test]
     fn memtable_get_all_should_work() {
         let store = MemTable::new();
         test_get_all(store);
     }
+```
 
+```javascript
     fn test_basi_interface(store: impl Storage) {
         // 第一次 set 会创建 table，插入 key 并返回 None（之前没值）
         let v = store.set("t1", "hello".into(), "world".into());
@@ -280,29 +343,41 @@ mod tests {
         // 再次 set 同样的 key 会更新，并返回之前的值
         let v1 = store.set("t1", "hello".into(), "world1".into());
         assert_eq!(v1, Ok(Some("world".into())));
+```
 
+```javascript
         // get 存在的 key 会得到最新的值
         let v = store.get("t1", "hello");
         assert_eq!(v, Ok(Some("world1".into())));
+```
 
+```text
         // get 不存在的 key 或者 table 会得到 None
         assert_eq!(Ok(None), store.get("t1", "hello1"));
         assert!(store.get("t2", "hello1").unwrap().is_none());
+```
 
+```text
         // contains 纯在的 key 返回 true，否则 false
         assert_eq!(store.contains("t1", "hello"), Ok(true));
         assert_eq!(store.contains("t1", "hello1"), Ok(false));
         assert_eq!(store.contains("t2", "hello"), Ok(false));
+```
 
+```javascript
         // del 存在的 key 返回之前的值
         let v = store.del("t1", "hello");
         assert_eq!(v, Ok(Some("world1".into())));
+```
 
+```text
         // del 不存在的 key 或 table 返回 None
         assert_eq!(Ok(None), store.del("t1", "hello1"));
         assert_eq!(Ok(None), store.del("t2", "hello"));
     }
+```
 
+```cpp
     fn test_get_all(store: impl Storage) {
         store.set("t2", "k1".into(), "v1".into()).unwrap();
         store.set("t2", "k2".into(), "v2".into()).unwrap();
@@ -316,7 +391,9 @@ mod tests {
             ]
         )
     }
+```
 
+```cpp
 		fn test_get_iter(store: impl Storage) {
         store.set("t2", "k1".into(), "v1".into()).unwrap();
         store.set("t2", "k2".into(), "v2".into()).unwrap();
@@ -331,10 +408,13 @@ mod tests {
         )
     }
 }
+```
 
 
+```text
 这种在写实现之前写单元测试，是标准的 TDD（Test-Driven Development）方式。-
 我个人不是 TDD 的狂热粉丝，但会在构建完 trait 后，为这个 trait 撰写测试代码，因为写测试代码是个很好的验证接口是否好用的时机。毕竟我们不希望实现 trait 之后，才发现 trait 的定义有瑕疵，需要修改，这个时候改动的代价就比较大了。
+```
 
 所以，当 trait 推敲完毕，就可以开始写使用 trait 的测试代码了。在使用过程中仔细感受，如果写测试用例时用得不舒服，或者为了使用它需要做很多繁琐的操作，那么可以重新审视 trait 的设计。
 
@@ -344,21 +424,28 @@ mod tests {
 
 好，搞定测试，确认trait设计没有什么问题之后，我们来写具体实现。可以创建 src/storage/memory.rs 来构建 MemTable：
 
+```cpp
 use crate::{KvError, Kvpair, Storage, Value};
 use dashmap::{mapref::one::Ref, DashMap};
+```
 
 /// 使用 DashMap 构建的 MemTable，实现了 Storage trait
 #[derive(Clone, Debug, Default)]
+```css
 pub struct MemTable {
     tables: DashMap<String, DashMap<String, Value>>,
 }
+```
 
+```cpp
 impl MemTable {
     /// 创建一个缺省的 MemTable
     pub fn new() -> Self {
         Self::default()
     }
+```
 
+```javascript
     /// 如果名为 name 的 hash table 不存在，则创建，否则返回
     fn get_or_create_table(&self, name: &str) -> Ref<String, DashMap<String, Value>> {
         match self.tables.get(name) {
@@ -370,28 +457,38 @@ impl MemTable {
         }
     }
 }
+```
 
+```javascript
 impl Storage for MemTable {
     fn get(&self, table: &str, key: &str) -> Result<Option<Value>, KvError> {
         let table = self.get_or_create_table(table);
         Ok(table.get(key).map(|v| v.value().clone()))
     }
+```
 
+```javascript
     fn set(&self, table: &str, key: String, value: Value) -> Result<Option<Value>, KvError> {
         let table = self.get_or_create_table(table);
         Ok(table.insert(key, value))
     }
+```
 
+```javascript
     fn contains(&self, table: &str, key: &str) -> Result<bool, KvError> {
         let table = self.get_or_create_table(table);
         Ok(table.contains_key(key))
     }
+```
 
+```javascript
     fn del(&self, table: &str, key: &str) -> Result<Option<Value>, KvError> {
         let table = self.get_or_create_table(table);
         Ok(table.remove(key).map(|(_k, v)| v))
     }
+```
 
+```javascript
     fn get_all(&self, table: &str) -> Result<Vec<Kvpair>, KvError> {
         let table = self.get_or_create_table(table);
         Ok(table
@@ -399,40 +496,51 @@ impl Storage for MemTable {
             .map(|v| Kvpair::new(v.key(), v.value().clone()))
             .collect())
     }
+```
 
+```html
 		fn get_iter(&self, _table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError> {
         todo!()
     }
 }
+```
 
 
 除了 get_iter() 外，这个实现代码非常简单，相信你看一下 dashmap 的文档，也能很快写出来。get_iter() 写起来稍微有些难度，我们先放下不表，会在下一篇 KV server 讲。如果你对此感兴趣，想挑战一下，欢迎尝试。
 
 实现完成之后，我们可以测试它是否符合预期。注意现在 src/storage/memory.rs 还没有被添加，所以 cargo 并不会编译它。要在 src/storage/mod.rs 开头添加代码：
 
+```cpp
 mod memory;
 pub use memory::MemTable;
+```
 
 
 这样代码就可以编译通过了。因为还没有实现 get_iter 方法，所以这个测试需要被注释掉：
 
+```javascript
 // #[test]
 // fn memtable_iter_should_work() {
 //     let store = MemTable::new();
 //     test_get_iter(store);
 // }
+```
 
 
 如果你运行 cargo test ，可以看到测试都通过了：
 
 > cargo test
+```text
    Compiling kv v0.1.0 (/Users/tchen/projects/mycode/rust/geek-time-rust-resources/21/kv)
     Finished test [unoptimized + debuginfo] target(s) in 1.95s
      Running unittests (/Users/tchen/.target/debug/deps/kv-8d746b0f387a5271)
+```
 
+```cpp
 running 2 tests
 test storage::tests::memtable_basic_interface_should_work ... ok
 test storage::tests::memtable_get_all_should_work ... ok
+```
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -453,24 +561,30 @@ use crate::*;
 
 mod command_service;
 
+```css
 /// 对 Command 的处理的抽象
 pub trait CommandService {
     /// 处理 Command，返回 Response
     fn execute(self, store: &impl Storage) -> CommandResponse;
 }
+```
 
 
 不要忘记在 src/lib.rs 中加入 service：
 
+```text
 mod error;
 mod pb;
 mod service;
 mod storage;
+```
 
+```cpp
 pub use error::KvError;
 pub use pb::abi::*;
 pub use service::*;
 pub use storage::*;
+```
 
 
 然后，在 src/service/command_service.rs 中，我们可以先写一些测试。为了简单起见，就列 HSET、HGET、HGETALL 三个命令：
@@ -478,21 +592,28 @@ pub use storage::*;
 use crate::*;
 
 #[cfg(test)]
+```cpp
 mod tests {
     use super::*;
     use crate::command_request::RequestData;
+```
 
+```javascript
     #[test]
     fn hset_should_work() {
         let store = MemTable::new();
         let cmd = CommandRequest::new_hset("t1", "hello", "world".into());
         let res = dispatch(cmd.clone(), &store);
         assert_res_ok(res, &[Value::default()], &[]);
+```
 
+```javascript
         let res = dispatch(cmd, &store);
         assert_res_ok(res, &["world".into()], &[]);
     }
+```
 
+```javascript
     #[test]
     fn hget_should_work() {
         let store = MemTable::new();
@@ -502,7 +623,9 @@ mod tests {
         let res = dispatch(cmd, &store);
         assert_res_ok(res, &[10.into()], &[]);
     }
+```
 
+```javascript
     #[test]
     fn hget_with_non_exist_key_should_return_404() {
         let store = MemTable::new();
@@ -510,7 +633,9 @@ mod tests {
         let res = dispatch(cmd, &store);
         assert_res_error(res, 404, "Not found");
     }
+```
 
+```javascript
     #[test]
     fn hgetall_should_work() {
         let store = MemTable::new();
@@ -523,7 +648,9 @@ mod tests {
         for cmd in cmds {
             dispatch(cmd, &store);
         }
+```
 
+```javascript
         let cmd = CommandRequest::new_hgetall("score");
         let res = dispatch(cmd, &store);
         let pairs = &[
@@ -533,7 +660,9 @@ mod tests {
         ];
         assert_res_ok(res, &[], pairs);
     }
+```
 
+```javascript
     // 从 Request 中得到 Response，目前处理 HGET/HGETALL/HSET
     fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
         match cmd.request_data.unwrap() {
@@ -543,7 +672,9 @@ mod tests {
             _ => todo!(),
         }
     }
+```
 
+```text
     // 测试成功返回的结果
     fn assert_res_ok(mut res: CommandResponse, values: &[Value], pairs: &[Kvpair]) {
         res.pairs.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -552,7 +683,9 @@ mod tests {
         assert_eq!(res.values, values);
         assert_eq!(res.pairs, pairs);
     }
+```
 
+```text
     // 测试失败返回的结果
     fn assert_res_error(res: CommandResponse, code: u32, msg: &str) {
         assert_eq!(res.status, code);
@@ -561,14 +694,17 @@ mod tests {
         assert_eq!(res.pairs, &[]);
     }
 }
+```
 
 
 这些测试的作用就是验证产品需求，比如：
 
 
+```text
 HSET 成功返回上一次的值（这和 Redis 略有不同，Redis 返回表示多少 key 受影响的一个整数）
 HGET 返回 Value
 HGETALL 返回一组无序的 Kvpair
+```
 
 
 目前这些测试是无法编译通过的，因为里面使用了一些未定义的方法，比如 10.into()：想把整数 10 转换成一个 Value、CommandRequest::new_hgetall(“score”)：想生成一个 HGETALL 命令。
@@ -580,15 +716,18 @@ HGETALL 返回一组无序的 Kvpair
 到现在为止我们写了两轮测试了，相信你对测试代码的作用有大概理解。我们来总结一下：
 
 
+```text
 验证并帮助接口迭代
 验证产品需求
 通过使用核心逻辑，帮助我们更好地思考外围逻辑并反推其实现
+```
 
 
 前两点是最基本的，也是很多人对TDD的理解，其实还有更重要的也就是第三点。除了前面的辅助函数外，我们在测试代码中还看到了 dispatch 函数，它目前用来辅助测试。但紧接着你会发现，这样的辅助函数，可以合并到核心代码中。这才是“测试驱动开发”的实质。
 
 好，根据测试，我们需要在 src/pb/mod.rs 中添加相关的外围逻辑，首先是 CommandRequest 的一些方法，之前写了 new_hset，现在再加入 new_hget 和 new_hgetall：
 
+```cpp
 impl CommandRequest {
     /// 创建 HGET 命令
     pub fn new_hget(table: impl Into<String>, key: impl Into<String>) -> Self {
@@ -599,7 +738,9 @@ impl CommandRequest {
             })),
         }
     }
+```
 
+```cpp
     /// 创建 HGETALL 命令
     pub fn new_hgetall(table: impl Into<String>) -> Self {
         Self {
@@ -608,7 +749,9 @@ impl CommandRequest {
             })),
         }
     }
+```
 
+```cpp
     /// 创建 HSET 命令
     pub fn new_hset(table: impl Into<String>, key: impl Into<String>, value: Value) -> Self {
         Self {
@@ -619,10 +762,12 @@ impl CommandRequest {
         }
     }
 }
+```
 
 
 然后写对 Value 的 From 的实现：
 
+```cpp
 /// 从 i64转换成 Value
 impl From<i64> for Value {
     fn from(i: i64) -> Self {
@@ -631,10 +776,12 @@ impl From<i64> for Value {
         }
     }
 }
+```
 
 
 测试代码目前就可以编译通过了，然而测试显然会失败，因为还没有做具体的实现。我们在 src/service/command_service.rs 下添加 trait 的实现代码：
 
+```javascript
 impl CommandService for Hget {
     fn execute(self, store: &impl Storage) -> CommandResponse {
         match store.get(&self.table, &self.key) {
@@ -644,7 +791,9 @@ impl CommandService for Hget {
         }
     }
 }
+```
 
+```javascript
 impl CommandService for Hgetall {
     fn execute(self, store: &impl Storage) -> CommandResponse {
         match store.get_all(&self.table) {
@@ -653,7 +802,9 @@ impl CommandService for Hgetall {
         }
     }
 }
+```
 
+```javascript
 impl CommandService for Hset {
     fn execute(self, store: &impl Storage) -> CommandResponse {
         match self.pair {
@@ -666,12 +817,14 @@ impl CommandService for Hset {
         }
     }
 }
+```
 
 
 这自然会引发更多的编译错误，因为我们很多地方都是用了 into() 方法，却没有实现相应的转换，比如，Value 到 CommandResponse 的转换、KvError 到 CommandResponse 的转换、Vec 到 CommandResponse 的转换等等。
 
 所以在 src/pb/mod.rs 里继续补上相应的外围逻辑：
 
+```cpp
 /// 从 Value 转换成 CommandResponse
 impl From<Value> for CommandResponse {
     fn from(v: Value) -> Self {
@@ -682,7 +835,9 @@ impl From<Value> for CommandResponse {
         }
     }
 }
+```
 
+```cpp
 /// 从 Vec<Kvpair> 转换成 CommandResponse
 impl From<Vec<Kvpair>> for CommandResponse {
     fn from(v: Vec<Kvpair>) -> Self {
@@ -693,7 +848,9 @@ impl From<Vec<Kvpair>> for CommandResponse {
         }
     }
 }
+```
 
+```cpp
 /// 从 KvError 转换成 CommandResponse
 impl From<KvError> for CommandResponse {
     fn from(e: KvError) -> Self {
@@ -703,20 +860,27 @@ impl From<KvError> for CommandResponse {
             values: vec![],
             pairs: vec![],
         };
+```
 
+```javascript
         match e {
             KvError::NotFound(_, _) => result.status = StatusCode::NOT_FOUND.as_u16() as _,
             KvError::InvalidCommand(_) => result.status = StatusCode::BAD_REQUEST.as_u16() as _,
             _ => {}
         }
+```
 
+```text
         result
     }
 }
+```
 
 
+```text
 从前面写接口到这里具体实现，不知道你是否感受到了这样一种模式：在 Rust 下，但凡出现两个数据结构 v1 到 v2 的转换，你都可以先以 v1.into() 来表示这个逻辑，继续往下写代码，之后再去补 From 的实现。如果 v1 和 v2 都不是你定义的数据结构，那么你需要把其中之一用 struct 包装一下，来绕过（[第14 讲]）之前提到的孤儿规则。-
 你学完这节课可以再去回顾一下[第 6 讲]，仔细思考一下当时说的“绝大多数处理逻辑都是把数据从一个接口转换成另一个接口”。
+```
 
 现在代码应该可以编译通过并测试通过了，你可以 cargo test 测试一下。
 
@@ -727,36 +891,47 @@ impl From<KvError> for CommandResponse {
 依旧从使用者的角度来看如何调用它。为此，我们在 src/service/mod.rs 里添加如下的测试代码：
 
 #[cfg(test)]
+```css
 mod tests {
     use super::*;
     use crate::{MemTable, Value};
+```
 
+```javascript
 		#[test]
     fn service_should_works() {
         // 我们需要一个 service 结构至少包含 Storage
         let service = Service::new(MemTable::default());
+```
 
+```javascript
         // service 可以运行在多线程环境下，它的 clone 应该是轻量级的
         let cloned = service.clone();
+```
 
+```javascript
         // 创建一个线程，在 table t1 中写入 k1, v1
         let handle = thread::spawn(move || {
             let res = cloned.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
             assert_res_ok(res, &[Value::default()], &[]);
         });
         handle.join().unwrap();
+```
 
+```javascript
         // 在当前线程下读取 table t1 的 k1，应该返回 v1
         let res = service.execute(CommandRequest::new_hget("t1", "k1"));
         assert_res_ok(res, &["v1".into()], &[]);
     }
 }
+```
 
 #[cfg(test)]
 use crate::{Kvpair, Value};
 
 // 测试成功返回的结果
 #[cfg(test)]
+```text
 pub fn assert_res_ok(mut res: CommandResponse, values: &[Value], pairs: &[Kvpair]) {
     res.pairs.sort_by(|a, b| a.partial_cmp(b).unwrap());
     assert_eq!(res.status, 200);
@@ -764,15 +939,18 @@ pub fn assert_res_ok(mut res: CommandResponse, values: &[Value], pairs: &[Kvpair
     assert_eq!(res.values, values);
     assert_eq!(res.pairs, pairs);
 }
+```
 
 // 测试失败返回的结果
 #[cfg(test)]
+```text
 pub fn assert_res_error(res: CommandResponse, code: u32, msg: &str) {
     assert_eq!(res.status, code);
     assert!(res.message.contains(msg));
     assert_eq!(res.values, &[]);
     assert_eq!(res.pairs, &[]);
 }
+```
 
 
 注意，这里的 assert_res_ok() 和 assert_res_error() 是从 src/service/command_service.rs 中挪过来的。在开发的过程中，不光产品代码需要不断重构，测试代码也需要重构来贯彻 DRY 思想。
@@ -791,11 +969,14 @@ pub fn assert_res_error(res: CommandResponse, code: u32, msg: &str) {
 
 根据这些想法，在 src/service/mod.rs 里添加 Service 的声明和实现：
 
+```html
 /// Service 数据结构
 pub struct Service<Store = MemTable> {
     inner: Arc<ServiceInner<Store>>,
 }
+```
 
+```cpp
 impl<Store> Clone for Service<Store> {
     fn clone(&self) -> Self {
         Self {
@@ -803,30 +984,40 @@ impl<Store> Clone for Service<Store> {
         }
     }
 }
+```
 
+```html
 /// Service 内部数据结构
 pub struct ServiceInner<Store> {
     store: Store,
 }
+```
 
+```cpp
 impl<Store: Storage> Service<Store> {
     pub fn new(store: Store) -> Self {
         Self {
             inner: Arc::new(ServiceInner { store }),
         }
     }
+```
 
+```javascript
     pub fn execute(&self, cmd: CommandRequest) -> CommandResponse {
         debug!("Got request: {:?}", cmd);
         // TODO: 发送 on_received 事件
         let res = dispatch(cmd, &self.inner.store);
         debug!("Executed response: {:?}", res);
         // TODO: 发送 on_executed 事件
+```
 
+```text
         res
     }
 }
+```
 
+```javascript
 // 从 Request 中得到 Response，目前处理 HGET/HGETALL/HSET
 pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
     match cmd.request_data {
@@ -837,23 +1028,28 @@ pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
         _ => KvError::Internal("Not implemented".into()).into(),
     }
 }
+```
 
 
 这段代码有几个地方值得注意：
 
 
+```text
 首先 Service 结构内部有一个 ServiceInner 存放实际的数据结构，Service 只是用 Arc 包裹了 ServiceInner。这也是 Rust 的一个惯例，把需要在多线程下 clone 的主体和其内部结构分开，这样代码逻辑更加清晰。
 execute() 方法目前就是调用了 dispatch，但它未来潜在可以做一些事件分发。这样处理体现了 SRP（Single Responsibility Principle）原则。
 dispatch 其实就是把测试代码的 dispatch 逻辑移动过来改动了一下。
+```
 
 
 再一次，我们重构了测试代码，把它的辅助函数变成了产品代码的一部分。现在，你可以运行 cargo test 测试一下，如果代码无法编译，可能是缺一些 use 代码，比如：
 
+```cpp
 use crate::{
     command_request::RequestData, CommandRequest, CommandResponse, KvError, MemTable, Storage,
 };
 use std::sync::Arc;
 use tracing::debug;
+```
 
 
 新的 server
@@ -862,24 +1058,29 @@ use tracing::debug;
 
 把之前的 examples/dummy_server.rs 复制一份，成为 examples/server.rs，然后引入 Service，主要的改动就三句：
 
+```javascript
 // main 函数开头，初始化 service
 let service: Service = Service::new(MemTable::new());
 // tokio::spawn 之前，复制一份 service
 let svc = service.clone();
 // while loop 中，使用 svc 来执行 cmd
 let res = svc.execute(cmd);
+```
 
 
 你可以试着自己修改。完整的代码如下：
 
+```cpp
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
 use kv::{CommandRequest, CommandResponse, MemTable, Service};
 use tokio::net::TcpListener;
 use tracing::info;
+```
 
 #[tokio::main]
+```javascript
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let service: Service = Service::new(MemTable::new());
@@ -901,6 +1102,7 @@ async fn main() -> Result<()> {
         });
     }
 }
+```
 
 
 完成之后，打开一个命令行窗口，运行：RUST_LOG=info cargo run --example server --quiet，然后在另一个命令行窗口，运行：RUST_LOG=info cargo run --example client --quiet。此时，服务器和客户端都收到了彼此的请求和响应，并且处理正常。
@@ -924,8 +1126,10 @@ KV server 并不是一个很难的项目，但想要把它写好，并不简单�
 思考题
 
 
+```text
 为剩下 6 个命令 HMGET、HMSET、HDEL、HMDEL、HEXIST、HMEXIST 构建测试，并实现它们。在测试和实现过程中，你也许需要添加更多的 From 的实现。
 如果有余力，可以试着实现 MemTable 的 get_iter() 方法（后续的 KV Store 实现会讲）。
+```
 
 
 延伸思考

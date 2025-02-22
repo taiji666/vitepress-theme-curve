@@ -1,15 +1,16 @@
 ---
 title: 32实操项目：使用PyO3开发Python3模块
-date: 1739706057.4001002
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             32 实操项目：使用PyO3开发Python3模块
                             你好，我是陈天。
+```
 
 上一讲介绍了 FFI 的基本用法，今天我们就趁热打铁来做个实操项目，体验一下如何把 Rust 生态中优秀的库介绍到 Python/Node.js 的社区。
 
 由于社区里已经有 PyO3 和 Neon 这样的工具，我们并不需要处理 Rust 代码兼容 C ABI 的细节，这些工具就可以直接处理。所以，今天会主要撰写 FFI shim 这一层的代码：-
-
 
 另外，PyO3和Neon的基本操作都是一样的，你会用一个，另一个的使用也就很容易理解了。这一讲我们就以 PyO3 为例。
 
@@ -23,19 +24,28 @@ Rust 下，嵌入式的搜索引擎有 tantivy，我们就使用它来提供搜�
 
 下面是 xunmi 用 Rust 调用的例子：
 
+```cpp
 use std::{str::FromStr, thread, time::Duration};
 use xunmi::*;
+```
 
+```javascript
 fn main() {
     // 可以通过 yaml 格式的配置文件加载定义好的 schema
     let config = IndexConfig::from_str(include_str!("../fixtures/config.yml")).unwrap();
+```
 
+```javascript
     // 打开或者创建 index
     let indexer = Indexer::open_or_create(config).unwrap();
+```
 
+```javascript
     // 要 index 的数据，可以是 xml/yaml/json
     let content = include_str!("../fixtures/wiki_00.xml");
+```
 
+```javascript
     // 我们使用的 wikipedia dump 是 xml 格式的，所以 InputType::Xml
     // 这里，wikipedia 的数据结构 id 是字符串，但 index 的 schema 里是 u64
     // wikipedia 里没有 content 字段，节点的内容（$value）相当于 content
@@ -45,35 +55,47 @@ fn main() {
         vec![("$value".into(), "content".into())],
         vec![("id".into(), (ValueType::String, ValueType::Number))],
     );
+```
 
+```text
     // 获得 index 的 updater，用于更新 index
     let mut updater = indexer.get_updater();
     // 你可以使用多个 updater 在不同上下文更新同一个 index
     let mut updater1 = indexer.get_updater();
+```
 
+```text
     // 可以通过 add/update 来更新 index，add 直接添加，update 会删除已有的 doc
     // 然后添加新的
     updater.update(content, &config).unwrap();
     // 你可以添加多组数据，最后统一 commit
     updater.commit().unwrap();
+```
 
+```javascript
     // 在其他上下文下更新 index
     thread::spawn(move || {
         let config = InputConfig::new(InputType::Yaml, vec![], vec![]);
         let text = include_str!("../fixtures/test.yml");
+```
 
+```text
         updater1.update(text, &config).unwrap();
         updater1.commit().unwrap();
     });
+```
 
+```cpp
     // indexer 默认会自动在每次 commit 后重新加载，但这会有上百毫秒的延迟
     // 在这个例子里我们会等一段时间再查询
     while indexer.num_docs() == 0 {
         thread::sleep(Duration::from_millis(100));
     }
+```
 
     println!("total: {}", indexer.num_docs());
 
+```javascript
     // 你可以提供查询来获取搜索结果
     let result = indexer.search("历史", &["title", "content"], 5, 0).unwrap();
     for (score, doc) in result.iter() {
@@ -81,32 +103,33 @@ fn main() {
         println!("score: {}, doc: {:?}", score, doc);
     }
 }
-
+```
 
 以下是索引的配置文件的样子：
 
 ---
 path: /tmp/searcher_index # 索引路径
 schema: # 索引的 schema，对于文本，使用 CANG_JIE 做中文分词
-  - name: id
+
+- name: id
     type: u64
     options:
       indexed: true
       fast: single
       stored: true
-  - name: url
+- name: url
     type: text
     options:
       indexing: ~
       stored: true
-  - name: title
+- name: title
     type: text
     options:
       indexing:
         record: position
         tokenizer: CANG_JIE
       stored: true
-  - name: content
+- name: content
     type: text
     options:
       indexing:
@@ -117,9 +140,7 @@ text_lang:
   chinese: true # 如果是 true，自动做繁体到简体的转换
 writer_memory: 100000000
 
-
 目标是，使用 PyO3 让 Rust 代码可以这样在 Python 中使用：-
-
 
 好，废话不多说，我们开始今天的项目挑战。
 
@@ -142,7 +163,6 @@ xunmi = "0.2"
 [build-dependencies]
 pyo3-build-config = "0.14"
 
-
 要定义好 lib 的名字和类型。lib 的名字，我们就定义成 xunmi，这样在 Python 中 import 时就用这个名称；crate-type 是 cdylib，我们需要 pyo3-build-config 这个 crate 来做编译时的一些简单处理（macOS 需要）。
 
 准备工作
@@ -156,7 +176,6 @@ fn main() {
     pyo3_build_config::add_extension_module_link_args();
 }
 
-
 它会在编译的时候添加一些编译选项。如果你不想用 build.rs 来额外处理，也可以创建 .cargo/config，然后添加：
 
 [target.x86_64-apple-darwin]
@@ -165,17 +184,16 @@ rustflags = [
   "-C", "link-arg=dynamic_lookup",
 ]
 
-
 二者的作用是等价的。
 
 然后我们创建一个目录 xunmi，再创建 xunmi/init.py，添入：
 
 from .xunmi import *
 
-
 最后创建一个 Makefile，添入：
 
-# 如果你的 BUILD_DIR 不同，可以 make BUILD_DIR=<your-dir>
+# 如果你的 BUILD_DIR 不同，可以 make BUILD_DIR=```<your-dir>```
+```
 BUILD_DIR := target/release
 
 SRCS := $(wildcard src/*.rs) Cargo.toml
@@ -188,18 +206,17 @@ TARGET_FILE = $(NAME)/$(NAME).so
 all: $(TARGET_FILE)
 
 test: $(TARGET_FILE)
-	python3 -m pytest
+ python3 -m pytest
 
 $(TARGET_FILE): $(BUILD_FILE1)
-	@cp $(BUILD_FILE1) $(TARGET_FILE)
+ @cp $(BUILD_FILE1) $(TARGET_FILE)
 
 $(BUILD_FILE1): $(SRCS)
-	@cargo build --release
-	@mv $(BUILD_FILE) $(BUILD_FILE1)|| true
+ @cargo build --release
+ @mv $(BUILD_FILE) $(BUILD_FILE1)|| true
 
 PHONY: test all
-
-
+```
 这个 Makefile 可以帮我们自动化一些工作，基本上，就是把编译出来的 .dylib 或者 .so 拷贝到 xunmi 目录下，被 python 使用。
 
 撰写代码
@@ -212,12 +229,17 @@ PHONY: test all
 
 use pyo3::{exceptions, prelude::*};
 
-#[pyfunction]
+# [pyfunction]
+
+```
 pub fn example_sql() -> PyResult<String> {
     Ok(queryer::example_sql())
 }
+```
 
-#[pyfunction]
+# [pyfunction]
+
+```
 pub fn query(sql: &str, output: Option<&str>) -> PyResult<String> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let data = rt.block_on(async { queryer::query(sql).await.unwrap() });
@@ -229,27 +251,29 @@ pub fn query(sql: &str, output: Option<&str>) -> PyResult<String> {
         ))),
     }
 }
+```
 
-#[pymodule]
+# [pymodule]
+
+```
 fn queryer_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(query, m)?)?;
     m.add_function(wrap_pyfunction!(example_sql, m)?)?;
     Ok(())
 }
-
+```
 
 使用了 #[pymodule] 宏，来提供 python module 入口函数，它负责注册这个 module 下的类和函数。通过 m.add_function 可以注册函数，之后，在 Python 里就可以这么调用：
 
 import queryer_py
 queryer_py.query("select * from file:///test.csv")
 
-
 但当时我们想暴露出来的接口功能很简单，让用户传入一个 SQL 字符串和输出类型的字符串，返回一个按照 SQL 查询处理过的、符合输出类型的字符串。所以为 Python 模块提供了两个接口 example_sql 和 query。
 
 不过，我们今天要做的事情远比第 6 讲中对 PyO3 的使用复杂。比如说要在两门语言中传递数据结构，让 Python 类可以使用 Rust 方法等，所以需要注册一些类以及对应的类方法。
 
 看上文使用截图中的一些代码（复制到这里了）：
-
+```
 from xunmi import *
 
 indexer = Indexer("./fixtures/config.yml")
@@ -262,8 +286,7 @@ updater.update(data, input_config)
 updater.commit()
 
 result = indexer.search("历史", ["title", "content"], 5, 0)
-
-
+```
 你会发现，我们需要注册 Indexer、IndexUpdater 和 InputConfig 这三个类，它们都有自己的成员函数，其中，Indexer 和 InputConfig 还要有类的构造函数。
 
 但是因为 xunmi 是 xunmi-py 外部引入的一个 crate，我们无法直接动 xunmi 的数据结构，把这几个类注册进去。怎么办？我们需要封装一下：
@@ -271,28 +294,32 @@ result = indexer.search("历史", ["title", "content"], 5, 0)
 use pyo3::{exceptions, prelude::*};
 use xunmi::{self as x};
 
-#[pyclass]
+# [pyclass]
+
 pub struct Indexer(x::Indexer);
 
-#[pyclass]
+# [pyclass]
+
 pub struct InputConfig(x::InputConfig);
 
-#[pyclass]
-pub struct IndexUpdater(x::IndexUpdater);
+# [pyclass]
 
+pub struct IndexUpdater(x::IndexUpdater);
 
 这里有个小技巧，可以把 xunmi 的命名空间临时改成 x，这样，xunmi 自己的结构用 x:: 来引用，就不会有命名的冲突了。
 
 有了这三个定义，我们就可以通过 m.add_class 把它们引入到模块中：
 
-#[pymodule]
+# [pymodule]
+
+```
 fn xunmi(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Indexer>()?;
     m.add_class::<InputConfig>()?;
     m.add_class::<IndexUpdater>()?;
     Ok(())
 }
-
+```
 
 注意，这里的函数名要和 crate lib name 一致，如果你没有定义 lib name，默认会使用 crate name。我们为了区别，crate name 使用了 “xunmi-py”，所以前面在 Cargo.toml 里，会单独声明一下 lib name：
 
@@ -300,12 +327,13 @@ fn xunmi(_py: Python, m: &PyModule) -> PyResult<()> {
 name = "xunmi"
 crate-type = ["cdylib"]
 
-
 把 struct 的方法暴露成 class 的方法
 
 注册好Python的类，继续写功能的实现，基本上是 shim 代码，也就是把 xunmi 里对应的数据结构的方法暴露给 Python。先看个简单的，IndexUpdater 的实现：
 
-#[pymethods]
+# [pymethods]
+
+```
 impl IndexUpdater {
     pub fn add(&mut self, input: &str, config: &InputConfig) -> PyResult<()> {
         Ok(self.0.add(input, &config.0).map_err(to_pyerr)?)
@@ -323,7 +351,7 @@ impl IndexUpdater {
         Ok(self.0.clear().map_err(to_pyerr)?)
     }
 }
-
+```
 
 首先，需要用 #[pymethods] 来包裹 impl IndexUpdater {}，这样，里面所有的 pub 方法都可以在 Python 侧使用。我们暴露了 add/update/commit/clear 这几个方法。方法的类型签名正常撰写即可，Rust 的基本类型都能通过 PyO3 对应到 Python，使用到的 InputConfig 之前也注册成 Python class 了。
 
@@ -335,40 +363,38 @@ f.close()
 input_config = InputConfig("xml", [("$value", "content")], [("id", ("string", "number"))])
 updater.update(data, input_config)
 
-
 错误处理
 
 还记得上一讲强调的三个要点吗，在写FFI的时候要注意Rust的错误处理。这里，所有函数如果要返回 Result，需要使用 PyResult。你原本的错误类型需要处理一下，变成 Python 错误。
 
 我们可以用 map_err 处理，其中 to_pyerr 实现如下：
 
+```
 pub(crate) fn to_pyerr<E: ToString>(err: E) -> PyErr {
     exceptions::PyValueError::new_err(err.to_string())
 }
-
+```
 
 通过使用 PyO3 提供的 PyValueError，在 Rust 侧生成的 err，会被 PyO3 转化成 Python 侧的异常。比如我们在创建 indexer 时提供一个不存在的 config：
 
+```
 In [3]: indexer = Indexer("./fixtures/config.ymla")
 ---------------------------------------------------------------------------
-ValueError                                Traceback (most recent call last)
-<ipython-input-3-bde6b0e501ea> in <module>
+
 ----> 1 indexer = Indexer("./fixtures/config.ymla")
 
 ValueError: No such file or directory (os error 2)
-
 
 即使你在 Rust 侧使用了 panic!，PyO3 也有很好的处理：
 
 In [3]: indexer = Indexer("./fixtures/config.ymla")
 ---------------------------------------------------------------------------
-PanicException                            Traceback (most recent call last)
-<ipython-input-11-082d933e67e2> in <module>
+
 ----> 1 indexer = Indexer("./fixtures/config.ymla")
       2 updater = indexer.get_updater()
 
 PanicException: called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
-
+```
 
 它也是在 Python 侧抛出一个异常。
 
@@ -376,7 +402,9 @@ PanicException: called `Result::unwrap()` on an `Err` value: Os { code: 2, kind:
 
 好，接着看 Indexer 怎么实现：
 
-#[pymethods]
+# [pymethods]
+
+```
 impl Indexer {
     // 创建或载入 index
     #[new]
@@ -417,12 +445,11 @@ impl Indexer {
         self.0.reload().map_err(to_pyerr)
     }
 }
-
+```
 
 你看，我们可以用 #[new] 来标记要成为构造函数的方法，所以，在 Python 侧，当你调用：
 
 indexer = Indexer("./fixtures/config.yml")
-
 
 其实，它在 Rust 侧就调用了 open_or_crate 方法。把某个用来构建数据结构的方法，标记为一个构造函数，可以让 Python 用户感觉用起来更加自然。
 
@@ -432,7 +459,9 @@ indexer = Indexer("./fixtures/config.yml")
 
 别着急，PyO3 巧妙使用了 Option，当 Python 侧使用缺省参数时，相当于传给 Rust 一个 None，Rust 侧就可以根据 None 来使用缺省值，比如下面 InputConfig 的实现：
 
-#[pymethods]
+# [pymethods]
+
+```
 impl InputConfig {
     #[new]
     fn new(
@@ -444,7 +473,7 @@ impl InputConfig {
             "yaml" | "yml" => x::InputType::Yaml,
             "json" => x::InputType::Json,
             "xml" => x::InputType::Xml,
-            _ => return Err(exceptions::PyValueError::new_err("Invalid input type")),
+            _=> return Err(exceptions::PyValueError::new_err("Invalid input type")),
         };
         let conversion = conversion
             .unwrap_or_default()
@@ -453,7 +482,7 @@ impl InputConfig {
                 let t = match (t1.as_ref(), t2.as_ref()) {
                     ("string", "number") => (x::ValueType::String, x::ValueType::Number),
                     ("number", "string") => (x::ValueType::Number, x::ValueType::String),
-                    _ => return None,
+                    _=> return None,
                 };
                 Some((k, t))
             })
@@ -466,7 +495,7 @@ impl InputConfig {
         )))
     }
 }
-
+```
 
 这段代码是典型的 shim 代码，它就是把接口包装成更简单的形式提供给 Python，然后内部做转换适配原本的接口。
 
@@ -475,7 +504,6 @@ impl InputConfig {
 input_config = InputConfig("xml", [("$value", "content")], [("id", ("string", "number"))])
 input_config = InputConfig("xml", [("$value", "content")])
 input_config = InputConfig("xml")
-
 
 完整代码
 
@@ -493,16 +521,21 @@ pub(crate) fn to_pyerr<E: ToString>(err: E) -> PyErr {
     exceptions::PyValueError::new_err(err.to_string())
 }
 
-#[pyclass]
+# [pyclass]
+
 pub struct Indexer(x::Indexer);
 
-#[pyclass]
+# [pyclass]
+
 pub struct InputConfig(x::InputConfig);
 
-#[pyclass]
+# [pyclass]
+
 pub struct IndexUpdater(x::IndexUpdater);
 
-#[pymethods]
+# [pymethods]
+
+```
 impl Indexer {
     #[new]
     pub fn open_or_create(filename: &str) -> PyResult<Indexer> {
@@ -539,8 +572,11 @@ impl Indexer {
         self.0.reload().map_err(to_pyerr)
     }
 }
+```
 
-#[pymethods]
+# [pymethods]
+
+```
 impl IndexUpdater {
     pub fn add(&mut self, input: &str, config: &InputConfig) -> PyResult<()> {
         self.0.add(input, &config.0).map_err(to_pyerr)
@@ -558,8 +594,11 @@ impl IndexUpdater {
         self.0.clear().map_err(to_pyerr)
     }
 }
+```
 
-#[pymethods]
+# [pymethods]
+
+```
 impl InputConfig {
     #[new]
     fn new(
@@ -571,7 +610,7 @@ impl InputConfig {
             "yaml" | "yml" => x::InputType::Yaml,
             "json" => x::InputType::Json,
             "xml" => x::InputType::Xml,
-            _ => return Err(exceptions::PyValueError::new_err("Invalid input type")),
+            _=> return Err(exceptions::PyValueError::new_err("Invalid input type")),
         };
         let conversion = conversion
             .unwrap_or_default()
@@ -580,7 +619,7 @@ impl InputConfig {
                 let t = match (t1.as_ref(), t2.as_ref()) {
                     ("string", "number") => (x::ValueType::String, x::ValueType::Number),
                     ("number", "string") => (x::ValueType::Number, x::ValueType::String),
-                    _ => return None,
+                    _=> return None,
                 };
                 Some((k, t))
             })
@@ -593,15 +632,18 @@ impl InputConfig {
         )))
     }
 }
+```
 
-#[pymodule]
+# [pymodule]
+
+```
 fn xunmi(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Indexer>()?;
     m.add_class::<InputConfig>()?;
     m.add_class::<IndexUpdater>()?;
     Ok(())
 }
-
+```
 
 整体的代码除了使用了一些 PyO3 提供的宏，没有什么特别之处，就是把 xunmi crate 的接口包装了一下（Indexer/InputConfig/IndexUpdater），然后把它们呈现在 pymodule 中。
 
@@ -617,10 +659,13 @@ One more thing
 
 use pyo3::types::{PyDict, PyTuple};
 
-#[pyclass]
+# [pyclass]
+
 struct MyClass {}
 
-#[pymethods]
+# [pymethods]
+
+```
 impl MyClass {
     #[staticmethod]
     #[args(kwargs = "**")]
@@ -644,22 +689,23 @@ impl MyClass {
         Ok(())
     }
 }
-
+```
 
 感兴趣的同学可以尝试一下（记得要 m.add_class 注册一下）。下面是运行结果：
 
-In [6]: MyClass.test1()                                                                                                           
+```
+In [6]: MyClass.test1()
 kwargs is none
 
-In [7]: MyClass.test1(a=1, b=2)                                                                                                   
+In [7]: MyClass.test1(a=1, b=2)
 ('a', 1)
 ('b', 2)
 
-In [8]: MyClass.test2(1,2,3)                                                                                                      
+In [8]: MyClass.test2(1,2,3)
 1
 2
 3
-
+```
 
 小结
 
@@ -675,6 +721,9 @@ PyO3 是一个非常成熟的让 Python 和 Rust 互操作的库。很多 Rust �
 
 欢迎在留言区分享讨论。感谢你的收听，今天你完成了第32次Rust打卡啦，继续坚持。我们下节课见～
 
-                        
-                        
-                            
+```html
+ValueError                                Traceback (most recent call last)
+<ipython-input-3-bde6b0e501ea> in <module>
+PanicException                            Traceback (most recent call last)
+<ipython-input-11-082d933e67e2> in <module>
+```

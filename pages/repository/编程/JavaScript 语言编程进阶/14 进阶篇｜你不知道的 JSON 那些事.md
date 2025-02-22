@@ -1,6 +1,6 @@
 ---
 title: 14 进阶篇｜你不知道的 JSON 那些事
-date: 1739707492.8878455
+date: 2025-02-22
 categories: [JavaScript 语言编程进阶]
 ---
 现在我们开启进阶篇的课程，这一部分我们主要掌握一些高级对象的使用，在涉及比较专业的场合中往往它们是不可代替的。本章节我们就从 JavaScript 中内置的最简单结构化数据 JSON 开始。
@@ -225,7 +225,7 @@ JSON.stringify({
 
 console.log 的打印结果是：
 
-```
+```text
 ""
 "name"
 "education"
@@ -347,7 +347,7 @@ JSON.stringify({ name: 'Mike' },null, new Array(12).fill('/').join('')) // 12
 
 得到的是：
 
-```
+```text
 {
 //////////"name": "Mike"
 }

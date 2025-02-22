@@ -1,10 +1,12 @@
 ---
 title: 50答疑（五）：如何在工作中引入OpenResty？
-date: 1739706057.2093432
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             50 答疑（五）：如何在工作中引入 OpenResty？
                             你好，我是温铭。
+```
 
 几个月的时间转瞬即逝，到现在，OpenResty专栏的最后一个版块微服务 API 网关篇，我们就已经学完了。恭喜你没有掉队，始终在积极学习和实践操作，并且热情地留下了你的思考。
 
@@ -60,9 +62,12 @@ A：在这种情况下，我们需要在 body filter 之前的 header filter 阶
 
 下面是一段示例代码：
 
+```css
 server {
     listen 8080;
+```
 
+```css
     location /test {
             proxy_pass http://www.baidu.com;
             header_filter_by_lua_block {
@@ -73,6 +78,7 @@ server {
             }
      }
 }
+```
 
 
 通过这段代码你可以看到，在 body filter 阶段中，ngx.arg[1] 代表的就是响应体。如果我们在它后面增加了字符串 abc，响应头 content length 就不准确了，所以，我们在 header filter 阶段直接把它禁用掉就可以了。
@@ -85,9 +91,11 @@ Q：lua_package_path 似乎配置的是Lua依赖的搜索路径。对于content_
 
 A：这位同学自己动手试验和思考的精神非常值得肯定，并且这个理解也是对的。lua_package_path 这个指令是用来加载 Lua 模块而使用的，比如我们在调用 require 'cjson' 时，就会到lua_package_path 中的指定目录中，去查找 cjson 这个模块。而 content_by_lua_file 则不同，它后面跟随的是磁盘中的一个文件路径：
 
+```css
 location /test {
      content_by_lua_file /path/test.lua;
  }
+```
 
 
 而且，如果这里不是绝对路径而是相对路径：

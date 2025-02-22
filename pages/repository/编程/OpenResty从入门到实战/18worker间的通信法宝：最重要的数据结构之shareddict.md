@@ -1,10 +1,12 @@
 ---
 title: 18worker间的通信法宝：最重要的数据结构之shareddict
-date: 1739706057.1616857
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             18 worker间的通信法宝：最重要的数据结构之shared dict
                             你好，我是温铭。
+```
 
 前面我们讲过，在 Lua 中， table 是唯一的数据结构。与之对应的一个事实是，共享内存字典shared dict，是你在 OpenResty 编程中最为重要的数据结构。它不仅支持数据的存放和读取，还支持原子计数和队列操作。
 
@@ -18,6 +20,7 @@ categories: [OpenResty从入门到实战]
 
 第一种是 Nginx 中的变量。它可以在 Nginx C 模块之间共享数据，自然的，也可以在 C 模块和 OpenResty 提供的 lua-nginx-module 之间共享数据，比如下面这段代码：
 
+```css
 location /foo {
      set $my_var ''; # this line is required to create $my_var at config time
      content_by_lua_block {
@@ -25,6 +28,7 @@ location /foo {
          ...
      }
  }
+```
 
 
 不过，使用 Nginx 变量这种方式来共享数据是比较慢的，因为它涉及到 hash 查找和内存分配。同时，这种方法有其局限性，只能用来存储字符串，不能支持复杂的 Lua 类型。
@@ -33,6 +37,7 @@ location /foo {
 
 下面是一个典型的使用场景，我们用 ngx.ctx 来缓存 Nginx 变量 这种昂贵的调用，并在不同阶段都可以使用到它：
 
+```css
 location /test {
      rewrite_by_lua_block {
          ngx.ctx.host = ngx.var.host
@@ -46,6 +51,7 @@ location /test {
          ngx.say(ngx.ctx.host)
      }
  }
+```
 
 
 这时，如果你使用 curl 访问的话：
@@ -59,48 +65,60 @@ curl -i 127.0.0.1:8080/test -H 'host:openresty.org'
 
 local ngx_ctx = ngx.ctx
 
+```javascript
 local function bar()
     ngx_ctx.host =  'test.com'
 end
+```
 
 
 我们应该在函数级别进行调用和缓存：
 
 local ngx = ngx
 
+```javascript
 local function bar()
     ngx_ctx.host =  'test.com'
 end
+```
 
 
 ngx.ctx 还有很多的细节，后面的性能优化部分，我们再继续探讨。
 
 接着往下看，第三种方法是使用模块级别的变量，在同一个 worker 内的所有请求之间共享数据。跟前面的 Nginx 变量和 ngx.ctx 不一样，这种方法有些不太好理解。不过别着急，概念抽象，代码先行，让我们先来看个例子，弄明白什么是 模块级别的变量：
 
+```text
 -- mydata.lua
  local _M = {}
+```
 
+```text
  local data = {
      dog = 3,
      cat = 4,
      pig = 5,
  }
+```
 
+```text
  function _M.get_age(name)
      return data[name]
  end
+```
 
  return _M
 
 
 在 nginx.conf 的配置如下：
 
+```css
 location /lua {
      content_by_lua_block {
          local mydata = require "mydata"
          ngx.say(mydata.get_age("dog"))
      }
  }
+```
 
 
 在这个示例中，mydata 就是一个模块，它只会被 worker 进程加载一次，之后，这个 worker 处理的所有请求，都会共享 mydata 模块的代码和数据。
@@ -111,19 +129,25 @@ location /lua {
 
 我们可以通过下面这个最简化的例子来体会下：
 
+```text
 -- mydata.lua
  local _M = {}
+```
 
+```text
  local data = {
      dog = 3,
      cat = 4,
      pig = 5,
  }
+```
 
+```text
  function _M.incr_age(name)
      data[name]  = data[name] + 1
     return data[name]
  end
+```
 
  return _M
 
@@ -132,6 +156,7 @@ location /lua {
 
 然后，在调用的代码中，我们增加了最关键的一行 ngx.sleep(5)，这个 sleep 是一个 yield 操作：
 
+```css
 location /lua {
      content_by_lua_block {
          local mydata = require "mydata"
@@ -140,6 +165,7 @@ location /lua {
          ngx.say(mydata. incr_age("dog"))
      }
  }
+```
 
 
 如果没有这行 sleep 代码（也可以是其他的非阻塞 IO 操作，比如访问 Redis 等），就不会有 yield 操作，也就不会产生竞争，那么，最后输出的数字就是顺序的。
@@ -179,9 +205,11 @@ shared dict 同样只能缓存字符串类型的数据，不支持复杂的 Lua 
 
 首先来看字典读写类。在最初的版本中，只有字典读写类的 API，它们也是共享字典最常用的功能。下面是一个最简单的示例：
 
+```bash
 $ resty --shdict='dogs 1m' -e 'local dict = ngx.shared.dogs
                                dict:set("Tom", 56)
                                print(dict:get("Tom"))'
+```
 
 
 除了 set 外，OpenResty 还提供了 safe_set、add、safe_add、replace 这四种写入的方法。这里safe 前缀的含义是，在内存占满的情况下，不根据 LRU 淘汰旧的数据，而是写入失败并返回 no memory 的错误信息。
@@ -197,12 +225,14 @@ value, flags, stale = ngx.shared.DICT:get_stale(key)
 
 再来看队列操作，它是 OpenResty 后续新增的功能，提供了和 Redis 类似的接口。队列中的每一个元素，都用 ngx_http_lua_shdict_list_node_t 来描述：
 
+```css
 typedef struct { 
     ngx_queue_t queue; 
     uint32_t value_len; 
     uint8_t value_type; 
     u_char data[1]; 
 } ngx_http_lua_shdict_list_node_t;
+```
 
 
 我把这些队列操作 API 的 PR 贴在了文章中，如果你对此感兴趣，可以跟着文档、测试案例和源码，来分析具体的实现。
@@ -210,49 +240,52 @@ typedef struct {
 不过，下面这 5 个队列 API，在文档中并没有对应的代码示例，这里我简单介绍一下：
 
 
+```text
 lpush/rpush，表示在队列两端增加元素；
 lpop/rpop，表示在队列两端弹出元素；
 llen，表示返回队列的元素数量。
+```
 
 
 别忘了我们上节课讲过的另一个利器——测试案例。如果文档中没有，我们通常可以在测试案例中找到对应的代码。队列相关的测试，正是在 145-shdict-list.t 这个文件中：
 
-=== TEST 1: lpush & lpop
 --- http_config
     lua_shared_dict dogs 1m;
 --- config
+```css
+=== TEST 1: lpush & lpop
     location = /test {
         content_by_lua_block {
             local dogs = ngx.shared.dogs
+```
 
+```text
             local len, err = dogs:lpush("foo", "bar")
             if len then
                 ngx.say("push success")
             else
                 ngx.say("push err: ", err)
             end
+```
 
+```text
             local val, err = dogs:llen("foo")
             ngx.say(val, " ", err)
+```
 
+```text
             local val, err = dogs:lpop("foo")
             ngx.say(val, " ", err)
+```
 
+```text
             local val, err = dogs:llen("foo")
             ngx.say(val, " ", err)
+```
 
-            local val, err = dogs:lpop("foo")
-            ngx.say(val, " ", err)
-        }
-    }
 --- request
 GET /test
 --- response_body
-push success
-1 nil
-bar nil
-0 nil
-nil nil
 --- no_error_log
 [error]
 
@@ -287,3 +320,14 @@ require "resty.core.shdict"
                         
                         
                             
+```text
+            local val, err = dogs:lpop("foo")
+            ngx.say(val, " ", err)
+        }
+    }
+push success
+1 nil
+bar nil
+0 nil
+nil nil
+```

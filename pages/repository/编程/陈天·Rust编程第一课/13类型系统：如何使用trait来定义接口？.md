@@ -1,10 +1,12 @@
 ---
 title: 13类型系统：如何使用trait来定义接口？
-date: 1739706057.3685184
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             13 类型系统：如何使用trait来定义接口？
                             你好，我是陈天。
+```
 
 通过上一讲的学习，我们对 Rust 类型系统的本质有了认识。作为对类型进行定义、检查和处理的工具，类型系统保证了某个操作处理的数据类型是我们所希望的。
 
@@ -28,6 +30,7 @@ trait 就是这样。它可以把数据结构中的行为单独抽取出来，�
 
 我们来看看基本 trait 如何定义。这里，以标准库中 std::io::Write 为例，可以看到这个 trait 中定义了一系列方法的接口：
 
+```html
 pub trait Write {
     fn write(&mut self, buf: &[u8]) -> Result<usize>;
     fn flush(&mut self) -> Result<()>;
@@ -38,7 +41,7 @@ pub trait Write {
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> Result<()> { ... }
     fn by_ref(&mut self) -> &mut Self where Self: Sized { ... }
 }
-
+```
 
 这些方法也被称作关联函数（associate function）。在 trait 中，方法可以有缺省的实现，对于这个 Write trait，你只需要实现 write 和 flush 两个方法，其他都有缺省实现。
 
@@ -46,20 +49,25 @@ pub trait Write {
 
 在刚才定义方法的时候，我们频繁看到两个特殊的关键字：Self 和 self。
 
-
+```text
 Self 代表当前的类型，比如 File 类型实现了 Write，那么实现过程中使用到的 Self 就指代 File。
 self 在用作方法的第一个参数时，实际上是 self: Self 的简写，所以 &self 是 self: &Self, 而 &mut self 是 self: &mut Self。
-
+```
 
 光讲定义，理解不太深刻，我们构建一个 BufBuilder 结构实现 Write trait，结合代码来说明。（Write trait 代码）：
 
+```cpp
 use std::fmt;
 use std::io::Write;
+```
 
+```html
 struct BufBuilder {
     buf: Vec<u8>,
 }
+```
 
+```cpp
 impl BufBuilder {
     pub fn new() -> Self {
         Self {
@@ -67,33 +75,41 @@ impl BufBuilder {
         }
     }
 }
+```
 
+```cpp
 // 实现 Debug trait，打印字符串
 impl fmt::Debug for BufBuilder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", String::from_utf8_lossy(&self.buf))
     }
 }
+```
 
+```cpp
 impl Write for BufBuilder {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         // 把 buf 添加到 BufBuilder 的尾部
         self.buf.extend_from_slice(buf);
         Ok(buf.len())
     }
+```
 
+```cpp
     fn flush(&mut self) -> std::io::Result<()> {
         // 由于是在内存中操作，所以不需要 flush
         Ok(())
     }
 }
+```
 
+```cpp
 fn main() {
     let mut buf = BufBuilder::new();
     buf.write_all(b"Hello world!").unwrap();
     println!("{:?}", buf);
 }
-
+```
 
 从代码中可以看到，我们实现了 write 和 flush 方法，其它的方法都用缺省实现，这样 BufBuilder 对 Write trait 的实现是完整的。如果没有实现 write 或者 flush，Rust 编译器会报错，你可以自己尝试一下。
 
@@ -103,7 +119,6 @@ fn main() {
 
 fn write_all(&mut self, buf: &[u8]) -> Result<()>
 
-
 它接受两个参数：&mut self 和 &[u8]，第一个参数传递的是 buf 这个变量的可变引用，第二个参数传递的是 b”Hello world!“。
 
 基本 trait 练习
@@ -112,10 +127,11 @@ fn write_all(&mut self, buf: &[u8]) -> Result<()>
 
 假设我们要做一个字符串解析器，可以把字符串的某部分解析成某个类型，那么可以这么定义这个 trait：它有一个方法是 parse，这个方法接受一个字符串引用，返回 Self。
 
+```css
 pub trait Parse {
   fn parse(s: &str) -> Self;
 }
-
+```
 
 这个 parse 方法是 trait 的静态方法，因为它的第一个参数和 self 无关，所以在调用时需要使用 T::parse(str) 。
 
@@ -125,11 +141,14 @@ pub trait Parse {
 
 整个代码如下（Parse trait 练习代码）：
 
+```cpp
 use regex::Regex;
 pub trait Parse {
     fn parse(s: &str) -> Self;
 }
+```
 
+```cpp
 impl Parse for u8 {
     fn parse(s: &str) -> Self {
         let re: Regex = Regex::new(r"^[0-9]+").unwrap();
@@ -143,18 +162,23 @@ impl Parse for u8 {
         }
     }
 }
+```
 
-#[test]
+# [test]
+
+```cpp
 fn parse_should_work() {
     assert_eq!(u8::parse("123abcd"), 123);
     assert_eq!(u8::parse("1234abcd"), 0);
     assert_eq!(u8::parse("abcd"), 0);
 }
+```
 
+```cpp
 fn main() {
     println!("result: {}", u8::parse("255 hello world"));
 }
-
+```
 
 这个实现并不难，如果你感兴趣的话，可以再尝试为 f64 实现这个 Parse trait，比如 “123.45abcd” 需要被解析成 123.45。
 
@@ -162,15 +186,11 @@ fn main() {
 
 有！上一讲介绍了泛型编程，所以在实现 trait 的时候，也可以用泛型参数来实现 trait，需要注意的是，要对泛型参数做一定的限制。
 
-
 第一，不是任何类型都可以通过字符串解析出来，在例子中，我们只能处理数字类型，并且这个类型还要能够被 str::parse 处理。
-
 
 具体看文档，str::parse 是一个泛型函数，它返回任何实现了 FromStr trait 的类型，所以这里对泛型参数的第一个限制是，它必须实现了 FromStr trait。
 
-
 第二，上面代码当无法正确解析字符串的时候，会直接返回 0，表示无法处理，但我们使用泛型参数后，无法返回 0，因为 0 不一定是某个符合泛型参数的类型中的一个值。怎么办？
-
 
 其实返回 0 的目的是为处理不了的情况，返回一个缺省值，在 Rust 标准库中有 Default trait，绝大多数类型都实现了这个 trait，来为数据结构提供缺省值，所以泛型参数的另一个限制是 Default。
 
@@ -178,11 +198,14 @@ fn main() {
 
 use std::str::FromStr;
 
+```cpp
 use regex::Regex;
 pub trait Parse {
     fn parse(s: &str) -> Self;
 }
+```
 
+```javascript
 // 我们约束 T 必须同时实现了 FromStr 和 Default
 // 这样在使用的时候我们就可以用这两个 trait 的方法了
 impl<T> Parse for T
@@ -204,19 +227,24 @@ where
         }
     }
 }
+```
 
-#[test]
+# [test]
+
+```cpp
 fn parse_should_work() {
     assert_eq!(u32::parse("123abcd"), 123);
     assert_eq!(u32::parse("123.45abcd"), 0);
     assert_eq!(f64::parse("123.45abcd"), 123.45);
     assert_eq!(f64::parse("abcd"), 0f64);
 }
+```
 
+```cpp
 fn main() {
     println!("result: {}", u8::parse("255 hello world"));
 }
-
+```
 
 通过对带有约束的泛型参数实现 trait，一份代码就实现了 u32/f64 等类型的 Parse trait，非常精简。不过，看这段代码你有没有感觉还是有些问题？当无法正确解析字符串时，我们返回了缺省值，难道不是应该返回一个错误么？
 
@@ -224,10 +252,11 @@ fn main() {
 
 所以更好的方式是 parse 函数返回一个 Result：
 
+```css
 pub trait Parse {
     fn parse(s: &str) -> Result<Self, E>;
 }
-
+```
 
 但这里 Result 的 E 让人犯难了：要返回的错误信息，在 trait 定义时并不确定，不同的实现者可以使用不同的错误类型，这里 trait 的定义者最好能够把这种灵活性留给 trait 的实现者。怎么办？
 
@@ -237,16 +266,18 @@ pub trait Parse {
 
 Rust 允许 trait 内部包含关联类型，实现时跟关联函数一样，它也需要实现关联类型。我们看怎么为 Parse trait 添加关联类型：
 
+```cpp
 pub trait Parse {
     type Error;
     fn parse(s: &str) -> Result<Self, Self::Error>;
 }
-
+```
 
 有了关联类型 Error，Parse trait 就可以在出错时返回合理的错误了，看修改后的代码（Parse trait DRY.2代码）：
 
 use std::str::FromStr;
 
+```cpp
 use regex::Regex;
 pub trait Parse {
     type Error;
@@ -254,7 +285,9 @@ pub trait Parse {
     where
         Self: Sized;
 }
+```
 
+```cpp
 impl<T> Parse for T
 where
     T: FromStr + Default,
@@ -277,8 +310,11 @@ where
         }
     }
 }
+```
 
-#[test]
+# [test]
+
+```cpp
 fn parse_should_work() {
     assert_eq!(u32::parse("123abcd"), Ok(123));
     assert_eq!(
@@ -288,11 +324,13 @@ fn parse_should_work() {
     assert_eq!(f64::parse("123.45abcd"), Ok(123.45));
     assert!(f64::parse("abcd").is_err());
 }
+```
 
+```cpp
 fn main() {
     println!("result: {:?}", u8::parse("255 hello world"));
 }
-
+```
 
 上面的代码中，我们允许用户把错误类型延迟到 trait 实现时才决定，这种带有关联类型的 trait 比普通 trait，更加灵活，抽象度更高。
 
@@ -306,12 +344,13 @@ trait 方法里的参数或者返回值，都可以用关联类型来表述，�
 
 来看看标准库里的操作符是如何重载的，以 std::ops::Add 这个用于提供加法运算的 trait 为例：
 
+```cpp
 pub trait Add<Rhs = Self> {
     type Output;
     #[must_use]
     fn add(self, rhs: Rhs) -> Self::Output;
 }
-
+```
 
 这个 trait 有一个泛型参数 Rhs，代表加号右边的值，它被用在 add 方法的第二个参数位。这里 Rhs 默认是 Self，也就是说你用 Add trait ，如果不提供泛型参数，那么加号右值和左值都要是相同的类型。
 
@@ -319,22 +358,30 @@ pub trait Add<Rhs = Self> {
 
 use std::ops::Add;
 
-#[derive(Debug)]
+# [derive(Debug)]
+
+```css
 struct Complex {
     real: f64,
     imagine: f64,
 }
+```
 
+```css
 impl Complex {
     pub fn new(real: f64, imagine: f64) -> Self {
         Self { real, imagine }
     }
 }
+```
 
+```css
 // 对 Complex 类型的实现
 impl Add for Complex {
     type Output = Self;
+```
 
+```javascript
     // 注意 add 第一个参数是 self，会移动所有权
     fn add(self, rhs: Self) -> Self::Output {
         let real = self.real + rhs.real;
@@ -342,7 +389,9 @@ impl Add for Complex {
         Self::new(real, imagine)
     }
 }
+```
 
+```javascript
 fn main() {
     let c1 = Complex::new(1.0, 1f64);
     let c2 = Complex::new(2 as f64, 3.0);
@@ -350,7 +399,7 @@ fn main() {
     // c1、c2 已经被移动，所以下面这句无法编译
     // println!("{:?}", c1 + c2);
 }
-
+```
 
 复数类型有实部和虚部，两个复数的实部相加，虚部相加，得到一个新的复数。注意 add 的第一个参数是 self，它会移动所有权，所以调用完两个复数 c1 + c2 后，根据所有权规则，它们就无法使用了。
 
@@ -360,25 +409,30 @@ fn main() {
 
 // ...
 
+```css
 // 如果不想移动所有权，可以为 &Complex 实现 add，这样可以做 &c1 + &c2
 impl Add for &Complex {
     // 注意返回值不应该是 Self 了，因为此时 Self 是 &Complex
     type Output = Complex;
+```
 
+```javascript
     fn add(self, rhs: Self) -> Self::Output {
         let real = self.real + rhs.real;
         let imagine = self.imagine + rhs.imagine;
         Complex::new(real, imagine)
     }
 }
+```
 
+```javascript
 fn main() {
     let c1 = Complex::new(1.0, 1f64);
     let c2 = Complex::new(2 as f64, 3.0);
     println!("{:?}", &c1 + &c2);
     println!("{:?}", c1 + c2);
 }
-
+```
 
 可以做 &c1 + &c2，这样所有权就不会移动了。
 
@@ -388,17 +442,22 @@ fn main() {
 
 // ...
 
+```html
 // 因为 Add<Rhs = Self> 是个泛型 trait，我们可以为 Complex 实现 Add<f64>
 impl Add<f64> for &Complex {
     type Output = Complex;
+```
 
+```javascript
     // rhs 现在是 f64 了
     fn add(self, rhs: f64) -> Self::Output {
         let real = self.real + rhs;
         Complex::new(real, self.imagine)
     }
 }
+```
 
+```javascript
 fn main() {
     let c1 = Complex::new(1.0, 1f64);
     let c2 = Complex::new(2 as f64, 3.0);
@@ -406,7 +465,7 @@ fn main() {
     println!("{:?}", &c1 + 5.0);
     println!("{:?}", c1 + c2);
 }
-
+```
 
 通过使用 Add ，为 Complex 实现了和 f64 相加的方法。所以泛型 trait 可以让我们在需要的时候，对同一种类型的同一个 trait，有多个实现。
 
@@ -416,6 +475,7 @@ tower::Service 是一个第三方库，它定义了一个精巧的用于处理�
 
 看 Service 的定义：
 
+```cpp
 // Service trait 允许某个 service 的实现能处理多个不同的 Request
 pub trait Service<Request> {
     type Response;
@@ -428,7 +488,7 @@ pub trait Service<Request> {
     ) -> Poll<Result<(), Self::Error>>;
     fn call(&mut self, req: Request) -> Self::Future;
 }
-
+```
 
 这个 trait 允许某个 Service 能处理多个不同的 Request。我们在 Web 开发中使用该 trait 的话，每个 Method+URL 可以定义为一个 Service，其 Request 是输入类型。
 
@@ -446,15 +506,14 @@ trait 的“继承”
 
 impl<T: ?Sized> StreamExt for T where T: Stream {}
 
-
 所以如果你实现了 Stream trait，就可以直接使用 StreamExt 里的方法了，非常方便。
 
 好，到这里trait就基本讲完了，简单总结一下，trait 作为对不同数据结构中相同行为的一种抽象。除了基本 trait 之外，
 
-
+```text
 当行为和具体的数据关联时，比如字符串解析时定义的 Parse trait，我们引入了带有关联类型的 trait，把和行为有关的数据类型的定义，进一步延迟到 trait 实现的时候。
 对于同一个类型的同一个 trait 行为，可以有不同的实现，比如我们之前大量使用的 From，此时可以用泛型 trait。
-
+```
 
 可以说 Rust 的 trait 就像一把瑞士军刀，把需要定义接口的各种场景都考虑进去了。
 
@@ -468,48 +527,61 @@ impl<T: ?Sized> StreamExt for T where T: Stream {}
 
 Rust 虽然没有父类和子类，但 trait 和实现 trait 的类型之间也是类似的关系，所以，Rust 也可以做子类型多态。看一个例子（代码）：
 
+```text
 struct Cat;
 struct Dog;
+```
 
+```css
 trait Animal {
     fn name(&self) -> &'static str;
 }
+```
 
+```css
 impl Animal for Cat {
     fn name(&self) -> &'static str {
         "Cat"
     }
 }
+```
 
+```css
 impl Animal for Dog {
     fn name(&self) -> &'static str {
         "Dog"
     }
 }
+```
 
+```css
 fn name(animal: impl Animal) -> &'static str {
     animal.name()
 }
+```
 
+```javascript
 fn main() {
     let cat = Cat;
     println!("cat: {}", name(cat));
 }
-
+```
 
 这里 impl Animal 是 T: Animal 的简写，所以 name 函数的定义和以下定义等价：
 
 fn name<T: Animal>(animal: T) -> &'static str;
 
-
 上一讲提到过，这种泛型函数会根据具体使用的类型被单态化，编译成多个实例，是静态分派。
 
 静态分派固然很好，效率很高，但很多时候，类型可能很难在编译时决定。比如要撰写一个格式化工具，这个在 IDE 里很常见，我们可以定义一个 Formatter 接口，然后创建一系列实现：
 
+```css
 pub trait Formatter {
     fn format(&self, input: &mut String) -> bool;
 }
+```
 
+```css
 struct MarkdownFormatter;
 impl Formatter for MarkdownFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -517,7 +589,9 @@ impl Formatter for MarkdownFormatter {
         true
     }
 }
+```
 
+```css
 struct RustFormatter;
 impl Formatter for RustFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -525,7 +599,9 @@ impl Formatter for RustFormatter {
         true
     }
 }
+```
 
+```css
 struct HtmlFormatter;
 impl Formatter for HtmlFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -533,42 +609,47 @@ impl Formatter for HtmlFormatter {
         true
     }
 }
-
+```
 
 首先，使用什么格式化方法，只有当打开文件，分析出文件内容之后才能确定，我们无法在编译期给定一个具体类型。其次，一个文件可能有一到多个格式化工具，比如一个 Markdown 文件里有 Rust 代码，同时需要 MarkdownFormatter 和 RustFormatter 来格式化。
 
 这里如果使用一个 Vec 来提供所有需要的格式化工具，那么，下面这个函数其 formatters 参数该如何确定类型呢？
 
+```css
 pub fn format(input: &mut String, formatters: Vec<???>) {
     for formatter in formatters {
         formatter.format(input);
     }
 }
-
+```
 
 正常情况下，Vec<> 容器里的类型需要是一致的，但此处无法给定一个一致的类型。
 
-所以我们要有一种手段，告诉编译器，此处需要并且仅需要任何实现了 Formatter 接口的数据类型。在 Rust 里，这种类型叫Trait Object，表现为 &dyn Trait 或者 Box<dyn Trait>。
+所以我们要有一种手段，告诉编译器，此处需要并且仅需要任何实现了 Formatter 接口的数据类型。在 Rust 里，这种类型叫Trait Object，表现为 &dyn Trait 或者``` Box<dyn Trait>```。
 
 这里，dyn 关键字只是用来帮助我们更好地区分普通类型和 Trait 类型，阅读代码时，看到 dyn 就知道后面跟的是一个 trait 了。
 
 于是，上述代码可以写成：
 
+```css
 pub fn format(input: &mut String, formatters: Vec<&dyn Formatter>) {
     for formatter in formatters {
         formatter.format(input);
     }
 }
-
+```
 
 这样可以在运行时，构造一个 Formatter 的列表，传递给 format 函数进行文件的格式化，这就是动态分派（dynamic dispatching）。
 
 看最终调用的格式化工具代码：
 
+```css
 pub trait Formatter {
     fn format(&self, input: &mut String) -> bool;
 }
+```
 
+```css
 struct MarkdownFormatter;
 impl Formatter for MarkdownFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -576,7 +657,9 @@ impl Formatter for MarkdownFormatter {
         true
     }
 }
+```
 
+```css
 struct RustFormatter;
 impl Formatter for RustFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -584,7 +667,9 @@ impl Formatter for RustFormatter {
         true
     }
 }
+```
 
+```css
 struct HtmlFormatter;
 impl Formatter for HtmlFormatter {
     fn format(&self, input: &mut String) -> bool {
@@ -592,29 +677,35 @@ impl Formatter for HtmlFormatter {
         true
     }
 }
+```
 
+```css
 pub fn format(input: &mut String, formatters: Vec<&dyn Formatter>) {
     for formatter in formatters {
         formatter.format(input);
     }
 }
+```
 
+```javascript
 fn main() {
     let mut text = "Hello world!".to_string();
     let html: &dyn Formatter = &HtmlFormatter;
     let rust: &dyn Formatter = &RustFormatter;
     let formatters = vec![html, rust];
     format(&mut text, formatters);
+```
 
+```text
     println!("text: {}", text);
 }
-
+```
 
 这个实现是不是很简单？学到这里你在兴奋之余，不知道会不会感觉有点负担，又一个Rust新名词出现了。别担心，虽然 Trait Object 是 Rust 独有的概念，但是这个概念并不新鲜。为什么这么说呢，来看它的实现机理。
 
 Trait Object 的实现机理
 
-当需要使用 Formatter trait 做动态分派时，可以像如下例子一样，将一个具体类型的引用，赋给 &Formatter ： 
+当需要使用 Formatter trait 做动态分派时，可以像如下例子一样，将一个具体类型的引用，赋给 &Formatter ：
 
 HtmlFormatter 的引用赋值给 Formatter 后，会生成一个 Trait Object，在上图中可以看到，Trait Object 的底层逻辑就是胖指针。其中，一个指针指向数据本身，另一个则指向虚函数表（vtable）。
 
@@ -622,10 +713,10 @@ vtable 是一张静态的表，Rust 在编译时会为使用了 trait object 的
 
 在这张表里，包含具体类型的一些信息，如 size、aligment 以及一系列函数指针：
 
-
+```text
 这个接口支持的所有的方法，比如 format() ；
 具体类型的 drop trait，当 Trait object 被释放，它用来释放其使用的所有资源。
-
+```
 
 这样，当在运行时执行 formatter.format() 时，formatter 就可以从 vtable 里找到对应的函数指针，执行具体的操作。
 
@@ -661,6 +752,7 @@ trait 作为对不同数据结构中相同行为的一种抽象，它可以让�
 
 以在 get hands dirty 系列中写的代码为例，我们使用了 trait 对系统进行解耦，并增强其扩展性，你可以简单回顾一下。比如第 5 讲的 Engine trait 和 SpecTransform trait，使用了普通 trait：
 
+```html
 // Engine trait：未来可以添加更多的 engine，主流程只需要替换 engine
 pub trait Engine {
     // 对 engine 按照 specs 进行一系列有序的处理
@@ -673,22 +765,26 @@ pub trait SpecTransform<T> {
     // 对图片使用 op 做 transform
     fn transform(&mut self, op: T);
 }
-
+```
 
 第 6 讲的 Fetch/Load trait，使用了带关联类型的 trait：
 
 // Rust 的 async trait 还没有稳定，可以用 async_trait 宏
-#[async_trait]
+# [async_trait]
+
+```cpp
 pub trait Fetch {
     type Error;
     async fn fetch(&self) -> Result<String, Self::Error>;
 }
+```
 
+```cpp
 pub trait Load {
     type Error;
     fn load(self) -> Result<DataSet, Self::Error>;
 }
-
+```
 
 思考题
 
@@ -696,6 +792,7 @@ pub trait Load {
 
 2.如下代码能编译通过么，为什么？
 
+```cpp
 use std::{fs::File, io::Write};
 fn main() {
     let mut f = File::create("/tmp/test_write_trait").unwrap();
@@ -704,39 +801,48 @@ fn main() {
     let w1 = w.by_ref();
     w1.write_all(b"world").unwrap();
 }
-
+```
 
 3.在 Complex 的例子中，c1 + c2 会导致所有权移动，所以我们使用了 &c1 + &c2 来避免这种行为。除此之外，你还有什么方法能够让 c1 + c2 执行完之后还能继续使用么？如何修改 Complex 的代码来实现这个功能呢？
 
+```text
     // c1、c2 已经被移动，所以下面这句无法编译
     // println!("{:?}", c1 + c2);
-
+```
 
 4.学有余力的同学可以挑战一下，Iterator 是 Rust 下的迭代器的 trait，你可以阅读 Iterator 的文档获得更多的信息。它有一个关联类型 Item 和一个方法 next() 需要实现，每次调用 next，如果迭代器中还能得到一个值，则返回 Some(Item)，否则返回 None。请阅读如下代码，想想看如何实现 SentenceIter 这个结构的迭代器？
 
+```text
 struct SentenceIter<'a> {
     s: &'a mut &'a str,
     delimiter: char,
 }
+```
 
+```css
 impl<'a> SentenceIter<'a> {
     pub fn new(s: &'a mut &'a str, delimiter: char) -> Self {
         Self { s, delimiter }
     }
 }
+```
 
+```text
 impl<'a> Iterator for SentenceIter<'a> {
     type Item; // 想想 Item 应该是什么类型？
+```
 
+```cpp
     fn next(&mut self) -> Option<Self::Item> {
         // 如何实现 next 方法让下面的测试通过？
         todo!()
     }
 }
+```
 
+# [test]
 
-
-#[test]
+```cpp
 fn it_works() {
     let mut s = "This is the 1st sentence. This is the 2nd sentence.";
     let mut iter = SentenceIter::new(&mut s, '.');
@@ -744,13 +850,15 @@ fn it_works() {
     assert_eq!(iter.next(), Some("This is the 2nd sentence."));
     assert_eq!(iter.next(), None);
 }
+```
 
+```cpp
 fn main() {
     let mut s = "a。 b。 c";
     let sentences: Vec<_> = SentenceIter::new(&mut s, '。').collect();
     println!("sentences: {:?}", sentences);
 }
-
+```
 
 今天你已经完成了Rust学习的第13次打卡。我们下节课见～
 
@@ -758,15 +866,11 @@ fn main() {
 
 使用 trait 有两个注意事项：
 
-
 第一，在定义和使用 trait 时，我们需要遵循孤儿规则（Orphan Rule）。
-
 
 trait 和实现 trait 的数据类型，至少有一个是在当前 crate 中定义的，也就是说，你不能为第三方的类型实现第三方的 trait，当你尝试这么做时，Rust 编译器会报错。我们在第6讲的 SQL查询工具query中，定义了很多简单的直接包裹已有数据结构的类型，就是为了应对孤儿规则。
 
-
 第二，Rust 对含有 async fn 的 trait ，还没有一个很好的被标准库接受的实现，如果你感兴趣可以看这篇文章了解它背后的原因。
-
 
 在第5讲Thumbor图片服务器我们使用了 async_trait 这个库，为 trait 的实现添加了一个标记宏 #[async_trait]。这是目前最推荐的无缝使用 async trait 的方法。未来 async trait 如果有了标准实现，我们不需要对现有代码做任何改动。
 
@@ -776,27 +880,36 @@ trait 和实现 trait 的数据类型，至少有一个是在当前 crate 中定
 
 另外，有同学可能好奇为什么我说“ vtable 会为每个类型的每个 trait 实现生成一张表”。这个并没有在任何公开的文档中提及，不过既然它是一个数据结构，我们就可以通过打印它的地址来追踪它的行为。我写了一段代码，你可以自行运行来进一步加深对 vtable 的理解（代码）：
 
+```cpp
 use std::fmt::{Debug, Display};
 use std::mem::transmute;
+```
 
+```javascript
 fn main() {
     let s1 = String::from("hello world!");
     let s2 = String::from("goodbye world!");
     // Display/Debug trait object for s
     let w1: &dyn Display = &s1;
     let w2: &dyn Debug = &s1;
+```
 
+```text
     // Display/Debug trait object for s1
     let w3: &dyn Display = &s2;
     let w4: &dyn Debug = &s2;
+```
 
+```css
     // 强行把 triat object 转换成两个地址 (usize, usize)
     // 这是不安全的，所以是 unsafe
     let (addr1, vtable1): (usize, usize) = unsafe { transmute(w1) };
     let (addr2, vtable2): (usize, usize) = unsafe { transmute(w2) };
     let (addr3, vtable3): (usize, usize) = unsafe { transmute(w3) };
     let (addr4, vtable4): (usize, usize) = unsafe { transmute(w4) };
+```
 
+```css
     // s 和 s1 在栈上的地址，以及 main 在 TEXT 段的地址
     println!(
         "s1: {:p}, s2: {:p}, main(): {:p}",
@@ -806,27 +919,31 @@ fn main() {
     println!("addr1: 0x{:x}, vtable1: 0x{:x}", addr1, vtable1);
     // trait object(s/Debug) 的 ptr 地址和 vtable 地址
     println!("addr2: 0x{:x}, vtable2: 0x{:x}", addr2, vtable2);
+```
 
+```css
     // trait object(s1/Display) 的 ptr 地址和 vtable 地址
     println!("addr3: 0x{:x}, vtable3: 0x{:x}", addr3, vtable3);
+```
 
+```css
     // trait object(s1/Display) 的 ptr 地址和 vtable 地址
     println!("addr4: 0x{:x}, vtable4: 0x{:x}", addr4, vtable4);
+```
 
+```text
     // 指向同一个数据的 trait object 其 ptr 地址相同
     assert_eq!(addr1, addr2);
     assert_eq!(addr3, addr4);
+```
 
+```text
     // 指向同一种类型的同一个 trait 的 vtable 地址相同
     // 这里都是 String + Display
     assert_eq!(vtable1, vtable3);
     // 这里都是 String + Debug
     assert_eq!(vtable2, vtable4);
 }
-
+```
 
 （如果你觉得有收获，也欢迎你分享给身边的朋友，邀他一起讨论～）
-
-                        
-                        
-                            

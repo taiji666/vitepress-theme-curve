@@ -1,10 +1,12 @@
 ---
 title: 21带你玩转时间、正则表达式等常用API
-date: 1739706057.1775875
+date: 2025-02-22
 categories: [OpenResty从入门到实战]
 ---
+```text
                             21 带你玩转时间、正则表达式等常用API
                             你好，我是温铭。在前面几节课中，你已经熟悉了不少OpenResty 中重要的 Lua API 了，今天我们再来了解下其他一些通用的 API，主要和正则表达式、时间、进程等相关。
+```
 
 正则
 
@@ -52,18 +54,22 @@ resty -e 'ngx.say(ngx.now())'
 
 不过，值得一提的是，这些返回当前时间的 API，如果没有非阻塞网络 IO 操作来触发，便会一直返回缓存的值，而不是像我们想的那样，能够返回当前的实时时间。可以看看下面这个示例代码：
 
+```bash
 $ resty -e 'ngx.say(ngx.now())
 os.execute("sleep 1")
 ngx.say(ngx.now())'
+```
 
 
 在两次调用 ngx.now 之间，我们使用 Lua 的阻塞函数 sleep 了 1 秒钟，但从打印的结果来看，这两次返回的时间戳却是一模一样的。
 
 那么，如果换成是非阻塞的 sleep 函数呢？比如下面这段新的代码：
 
+```bash
 $ resty -e 'ngx.say(ngx.now())
 ngx.sleep(1)
 ngx.say(ngx.now())'
+```
 
 
 显然，它就会打印出不同的时间戳了。这里顺带引出了 ngx.sleep ，这个非阻塞的 sleep 函数。这个函数除了可以休眠指定的时间外，还有另外一个特别的用处。
@@ -76,9 +82,11 @@ worker 和进程 API
 
 事实上，ngx.worker.* 由 lua-nginx-module 提供，而ngx.process.* 则是由 lua-resty-core 提供。还记得上节课我们留的作业题吗，如何保证在多 worker 的情况下，只启动一个 timer？其实，这就需要用到 ngx.worker.id 这个 API 了。你可以在启动 timer 之前，先做一个简单的判断：
 
+```text
 if ngx.worker.id == 0 then
     start_timer()
 end
+```
 
 
 这样，我们就能实现只启动一个 timer的目的了。这里注意，worker id 是从 0 开始返回的，这和 Lua 中数组下标从 1 开始并不相同，千万不要混淆了。
@@ -95,8 +103,10 @@ end
 
 再来看下 Lua 中的空值（nil），它是未定义的意思，比如你申明了一个变量，但还没有初始化，它的值就是 nil：
 
+```bash
 $ resty -e 'local a
 ngx.say(type(a))'
+```
 
 
 而 nil 也是 Lua 中的一种数据类型。
@@ -107,27 +117,35 @@ ngx.null
 
 第一个坑是ngx.null。因为 Lua 的 nil 无法作为 table 的 value，所以 OpenResty 引入了 ngx.null，作为 table 中的空值：
 
+```bash
 $ resty -e  'print(ngx.null)'
 null
+```
 
 
+```bash
 $ resty -e 'print(type(ngx.null))'
 userdata
+```
 
 
 从上面两段代码你可以看出，ngx.null 被打印出来是 null，而它的类型是 userdata。那么，可以把它当作假值吗？当然不行，事实上，ngx.null 的布尔值为真：
 
+```bash
 $ resty -e 'if ngx.null then
 ngx.say("true")
 end'
+```
 
 
 所以，要谨记，只有 nil 和 false 是假值。如果你遗漏了这一点，就很容易踩坑，比如你在使用 lua-resty-redis 的时候，做了下面这个判断：
 
+```text
 local res, err = red:get("dog")
 if not res then
     res = res + "test"
 end 
+```
 
 
 如果返回值 res 是 nil，就说明函数调用失败了；如果 res 是 ngx.null，就说明 redis 中不存在 dog 这个key。那么，在 dog 这个 key 不存在的情况下，这段代码就 500 崩溃了。
@@ -136,18 +154,22 @@ cdata:NULL
 
 第二个坑是cdata:NULL。当你通过 LuaJIT FFI 接口去调用 C 函数，而这个函数返回一个 NULL 指针，那么你就会遇到另外一种空值，即cdata:NULL 。
 
+```bash
 $ resty -e 'local ffi = require "ffi"
 local cdata_null = ffi.new("void*", nil)
 if cdata_null then
     ngx.say("true")
 end'
+```
 
 
 和 ngx.null 一样，cdata:NULL 也是真值。但更让人匪夷所思的是，下面这段代码，会打印出 true，也就是说cdata:NULL 是和 nil 相等的：
 
+```bash
 $ resty -e 'local ffi = require "ffi"
 local cdata_null = ffi.new("void*", nil)
 ngx.say(cdata_null == nil)'
+```
 
 
 那么我们应该如何处理 ngx.null 和 cdata:NULL 呢？显然，让应用层来关心这些闹心事儿是不现实的，最好是做一个二层封装，不要让调用者知道这些细节即可。
@@ -156,10 +178,12 @@ cjson.null
 
 最后，我们再来看下 cjson 中出现的空值。cjson 库会把 json 中的 NULL，解码为 Lua 的 lightuserdata，并用 cjson.null 来表示：
 
+```bash
 $ resty -e 'local cjson = require "cjson"
 local data = cjson.encode(nil)
 local decode_null = cjson.decode(data)
 ngx.say(decode_null == cjson.null)'
+```
 
 
 Lua 中的 nil，被 json encode 和 decode 一圈儿之后，就变成了 cjson.null。你可以想得到，它引入的原因和 ngx.null 是一样的，因为 nil 无法在 table 中作为 value。

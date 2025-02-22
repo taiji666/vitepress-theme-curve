@@ -1,10 +1,12 @@
 ---
 title: 19闭包：FnOnce、FnMut和Fn，为什么有这么多类型？
-date: 1739706057.3843255
+date: 2025-02-22
 categories: [陈天·Rust编程第一课]
 ---
+```text
                             19 闭包：FnOnce、FnMut和Fn，为什么有这么多类型？
                             你好，我是陈天。
+```
 
 在现代编程语言中，闭包是一个很重要的工具，可以让我们很方便地以函数式编程的方式来撰写代码。因为闭包可以作为参数传递给函数，可以作为返回值被函数返回，也可以为它实现某个 trait，使其能表现出其他行为，而不仅仅是作为函数被调用。
 
@@ -25,19 +27,23 @@ categories: [陈天·Rust编程第一课]
 
 之前的课程中，多次见到了创建新线程的 thread::spawn，它的参数就是一个闭包：
 
+```html
 pub fn spawn<F, T>(f: F) -> JoinHandle<T> 
 where
     F: FnOnce() -> T,
     F: Send + 'static,
     T: Send + 'static,
+```
 
 
 仔细看这个接口：
 
 
+```text
 F: FnOnce() → T，表明 F 是一个接受 0 个参数、返回 T 的闭包。FnOnce 我们稍后再说。
 F: Send + ‘static，说明闭包 F 这个数据结构，需要静态生命周期或者拥有所有权，并且它还能被发送给另一个线程。
 T: Send + ‘static，说明闭包 F 返回的数据结构 T，需要静态生命周期或者拥有所有权，并且它还能被发送给另一个线程。
+```
 
 
 1 和 3 都很好理解，2 就有些费解了。一个闭包，它不就是一段代码 + 被捕获的变量么？需要静态生命周期或者拥有所有权是什么意思？
@@ -48,15 +54,21 @@ T: Send + ‘static，说明闭包 F 返回的数据结构 T，需要静态生�
 
 use std::thread;
 
+```javascript
 fn main() {
     let s = String::from("hello world");
+```
 
+```javascript
     let handle = thread::spawn(move || {
         println!("moved: {:?}", s);
     });
+```
 
+```text
     handle.join().unwrap();
 }
+```
 
 
 但你有没有好奇过，加 move 和不加 move，这两种闭包有什么本质上的不同？闭包究竟是一种什么样的数据类型，让编译器可以判断它是否满足 Send + ‘static 呢？我们从闭包的本质下手来尝试回答这两个问题。
@@ -75,6 +87,7 @@ A closure expression produces a closure value with a unique, anonymous type that
 
 为了搞明白这一点，我们得写段代码探索一下，建议你跟着敲一遍认真思考（代码）：
 
+```cpp
 use std::{collections::HashMap, mem::size_of_val};
 fn main() {
     // 长度为 0
@@ -96,7 +109,9 @@ fn main() {
         let name3 = String::from("lindsey");
         println!("hello: {}, {:?}, {:?}", x, name2, name3);
     };
+```
 
+```text
 		println!(
         "c1: {}, c2: {}, c3: {}, c4: {}, c5: {}, main: {}",
         size_of_val(&c1),
@@ -107,16 +122,19 @@ fn main() {
         size_of_val(&main),
     )
 }
+```
 
 
 分别生成了 5 个闭包：
 
 
+```text
 c1 没有参数，也没捕获任何变量，从代码输出可以看到，c1 长度为 0；
 c2 有一个 i32 作为参数，没有捕获任何变量，长度也为 0，可以看出参数跟闭包的大小无关；
 c3 捕获了一个对变量 name 的引用，这个引用是 &String，长度为 8。而 c3 的长度也是 8；
 c4 捕获了变量 name1 和 table，由于用了 move，它们的所有权移动到了 c4 中。c4 长度是 72，恰好等于 String 的 24 字节，加上 HashMap 的 48 字节。
 c5 捕获了 name2，name2 的所有权移动到了 c5，虽然 c5 有局部变量，但它的大小和局部变量也无关，c5 的大小等于 String 的 24 字节。
+```
 
 
 学到这里，前面的第一个问题就解决了，可以看到，不带 move 时，闭包捕获的是对应自由变量的引用；带 move 时，对应自由变量的所有权会被移动到闭包结构中。
@@ -133,10 +151,12 @@ c5 捕获了 name2，name2 的所有权移动到了 c5，虽然 c5 有局部变�
 
 而 c4 捕获的 name 和 table，内存结构和下面的结构体一模一样：
 
+```css
 struct Closure4 {
     name: String,  // (ptr|cap|len)=24字节
     table: HashMap<&str, &str> // (RandomState(16)|mask|ctrl|left|len)=48字节
 }
+```
 
 
 不过，对于 closure 类型来说，编译器知道像函数一样调用闭包 c4() 是合法的，并且知道执行 c4() 时，代码应该跳转到什么地址来执行。在执行过程中，如果遇到 name、table，可以从自己的数据结构中获取。
@@ -148,10 +168,12 @@ let c4 = move || println!("hello: {:?}, {}", table, name1);
 
 其数据的位置是相反的，类似于：
 
+```css
 struct Closure4 {
     table: HashMap<&str, &str> // (RandomState(16)|mask|ctrl|left|len)=48字节
     name: String,  // (ptr|cap|len)=24字节
 }
+```
 
 
 从 gdb 中也可以看到同样的结果：-
@@ -185,8 +207,10 @@ Kotlin 运行超时，Swift 很慢，Rust 的性能却和使用命令式编程�
 在其他语言中，闭包变量因为多重引用导致生命周期不明确，但 Rust 从一开始就消灭了这个问题：
 
 
+```text
 如果不使用 move 转移所有权，闭包会引用上下文中的变量，这个引用受借用规则的约束，所以只要编译通过，那么闭包对变量的引用就不会超过变量的生命周期，没有内存安全问题。
 如果使用 move 转移所有权，上下文中的变量在转移后就无法访问，闭包完全接管这些变量，它们的生命周期和闭包一致，所以也不会有内存安全问题。
+```
 
 
 而 Rust 为每个闭包生成一个新的类型，又使得调用闭包时可以直接和代码对应，省去了使用函数指针再转一道手的额外消耗。
@@ -203,10 +227,12 @@ FnOnce
 
 先来看 FnOnce。它的定义如下：
 
+```html
 pub trait FnOnce<Args> {
     type Output;
     extern "rust-call" fn call_once(self, args: Args) -> Self::Output;
 }
+```
 
 
 FnOnce 有一个关联类型 Output，显然，它是闭包返回值的类型；还有一个方法 call_once，要注意的是 call_once 第一个参数是 self，它会转移 self 的所有权到 call_once 函数中。
@@ -217,64 +243,86 @@ FnOnce 有一个关联类型 Output，显然，它是闭包返回值的类型；
 
 看一个隐式的 FnOnce 的例子：
 
+```javascript
 fn main() {
     let name = String::from("Tyr");
     // 这个闭包啥也不干，只是把捕获的参数返回去
     let c = move |greeting: String| (greeting, name);
+```
 
     let result = c("hello".to_string());
 
     println!("result: {:?}", result);
 
+```javascript
     // 无法再次调用
     let result = c("hi".to_string());
 }
+```
 
 
 这个闭包 c，啥也没做，只是把捕获的参数返回。就像一个结构体里，某个字段被转移走之后，就不能再访问一样，闭包内部的数据一旦被转移，这个闭包就不完整了，也就无法再次使用，所以它是一个 FnOnce 的闭包。
 
 如果一个闭包并不转移自己的内部数据，那么它就不是 FnOnce，然而，一旦它被当做 FnOnce 调用，自己会被转移到 call_once 函数的作用域中，之后就无法再次调用了，我们看个例子（代码）：
 
+```javascript
 fn main() {
     let name = String::from("Tyr");
+```
 
+```javascript
     // 这个闭包会 clone 内部的数据返回，所以它不是 FnOnce
     let c = move |greeting: String| (greeting, name.clone());
+```
 
     // 所以 c1 可以被调用多次
 
+```text
     println!("c1 call once: {:?}", c("qiao".into()));
     println!("c1 call twice: {:?}", c("bonjour".into()));
+```
 
+```text
     // 然而一旦它被当成 FnOnce 被调用，就无法被再次调用
     println!("result: {:?}", call_once("hi".into(), c));
+```
 
+```javascript
     // 无法再次调用
     // let result = c("hi".to_string());
+```
 
+```text
     // Fn 也可以被当成 FnOnce 调用，只要接口一致就可以
     println!("result: {:?}", call_once("hola".into(), not_closure));
 }
+```
 
+```text
 fn call_once(arg: String, c: impl FnOnce(String) -> (String, String)) -> (String, String) {
     c(arg)
 }
+```
 
+```text
 fn not_closure(arg: String) -> (String, String) {
     (arg, "Rosie".into())
 }
+```
 
 
 FnMut
 
 理解了 FnOnce，我们再来看 FnMut，它的定义如下：
 
+```html
 pub trait FnMut<Args>: FnOnce<Args> {
     extern "rust-call" fn call_mut(
         &mut self, 
         args: Args
     ) -> Self::Output;
 }
+```
 
 
 首先，FnMut “继承”了 FnOnce，或者说 FnOnce 是 FnMut 的 super trait。所以FnMut也拥有 Output 这个关联类型和 call_once 这个方法。此外，它还有一个 call_mut() 方法。注意 call_mut() 传入 &mut self，它不移动 self，所以 FnMut 可以被多次调用。
@@ -283,41 +331,57 @@ pub trait FnMut<Args>: FnOnce<Args> {
 
 如果你理解了前面讲的闭包的内存组织结构，那么 FnMut 就不难理解，就像结构体如果想改变数据需要用 let mut 声明一样，如果你想改变闭包捕获的数据结构，那么就需要 FnMut。我们看个例子（代码）：
 
+```cpp
 fn main() {
     let mut name = String::from("hello");
     let mut name1 = String::from("hola");
+```
 
+```text
     // 捕获 &mut name
     let mut c = || {
         name.push_str(" Tyr");
         println!("c: {}", name);
     };
+```
 
+```text
     // 捕获 mut name1，注意 name1 需要声明成 mut
     let mut c1 = move || {
         name1.push_str("!");
         println!("c1: {}", name1);
     };
+```
 
+```text
     c();
     c1();
+```
 
+```text
     call_mut(&mut c);
     call_mut(&mut c1);
+```
 
+```text
     call_once(c);
     call_once(c1);
 }
+```
 
+```text
 // 在作为参数时，FnMut 也要显式地使用 mut，或者 &mut
 fn call_mut(c: &mut impl FnMut()) {
     c();
 }
+```
 
+```text
 // 想想看，为啥 call_once 不需要 mut？
 fn call_once(c: impl FnOnce()) {
     c();
 }
+```
 
 
 在声明的闭包 c 和 c1 里，我们修改了捕获的 name 和 name1。不同的是 name 使用了引用，而 name1 移动了所有权，这两种情况和其它代码一样，也需要遵循所有权和借用有关的规则。所以，如果在闭包 c 里借用了 name，你就不能把 name 移动给另一个闭包 c1。
@@ -328,46 +392,66 @@ Fn
 
 最后我们来看看 Fn trait。它的定义如下：
 
+```html
 pub trait Fn<Args>: FnMut<Args> {
     extern "rust-call" fn call(&self, args: Args) -> Self::Output;
 }
+```
 
 
 可以看到，它“继承”了 FnMut，或者说 FnMut 是 Fn 的 super trait。这也就意味着任何需要 FnOnce 或者 FnMut 的场合，都可以传入满足 Fn 的闭包。我们继续看例子（代码）：
 
+```javascript
 fn main() {
     let v = vec![0u8; 1024];
     let v1 = vec![0u8; 1023];
+```
 
+```text
     // Fn，不移动所有权
     let mut c = |x: u64| v.len() as u64 * x;
     // Fn，移动所有权
     let mut c1 = move |x: u64| v1.len() as u64 * x;
+```
 
+```text
     println!("direct call: {}", c(2));
     println!("direct call: {}", c1(2));
+```
 
+```text
     println!("call: {}", call(3, &c));
     println!("call: {}", call(3, &c1));
+```
 
+```text
     println!("call_mut: {}", call_mut(4, &mut c));
     println!("call_mut: {}", call_mut(4, &mut c1));
+```
 
+```text
     println!("call_once: {}", call_once(5, c));
     println!("call_once: {}", call_once(5, c1));
 }
+```
 
+```css
 fn call(arg: u64, c: &impl Fn(u64) -> u64) -> u64 {
     c(arg)
 }
+```
 
+```css
 fn call_mut(arg: u64, c: &mut impl FnMut(u64) -> u64) -> u64 {
     c(arg)
 }
+```
 
+```css
 fn call_once(arg: u64, c: impl FnOnce(u64) -> u64) -> u64 {
     c(arg)
 }
+```
 
 
 闭包的使用场景
@@ -376,6 +460,7 @@ fn call_once(arg: u64, c: impl FnOnce(u64) -> u64) -> u64 {
 
 thread::spawn 自不必说，我们熟悉的 Iterator trait 里面大部分函数都接受一个闭包，比如 map：
 
+```cpp
 fn map<B, F>(self, f: F) -> Map<Self, F>
 where
 		Self: Sized,
@@ -383,6 +468,7 @@ where
 {
 		Map::new(self, f)
 }
+```
 
 
 可以看到，Iterator 的 map() 方法接受一个 FnMut，它的参数是 Self::Item，返回值是没有约束的泛型参数 B。Self::Item 是 Iterator::next() 方法吐出来的数据，被 map 之后，可以得到另一个结果。
@@ -391,31 +477,40 @@ where
 
 use std::ops::Mul;
 
+```javascript
 fn main() {
     let c1 = curry(5);
     println!("5 multiply 2 is: {}", c1(2));
+```
 
+```javascript
     let adder2 = curry(3.14);
     println!("pi multiply 4^2 is: {}", adder2(4. * 4.));
 }
+```
 
+```html
 fn curry<T>(x: T) -> impl Fn(T) -> T
 where
     T: Mul<Output = T> + Copy,
 {
     move |y| x * y
 }
+```
 
 
 最后，闭包还有一种并不少见，但可能不太容易理解的用法：为它实现某个 trait，使其也能表现出其他行为，而不仅仅是作为函数被调用。比如说有些接口既可以传入一个结构体，又可以传入一个函数或者闭包。
 
 我们看一个 tonic（Rust 下的 gRPC 库）的例子：
 
+```cpp
 pub trait Interceptor {
     /// Intercept a request before it is sent, optionally cancelling it.
     fn call(&mut self, request: crate::Request<()>) -> Result<crate::Request<()>, Status>;
 }
+```
 
+```cpp
 impl<F> Interceptor for F
 where
     F: FnMut(crate::Request<()>) -> Result<crate::Request<()>, Status>,
@@ -424,6 +519,7 @@ where
         self(request)
     }
 }
+```
 
 
 在这个例子里，Interceptor 有一个 call 方法，它可以让 gRPC Request 被发送出去之前被修改，一般是添加各种头，比如 Authorization 头。
@@ -437,9 +533,11 @@ Rust 闭包的效率非常高。首先闭包捕获的变量，都储存在栈上
 Rust 支持三种不同的闭包 trait：FnOnce、FnMut 和 Fn。FnOnce 是 FnMut 的 super trait，而 FnMut 又是 Fn 的 super trait。从这些 trait 的接口可以看出，
 
 
+```text
 FnOnce 只能调用一次；
 FnMut 允许在执行时修改闭包的内部数据，可以执行多次；
 Fn 不允许修改闭包的内部数据，也可以执行多次。
+```
 
 
 总结一下三种闭包使用的情况以及它们之间的关系：
@@ -451,6 +549,7 @@ Fn 不允许修改闭包的内部数据，也可以执行多次。
 
 fn main() {
 
+```javascript
 let name = String::from("Tyr");
 let vec = vec!["Rust", "Elixir", "Javascript"];
 let v = &vec[..];
@@ -460,6 +559,7 @@ let c = move || {
     println!("v: {:?}, name: {:?}", v, name.clone());
 };
 c();
+```
 
 
 // 请问在这里，还能访问 name 么？为什么？
@@ -468,8 +568,10 @@ c();
 
 在讲到 FnMut 时，我们放了一段代码，在那段代码里，我问了一个问题：为啥 call_once 不需要 c 是 mut 呢？就像下面这样：
 
+```text
 // 想想看，为啥 call_once 不需要 mut？
 fn call_once(mut c: impl FnOnce()) {
+```
 
 c();
 
@@ -491,12 +593,14 @@ env: String,
 
 impl Executor for BashExecutor {
 
+```text
 fn execute(&self, cmd: &str) -> Result<String, &'static str> {
     Ok(format!(
         "fake bash execute: env: {}, cmd: {}",
         self.env, cmd
     ))
 }
+```
 
 }
 
@@ -507,15 +611,19 @@ fn main() {
 let env = "PATH=/usr/bin".to_string();
 
 
+```javascript
 let cmd = "cat /etc/passwd";
 let r1 = execute(cmd, BashExecutor { env: env.clone() });
 println!("{:?}", r1);
+```
 
 
+```javascript
 let r2 = execute(cmd, |cmd: &str| {
     Ok(format!("fake fish execute: env: {}, cmd: {}", env, cmd))
 });
 println!("{:?}", r2);
+```
 
 }
 
@@ -532,29 +640,38 @@ exec.execute(cmd)
 
 怎么理解 FnOnce 的 Args 泛型参数呢？Args 又是怎么和 FnOnce 的约束，比如 FnOnce(String) 这样的参数匹配呢？感兴趣的同学可以看下面的例子，它（不完全）模拟了 FnOnce 中闭包的使用（代码）：
 
+```text
 struct ClosureOnce<Captured, Args, Output> {
     // 捕获的数据
     captured: Captured,
     // closure 的执行代码
     func: fn(Args, Captured) -> Output,
 }
+```
 
+```css
 impl<Captured, Args, Output> ClosureOnce<Captured, Args, Output> {
     // 模拟 FnOnce 的 call_once，直接消耗 self
     fn call_once(self, greeting: Args) -> Output {
         (self.func)(greeting, self.captured)
     }
 }
+```
 
+```text
 // 类似 greeting 闭包的函数体
 fn greeting_code1(args: (String,), captured: (String,)) -> (String, String) {
     (args.0, captured.0)
 }
+```
 
+```text
 fn greeting_code2(args: (String, String), captured: (String, u8)) -> (String, String, String, u8) {
     (args.0, args.1, captured.0, captured.1)
 }
+```
 
+```javascript
 fn main() {
     let name = "Tyr".into();
     // 模拟变量捕捉
@@ -562,20 +679,27 @@ fn main() {
         captured: (name,),
         func: greeting_code1,
     };
+```
 
+```text
     // 模拟闭包调用，这里和 FnOnce 不完全一样，传入的是一个 tuple 来匹配 Args 参数
     println!("{:?}", c.call_once(("hola".into(),)));
     // 调用一次后无法继续调用
     // println!("{:?}", clo.call_once("hola".into()));
+```
 
+```javascript
     // 更复杂一些的复杂的闭包
     let c1 = ClosureOnce {
         captured: ("Tyr".into(), 18),
         func: greeting_code2,
     };
+```
 
+```text
     println!("{:?}", c1.call_once(("hola".into(), "hallo".into())));
 }
+```
 
 
                         

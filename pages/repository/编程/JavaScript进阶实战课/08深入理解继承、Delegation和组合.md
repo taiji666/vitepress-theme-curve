@@ -1,9 +1,9 @@
 ---
 title: 08深入理解继承、Delegation和组合
-date: 1739706057.5979395
+date: 2025-02-22
 categories: [JavaScript进阶实战课]
 ---
-                            08 深入理解继承、Delegation和组合
+# 08 深入理解继承、Delegation和组合
                             你好，我是石川。
 
 关于面向对象编程，最著名的一本书就数GoF（Gang of Four）写的《设计模式：可复用面向对象软件的基础》了。这本书里一共提供了23种不同的设计模式，不过今天我们不会去展开了解这些细节，而是会把重点放在其中一个面向对象的核心思想上，也就是组合优于继承。
@@ -24,8 +24,7 @@ categories: [JavaScript进阶实战课]
 
 如何通过继承多态重用？
 
-实际上，从ES6开始，我们就可以通过extends的方式来做继承。具体如下所示：
-
+```javascript
 class Widget {
   appName = "核心微件";
   getName () {
@@ -42,15 +41,14 @@ console.log(calendar.getName()); // 返回 "核心微件"
 calendar.appName = "日历应用"
 console.log(typeof calendar.getName); // 返回 function
 console.log(calendar.getName()); // 返回 “日历应用”
+```
 
-
-接着来看多态。从ES6开始，我们可以通过super在子类构建者里面调用父类的构建者，并且覆盖父类里的属性。可以看到在下面的例子里，我们是通过super将Calendar的appName属性从“核心微件”改成了“日历应用”。
-
+```javascript
 class Widget {
   constructor() {
     this.appName = "核心微件";
   }
-  
+
   getName () {
     return this.appName;
   }
@@ -69,16 +67,15 @@ console.log(calendar.getName()); // 返回 "日历应用"
 console.log(typeof calendar.getName); // 返回 function
 console.log(calendar.getName()); // 返回 “日历应用”
 
-
-在一些实际的例子，如React这样的三方库里，我们也经常可以看到一些继承的例子，比如我们可以通过继承React.Component来创建一个WelcomeMessage的子类。
-
+```
+```javascript
 class WelcomeMessage extends React.Component {
   render() {
     return <h1>Hello, {this.props.name}</h1>;
   }
 }
 
-
+```
 授权
 
 说完了继承，我们再来看授权这个方法。
@@ -91,8 +88,7 @@ class WelcomeMessage extends React.Component {
 
 在前面的例子中，结合我们在第1讲里提到的基于原型链的继承，我们会发现使用JavaScript无论是通过函数构建也好，还是加了语法糖的类也好，来模拟一般的面向对象语言，比如Java的类和继承，对于有些开发者来说是比较反直觉的。在使用的时候需要大量的思想转换，才能把JavaScript的底层逻辑转换成实际呈现出来的实现。
 
-那么有没有一种方式可以让代码更直观呢？这种方式其实就是通过原型本身来做授权会更符合直觉。从ES5开始，JavaScript就支持了Object.create()的方法。下面我们来看一个例子：
-
+```javascript
 var Widget = {
   setCity : function(City) {this.city = City; },
   outputCity : function() {return this.city;}
@@ -118,11 +114,10 @@ weatherApp2.setWeather("南京","28度");
 weatherApp1.outputWeather(); // 北京, 26度
 weatherApp2.outputWeather(); // 南京, 28度
 
-
+```
 可见，我们创建的Weather天气预报这个对象，授权给了Widget，让Widget在得到授权的情况下，帮助Weather来设定城市和返回城市。Widget对象在这里更像是一个平台，它在得到Weather的授权后为Weather赋能。而Weather对象可以在这个基础上，专注于实现自己的属性和方法，并且产出weatherApp1和weatherApp2的实例。
 
-当然也有开发者认为class的方式没有什么反直觉的，那授权同样可以通过class来实现。比如我们如果想在上一讲提到过的集合（Set）和字典（Map）的基础上，加上计数的功能，可以通过继承Set来实现。但是我们也可以反之，在把部分功能授权给Map的基础上，自己专注实现一些类似Set的API接口。
-
+```javascript
 class SetLikeMap {
     // 初始化字典
     constructor() { this.map = new Map(); }
@@ -137,7 +132,7 @@ class SetLikeMap {
     values() { return this.map.values(); }
     entries() { return this.map.entries(); }
 }
-
+```
 
 组合
 
@@ -149,8 +144,7 @@ class SetLikeMap {
 
 在JavaScript中，函数有自带的apply和call功能。我们可以通过apply或call来“借用”一个功能。这种方式，也叫隐性混入（Implicit mixin）。比如在数组中，有一个原生的slice的方法，我们就可以通过call来借用这个原生方法。
 
-如下代码示例，我们就是通过借用这个功能，把函数的实参当做数组来slice。
-
+```javascript
 function argumentSlice() {
     var args = [].slice.call(arguments, 1, 3);
     return args;
@@ -158,7 +152,7 @@ function argumentSlice() {
 // example
 argumentSlice(1, 2, 3, 4, 5, 6); // returns [2,3]
 
-
+```
 如何通过拷贝赋予重用？
 
 除了“借力”以外，我们还能通过什么组合方式来替代继承呢？这就要说到“拷贝”了。这个方法顾名思义，就是把别人的属性和方法拷贝到自己的身上。这种方式也叫显性混入（Explicit mixin）。
@@ -167,8 +161,7 @@ argumentSlice(1, 2, 3, 4, 5, 6); // returns [2,3]
 
 那么下面，我们就先看看在ES6之后，JavaScript是如何名正言顺地来做拷贝的。
 
-首先，通过对象自带的assign()，我们可以把Widget的属性赋予calendar，当然在calendar里，我们也可以保存自己本身的属性。和借用一样，借用和赋予都不会产生原型链。如以下代码所示：
-
+```javascript
 var widget = {
   appName : "核心微件"
 }
@@ -181,14 +174,13 @@ console.log(calendar.hasOwnProperty("appName")); // 返回 true
 console.log(calendar.appName); // 返回 “核心微件”
 console.log(calendar.hasOwnProperty("appVersion")); // 返回 true
 console.log(calendar.appVersion); // 返回 “1.0.9”
-
+```
 
 好，接着我们再来看看在ES6之前，人们是怎么通过“抄袭”来拷贝的。
 
 这里实际上分为“浅度拷贝”和“深度拷贝”两个概念。“浅度拷贝”类似于上面提到的赋予assign这个方法，它所做的就是遍历父类里面的属性，然后拷贝到子类。我们可以通过JavaScript中专有的for in循环，来遍历对象中的属性。
 
-细心的同学可能会发现，我们在第2讲中说到用拷贝来做到不可变时，就了解过通过延展操作符来实现浅拷贝的方法了。
-
+```javascript
 // 数组浅拷贝
 var a = [ 1, 2 ];
 var b = [ ...a ];
@@ -206,9 +198,8 @@ p.y = 3;
 o.y;  // 2
 p.y;  // 3
 
-
-而在延展操作符出现之前，人们大概可以通过这样一个for in循环做到类似的浅拷贝。
-
+```
+```javascript
 function shallowCopy(parent, child) {
   var i;
   child = child || {};
@@ -219,17 +210,15 @@ function shallowCopy(parent, child) {
   }
   return child;
 }
-
+```
 
 至于深度拷贝，是指当一个对象里面存在嵌入的对象就会深入遍历。但这样会引起一个问题：如果这个对象有多层嵌套的话，是每一层都要遍历吗？究竟多深算深？还有就是如果一个对象也引用了其它对象的属性，我们要不要也拷贝过来？
 
-所以相对于深度拷贝，浅度拷贝的问题会少一些。但是在第2讲的留言互动区，我们也说过，如果我们想要保证一个对象的深度不可变，还是需要深度拷贝的。深度拷贝的一个相对简单的实现方案是用JSON.stringify。当然这个方案的前提是这个对象必须是JSON-safe的。
-
+```javascript
 function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
+```
 
-
-同时，在第2讲的留言区中，也有同学提到过另外一种递归的实现方式，所以我们也大致可以通过这样一个递归来实现：
-
+```javascript
 function deepCopy(parent, child) {
   var i,
   toStr = Object.prototype.toString,
@@ -247,12 +236,11 @@ function deepCopy(parent, child) {
   }
   return child;
 }
-
+```
 
 如何通过组合做到重用？
 
-上面我们说的无论是借用、赋予，深度还是浅度拷贝，都是一对一的关系。最后我们再来看看，如何通过ES6当中的assign来做到组合混入，也就是说把几个对象的属性都混入在一起。其实方法很简单，以下是参考：
-
+```javascript
 var touchScreen = {
   hasTouchScreen : () => true
 };
@@ -272,11 +260,10 @@ console.log(
   hasSpeaker: ${ Phone.hasPecans() }
  );
 
-
+```
 React中的组合优于继承
 
-在React当中，我们也可以看到组合优于继承的无处不在，并且它同样体现在我们前面讲过的两个方面，一个是“团队内部的合作”，另一个是“个体与平台合作”。下面，我们先看看“团队内部的合作”的例子，在下面的例子里，WelcomeDialog就是嵌入在FancyBorder中的一个团队成员。
-
+```javascript
 function FancyBorder(props) {
   return (
     <div className={'FancyBorder FancyBorder-' + props.color}>
@@ -297,10 +284,9 @@ function WelcomeDialog() {
     </FancyBorder>
   );
 }
+```
 
-
-另外，我们也可以看到“个体与平台合作”的影子。在这里，WelcomeDialog是一个“专业”的Dialog，它授权给Dialog这个平台，借助平台的功能，实现自己的title和message。这里就是用到了组合。
-
+```javascript
 function Dialog(props) {
   return (
     <FancyBorder color="blue">
@@ -321,7 +307,7 @@ function WelcomeDialog() {
   );
 }
 
-
+```
 总结
 
 这节课，我们了解了通过JavaScript做到代码复用的几种核心思想和方法，从传统的继承，到JavaScript特色的授权以及组合等方式都有分析。虽然我说授权和组合优于继承，但实际上它们之间的关系不是非黑即白的。
@@ -338,6 +324,8 @@ function WelcomeDialog() {
 
 欢迎在留言区分享你的答案、交流学习心得或者提出问题，如果觉得有收获，也欢迎你把今天的内容分享给更多的朋友。我们下节课见！
 
-                        
-                        
-                            
+
+```text
+​                        
+​                            
+```
